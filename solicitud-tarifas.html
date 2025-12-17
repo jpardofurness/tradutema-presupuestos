@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
     <title>Tradutema - Solicitud de Tarifas</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -22,645 +20,152 @@
             --text-primary: #1a1a2e;
             --text-secondary: #6b7280;
             --border-color: #e5e7eb;
-            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
             --shadow-md: 0 4px 12px rgba(30,58,95,0.12);
             --shadow-lg: 0 10px 30px rgba(30,58,95,0.15);
             --radius-sm: 8px;
             --radius-md: 12px;
             --radius-lg: 16px;
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            line-height: 1.5;
-        }
-
-        /* Header */
-        .header {
-            background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%);
-            color: white;
-            padding: 20px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: var(--shadow-lg);
-        }
-
-        .header-content {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .logo {
-            font-family: 'Space Mono', monospace;
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--accent-gold);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-
-        .subtitle {
-            font-size: 0.85rem;
-            opacity: 0.85;
-            margin-top: 4px;
-            font-weight: 400;
-        }
-
-        /* Main Content */
-        .main {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border-radius: var(--radius-lg);
-            padding: 20px;
-            margin-bottom: 16px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
-        }
-
-        .card-title {
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--tradutema-blue);
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .card-title::before {
-            content: '';
-            width: 4px;
-            height: 16px;
-            background: var(--accent-gold);
-            border-radius: 2px;
-        }
-
-        /* Form Elements */
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.5; }
+        
+        .header { background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%); color: white; padding: 20px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-lg); }
+        .header-content { max-width: 600px; margin: 0 auto; }
+        .logo { font-family: 'Space Mono', monospace; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 36px; height: 36px; background: var(--accent-gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .subtitle { font-size: 0.85rem; opacity: 0.85; margin-top: 4px; }
+        
+        .main { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); }
+        .card-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--tradutema-blue); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .card-title::before { content: ''; width: 4px; height: 16px; background: var(--accent-gold); border-radius: 2px; }
+        
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
         select, input[type="text"], input[type="number"], input[type="date"], input[type="time"], textarea {
-            width: 100%;
-            padding: 14px 16px;
-            font-size: 1rem;
-            font-family: inherit;
-            border: 2px solid var(--border-color);
-            border-radius: var(--radius-md);
-            background: var(--bg-card);
-            color: var(--text-primary);
-            transition: all 0.2s ease;
-            -webkit-appearance: none;
-        }
-
-        select {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            background-size: 20px;
-            padding-right: 44px;
-        }
-
-        select:focus, input:focus, textarea:focus {
-            outline: none;
-            border-color: var(--tradutema-blue);
-            box-shadow: 0 0 0 3px rgba(30,58,95,0.1);
-        }
-
-        textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        /* Language Selector Row */
-        .language-row {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .language-row .form-group {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        .arrow-icon {
-            font-size: 1.5rem;
-            color: var(--tradutema-blue);
-            margin-top: 24px;
-        }
-
-        /* Deadline Toggle */
-        .deadline-toggle {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-
-        .toggle-btn {
-            flex: 1;
-            padding: 14px;
-            border: 2px solid var(--border-color);
-            background: var(--bg-card);
-            border-radius: var(--radius-md);
-            font-family: inherit;
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .toggle-btn.active {
-            border-color: var(--tradutema-blue);
-            background: var(--tradutema-blue);
-            color: white;
-        }
-
-        .deadline-fields {
-            display: none;
-            gap: 12px;
-        }
-
-        .deadline-fields.visible {
-            display: flex;
-        }
-
-        .deadline-fields .form-group {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        /* Providers List */
-        .providers-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .provider-item {
-            display: flex;
-            align-items: center;
-            padding: 14px;
-            border: 2px solid var(--border-color);
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: var(--bg-card);
-        }
-
-        .provider-item:hover {
-            border-color: var(--tradutema-blue-light);
-            background: rgba(30,58,95,0.02);
-        }
-
-        .provider-item.selected {
-            border-color: var(--tradutema-blue);
-            background: rgba(30,58,95,0.05);
-        }
-
-        .provider-checkbox {
-            width: 24px;
-            height: 24px;
-            border: 2px solid var(--border-color);
-            border-radius: 6px;
-            margin-right: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            transition: all 0.2s ease;
-        }
-
-        .provider-item.selected .provider-checkbox {
-            background: var(--tradutema-blue);
-            border-color: var(--tradutema-blue);
-        }
-
-        .provider-checkbox::after {
-            content: '✓';
-            color: white;
-            font-weight: 700;
-            font-size: 14px;
-            opacity: 0;
-            transform: scale(0);
-            transition: all 0.2s ease;
-        }
-
-        .provider-item.selected .provider-checkbox::after {
-            opacity: 1;
-            transform: scale(1);
-        }
-
-        .provider-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .provider-name {
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 2px;
-        }
-
-        .provider-email {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .provider-rate {
-            text-align: right;
-            flex-shrink: 0;
-            margin-left: 10px;
-        }
-
-        .provider-rate-value {
-            font-family: 'Space Mono', monospace;
-            font-weight: 700;
-            color: var(--tradutema-blue);
-            font-size: 0.95rem;
-        }
-
-        .provider-rate-label {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        .no-providers {
-            text-align: center;
-            padding: 30px;
-            color: var(--text-secondary);
-        }
-
-        .no-providers-icon {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            opacity: 0.5;
-        }
-
-        /* Select All */
-        .select-all-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .select-all-btn {
-            font-size: 0.85rem;
-            color: var(--tradutema-blue);
-            background: none;
-            border: none;
-            font-family: inherit;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 8px 12px;
-            border-radius: var(--radius-sm);
-            transition: background 0.2s;
-        }
-
-        .select-all-btn:hover {
-            background: rgba(30,58,95,0.08);
-        }
-
-        .selected-count {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        /* Checkbox Toggle */
-        .checkbox-row {
-            display: flex;
-            align-items: center;
-            padding: 12px 0;
-        }
-
-        .custom-checkbox {
-            position: relative;
-            width: 52px;
-            height: 28px;
-            background: var(--border-color);
-            border-radius: 14px;
-            cursor: pointer;
-            transition: background 0.3s;
-            margin-right: 12px;
-            flex-shrink: 0;
-        }
-
-        .custom-checkbox.checked {
-            background: var(--tradutema-blue);
-        }
-
-        .custom-checkbox::after {
-            content: '';
-            position: absolute;
-            top: 3px;
-            left: 3px;
-            width: 22px;
-            height: 22px;
-            background: white;
-            border-radius: 50%;
-            box-shadow: var(--shadow-sm);
-            transition: transform 0.3s;
-        }
-
-        .custom-checkbox.checked::after {
-            transform: translateX(24px);
-        }
-
-        .checkbox-label {
-            font-size: 0.9rem;
-            color: var(--text-primary);
-        }
-
-        /* Buttons */
-        .btn-primary {
-            width: 100%;
-            padding: 18px 24px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            font-family: inherit;
-            color: white;
-            background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%);
-            border: none;
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-secondary {
-            width: 100%;
-            padding: 14px 20px;
-            font-size: 1rem;
-            font-weight: 500;
-            font-family: inherit;
-            color: var(--tradutema-blue);
-            background: white;
-            border: 2px solid var(--tradutema-blue);
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-top: 10px;
-        }
-
-        .btn-secondary:hover {
-            background: rgba(30,58,95,0.05);
-        }
-
-        /* Status Messages */
-        .status-message {
-            padding: 14px 16px;
-            border-radius: var(--radius-md);
-            margin-bottom: 16px;
-            font-size: 0.9rem;
-            display: none;
-        }
-
-        .status-message.visible {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-message.success {
-            background: rgba(46,204,113,0.1);
-            color: #1e8449;
-            border: 1px solid rgba(46,204,113,0.3);
-        }
-
-        .status-message.error {
-            background: rgba(231,76,60,0.1);
-            color: #c0392b;
-            border: 1px solid rgba(231,76,60,0.3);
-        }
-
-        .status-message.loading {
-            background: rgba(30,58,95,0.08);
-            color: var(--tradutema-blue);
-            border: 1px solid rgba(30,58,95,0.2);
-        }
-
-        /* Preview Modal */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            display: none;
-            align-items: flex-end;
-            justify-content: center;
-        }
-
-        .modal-overlay.visible {
-            display: flex;
-        }
-
-        .modal {
-            background: white;
-            width: 100%;
-            max-width: 600px;
-            max-height: 85vh;
-            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-            overflow: hidden;
-            animation: slideUp 0.3s ease;
-        }
-
-        @keyframes slideUp {
-            from {
-                transform: translateY(100%);
-            }
-            to {
-                transform: translateY(0);
-            }
-        }
-
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-        }
-
-        .modal-close {
-            width: 36px;
-            height: 36px;
-            border: none;
-            background: var(--bg-primary);
-            border-radius: 50%;
-            font-size: 1.2rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-body {
-            padding: 20px;
-            overflow-y: auto;
-            max-height: calc(85vh - 140px);
-        }
-
-        .modal-footer {
-            padding: 16px 20px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            gap: 10px;
-        }
-
-        .modal-footer button {
-            flex: 1;
-        }
-
-        .preview-content {
-            background: var(--bg-primary);
-            padding: 16px;
-            border-radius: var(--radius-md);
-            font-family: 'Space Mono', monospace;
-            font-size: 0.85rem;
-            white-space: pre-wrap;
-            line-height: 1.6;
-        }
-
-        .preview-recipient {
-            background: rgba(30,58,95,0.08);
-            padding: 10px 14px;
-            border-radius: var(--radius-sm);
-            margin-bottom: 12px;
-            font-size: 0.9rem;
-        }
-
-        .preview-recipient strong {
-            color: var(--tradutema-blue);
-        }
-
-        /* Loading Spinner */
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Config Section */
-        .config-section {
-            background: rgba(30,58,95,0.03);
-            border: 1px dashed var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-
-        .config-label {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .config-input {
-            font-family: 'Space Mono', monospace;
-            font-size: 0.85rem;
-        }
-
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 20px;
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-        }
-
-        /* Responsive */
+            width: 100%; padding: 14px 16px; font-size: 1rem; font-family: inherit;
+            border: 2px solid var(--border-color); border-radius: var(--radius-md);
+            background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;
+        }
+        select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 20px; padding-right: 44px; -webkit-appearance: none; }
+        select:focus, input:focus, textarea:focus { outline: none; border-color: var(--tradutema-blue); box-shadow: 0 0 0 3px rgba(30,58,95,0.1); }
+        textarea { min-height: 100px; resize: vertical; }
+        
+        .language-row { display: flex; gap: 12px; align-items: center; }
+        .language-row .form-group { flex: 1; margin-bottom: 0; }
+        .arrow-icon { font-size: 1.5rem; color: var(--tradutema-blue); margin-top: 24px; }
+        
+        .deadline-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+        .toggle-btn { flex: 1; padding: 14px; border: 2px solid var(--border-color); background: var(--bg-card); border-radius: var(--radius-md); font-family: inherit; font-size: 0.9rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+        .toggle-btn.active { border-color: var(--tradutema-blue); background: var(--tradutema-blue); color: white; }
+        .deadline-fields { display: none; gap: 12px; }
+        .deadline-fields.visible { display: flex; }
+        .deadline-fields .form-group { flex: 1; margin-bottom: 0; }
+        
+        .file-upload-area { border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg-primary); }
+        .file-upload-area:hover { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.03); }
+        .file-upload-area.has-files { border-color: var(--accent-green); background: rgba(46,204,113,0.05); }
+        .file-upload-icon { font-size: 2.5rem; margin-bottom: 8px; }
+        .file-upload-text { color: var(--text-secondary); font-size: 0.9rem; }
+        .file-upload-text strong { color: var(--tradutema-blue); }
+        .file-input { display: none; }
+        .file-list { margin-top: 12px; }
+        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: white; border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid var(--border-color); font-size: 0.9rem; }
+        .file-item-remove { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.2rem; padding: 4px 8px; }
+        
+        .providers-list { display: flex; flex-direction: column; gap: 10px; }
+        .provider-item { display: flex; align-items: center; padding: 14px; border: 2px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; background: var(--bg-card); }
+        .provider-item:hover { border-color: var(--tradutema-blue-light); }
+        .provider-item.selected { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.05); }
+        .provider-checkbox { width: 24px; height: 24px; border: 2px solid var(--border-color); border-radius: 6px; margin-right: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+        .provider-item.selected .provider-checkbox { background: var(--tradutema-blue); border-color: var(--tradutema-blue); }
+        .provider-checkbox::after { content: '✓'; color: white; font-weight: 700; font-size: 14px; opacity: 0; }
+        .provider-item.selected .provider-checkbox::after { opacity: 1; }
+        .provider-info { flex: 1; min-width: 0; }
+        .provider-name { font-weight: 600; color: var(--text-primary); }
+        .provider-email { font-size: 0.8rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
+        .provider-rate { text-align: right; margin-left: 10px; }
+        .provider-rate-value { font-family: 'Space Mono', monospace; font-weight: 700; color: var(--tradutema-blue); }
+        .provider-rate-label { font-size: 0.7rem; color: var(--text-secondary); }
+        .no-providers { text-align: center; padding: 30px; color: var(--text-secondary); }
+        .no-providers-icon { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.5; }
+        
+        .select-all-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
+        .select-all-btn { font-size: 0.85rem; color: var(--tradutema-blue); background: none; border: none; font-family: inherit; font-weight: 500; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); }
+        .select-all-btn:hover { background: rgba(30,58,95,0.08); }
+        .selected-count { font-size: 0.85rem; color: var(--text-secondary); }
+        
+        .checkbox-row { display: flex; align-items: center; padding: 12px 0; }
+        .custom-checkbox { position: relative; width: 52px; height: 28px; background: var(--border-color); border-radius: 14px; cursor: pointer; transition: background 0.3s; margin-right: 12px; flex-shrink: 0; }
+        .custom-checkbox.checked { background: var(--tradutema-blue); }
+        .custom-checkbox::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: transform 0.3s; }
+        .custom-checkbox.checked::after { transform: translateX(24px); }
+        .checkbox-label { font-size: 0.9rem; }
+        
+        .estimated-price { background: linear-gradient(135deg, rgba(30,58,95,0.08) 0%, rgba(212,168,83,0.15) 100%); border-radius: var(--radius-md); padding: 16px; margin-top: 12px; display: none; }
+        .estimated-price.visible { display: block; }
+        .estimated-price-label { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .estimated-price-value { font-family: 'Space Mono', monospace; font-size: 1.5rem; font-weight: 700; color: var(--tradutema-blue); }
+        
+        .btn-primary { width: 100%; padding: 18px 24px; font-size: 1.1rem; font-weight: 600; font-family: inherit; color: white; background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%); border: none; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; box-shadow: var(--shadow-md); display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { width: 100%; padding: 16px 20px; font-size: 1rem; font-weight: 600; font-family: inherit; color: var(--text-secondary); background: white; border: 2px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; }
+        .btn-secondary:hover { border-color: var(--tradutema-blue); color: var(--tradutema-blue); }
+        .btn-success { background: var(--accent-green); }
+        .btn-success:hover { background: #27ae60; transform: translateY(-2px); }
+        
+        .status-message { padding: 14px 16px; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 0.9rem; display: none; align-items: center; gap: 10px; }
+        .status-message.visible { display: flex; }
+        .status-message.success { background: rgba(46,204,113,0.1); color: #1e8449; border: 1px solid rgba(46,204,113,0.3); }
+        .status-message.error { background: rgba(231,76,60,0.1); color: #c0392b; border: 1px solid rgba(231,76,60,0.3); }
+        .status-message.loading { background: rgba(30,58,95,0.08); color: var(--tradutema-blue); border: 1px solid rgba(30,58,95,0.2); }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: flex-end; justify-content: center; }
+        .modal-overlay.visible { display: flex; }
+        .modal { background: white; width: 100%; max-width: 600px; max-height: 85vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; overflow: hidden; animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-weight: 600; font-size: 1.1rem; }
+        .modal-close { width: 36px; height: 36px; border: none; background: var(--bg-primary); border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-body { padding: 20px; overflow-y: auto; max-height: calc(85vh - 160px); }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; }
+        .modal-footer button { flex: 1; }
+        .preview-content { background: var(--bg-primary); padding: 16px; border-radius: var(--radius-md); font-family: 'Space Mono', monospace; font-size: 0.85rem; white-space: pre-wrap; line-height: 1.6; }
+        .preview-recipient { background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 0.9rem; }
+        .preview-recipient strong { color: var(--tradutema-blue); }
+        
+        .confirm-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .confirm-modal.visible { display: flex; }
+        .confirm-box { background: white; border-radius: var(--radius-lg); padding: 24px; max-width: 400px; width: 100%; text-align: center; animation: popIn 0.2s ease; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .confirm-icon { font-size: 3rem; margin-bottom: 16px; }
+        .confirm-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 8px; }
+        .confirm-text { color: var(--text-secondary); margin-bottom: 24px; }
+        .confirm-buttons { display: flex; gap: 12px; }
+        .confirm-buttons button { flex: 1; padding: 14px; }
+        
+        .success-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(46,204,113,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; color: white; }
+        .success-overlay.visible { display: flex; }
+        .success-checkmark { font-size: 5rem; margin-bottom: 20px; animation: bounceIn 0.5s ease; }
+        @keyframes bounceIn { 0% { transform: scale(0); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        .success-text { font-size: 1.5rem; font-weight: 600; }
+        .success-subtext { font-size: 1rem; opacity: 0.9; margin-top: 8px; }
+        
+        .config-section { background: rgba(30,58,95,0.03); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
+        .config-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .config-input { font-family: 'Space Mono', monospace; font-size: 0.85rem; }
+        
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.75rem; }
+        .footer a { color: var(--tradutema-blue); text-decoration: none; }
+        .version-info { font-family: 'Space Mono', monospace; margin-top: 4px; opacity: 0.7; }
+        
         @media (min-width: 600px) {
-            .main {
-                padding: 30px;
-            }
-            
-            .modal {
-                border-radius: var(--radius-lg);
-                margin: auto;
-                max-height: 80vh;
-            }
+            .main { padding: 30px; }
+            .modal { border-radius: var(--radius-lg); margin: auto; max-height: 80vh; }
         }
     </style>
 </head>
@@ -676,21 +181,14 @@
     </header>
 
     <main class="main">
-        <!-- Status Message -->
         <div id="statusMessage" class="status-message"></div>
 
-        <!-- API Configuration -->
         <div class="config-section" id="configSection">
             <div class="config-label">⚙️ Configuración API (una sola vez)</div>
-            <input type="text" id="apiUrl" class="config-input" 
-                   placeholder="Pega aquí la URL del Google Apps Script desplegado"
-                   value="">
-            <button class="btn-secondary" onclick="saveConfig()" style="margin-top: 10px;">
-                Guardar y Conectar
-            </button>
+            <input type="text" id="apiUrl" class="config-input" placeholder="Pega la URL del Apps Script (termina en /exec)">
+            <button class="btn-secondary" onclick="saveConfig()" style="margin-top: 10px;">Guardar y Conectar</button>
         </div>
 
-        <!-- Language Selection -->
         <div class="card">
             <div class="card-title">Combinación de idiomas</div>
             <div class="language-row">
@@ -710,16 +208,24 @@
             </div>
         </div>
 
-        <!-- Deadline -->
+        <div class="card">
+            <div class="card-title">Documentos a traducir</div>
+            <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('fileInput').click()">
+                <div class="file-upload-icon">📎</div>
+                <div class="file-upload-text">
+                    <strong>Toca para adjuntar archivos</strong><br>
+                    <small>Se incluirán como referencia en el email</small>
+                </div>
+                <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx" onchange="handleFiles(this.files)">
+            </div>
+            <div class="file-list" id="fileList"></div>
+        </div>
+
         <div class="card">
             <div class="card-title">Plazo de entrega</div>
             <div class="deadline-toggle">
-                <button class="toggle-btn active" id="deadlineOpen" onclick="setDeadlineType('open')">
-                    📅 Plazo abierto
-                </button>
-                <button class="toggle-btn" id="deadlineFixed" onclick="setDeadlineType('fixed')">
-                    ⏰ Fecha específica
-                </button>
+                <button class="toggle-btn active" id="deadlineOpen" onclick="setDeadlineType('open')">📅 Plazo abierto</button>
+                <button class="toggle-btn" id="deadlineFixed" onclick="setDeadlineType('fixed')">⏰ Fecha específica</button>
             </div>
             <div class="deadline-fields" id="deadlineFields">
                 <div class="form-group">
@@ -733,30 +239,30 @@
             </div>
         </div>
 
-        <!-- Word Count & Options -->
         <div class="card">
             <div class="card-title">Detalles del encargo</div>
             <div class="form-group">
-                <label>Número de palabras (opcional)</label>
-                <input type="number" id="wordCount" placeholder="Ej: 1500" min="0">
+                <label>Número de palabras</label>
+                <input type="number" id="wordCount" placeholder="Ej: 1500" min="0" oninput="updateEstimate()">
             </div>
             <div class="checkbox-row">
-                <div class="custom-checkbox" id="includePricing" onclick="toggleCheckbox('includePricing')"></div>
+                <div class="custom-checkbox" id="includePricing" onclick="toggleCheckbox('includePricing'); updateEstimate()"></div>
                 <span class="checkbox-label">Incluir tarifa acordada en el mensaje</span>
             </div>
-            <div class="form-group" style="margin-top: 8px;">
+            <div class="estimated-price" id="estimatedPrice">
+                <div class="estimated-price-label">💶 Precio estimado (tarifa acordada)</div>
+                <div class="estimated-price-value" id="estimatedPriceValue">0,00 €</div>
+            </div>
+            <div class="form-group" style="margin-top: 16px;">
                 <label>Comentarios adicionales</label>
                 <textarea id="comments" placeholder="Detalles sobre el documento, formato de entrega, etc."></textarea>
             </div>
         </div>
 
-        <!-- Providers -->
         <div class="card">
             <div class="card-title">Proveedores disponibles</div>
             <div class="select-all-row">
-                <button class="select-all-btn" onclick="toggleSelectAll()">
-                    Seleccionar todos
-                </button>
+                <button class="select-all-btn" onclick="toggleSelectAll()">Seleccionar todos</button>
                 <span class="selected-count" id="selectedCount">0 seleccionados</span>
             </div>
             <div class="providers-list" id="providersList">
@@ -767,7 +273,6 @@
             </div>
         </div>
 
-        <!-- Submit -->
         <button class="btn-primary" id="submitBtn" onclick="previewEmails()" disabled>
             <span>👁️</span>
             <span>Previsualizar mensaje</span>
@@ -775,196 +280,213 @@
     </main>
 
     <footer class="footer">
-        Tradutema © 2025 · Solicitud de Tarifas v1.0
+        <div>Tradutema © 2025 · <a href="#" onclick="showConfig()">Cambiar API</a></div>
+        <div class="version-info" id="versionInfo">HTML v1.1 · API: conectando...</div>
     </footer>
 
-    <!-- Preview Modal -->
+    <!-- Modal Preview -->
     <div class="modal-overlay" id="previewModal">
         <div class="modal">
             <div class="modal-header">
-                <span class="modal-title">Vista previa del mensaje</span>
+                <span class="modal-title">📧 Vista previa del mensaje</span>
                 <button class="modal-close" onclick="closeModal()">✕</button>
             </div>
-            <div class="modal-body" id="previewBody">
-                <!-- Preview content -->
-            </div>
+            <div class="modal-body" id="previewBody"></div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-                <button class="btn-primary" id="sendBtn" onclick="sendEmails()">
-                    <span>📧</span>
-                    <span>Enviar emails</span>
-                </button>
+                <button class="btn-secondary" onclick="closeModal()">✕ Cancelar</button>
+                <button class="btn-primary btn-success" onclick="confirmSend()">📧 Enviar</button>
             </div>
         </div>
     </div>
 
+    <!-- Modal Confirm -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="confirm-box">
+            <div class="confirm-icon">📧</div>
+            <div class="confirm-title">¿Enviar emails?</div>
+            <div class="confirm-text" id="confirmText">Se enviarán X emails.</div>
+            <div class="confirm-buttons">
+                <button class="btn-secondary" onclick="closeConfirm()">Cancelar</button>
+                <button class="btn-primary btn-success" id="confirmBtn" onclick="sendEmails()">Sí, enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Overlay -->
+    <div class="success-overlay" id="successOverlay">
+        <div class="success-checkmark">✓</div>
+        <div class="success-text">¡Emails enviados!</div>
+        <div class="success-subtext" id="successSubtext">X proveedores notificados</div>
+    </div>
+
     <script>
-        // State
+        // ══════════════════════════════════════════════════════════════════
+        // TRADUTEMA - Solicitud de Tarifas a Proveedores
+        // HTML Version: 1.1
+        // Fecha: 17/12/2025 18:00
+        // ══════════════════════════════════════════════════════════════════
+
+        const HTML_VERSION = '1.1';
         let allProviders = [];
         let filteredProviders = [];
         let selectedProviders = new Set();
+        let uploadedFiles = [];
         let apiUrl = localStorage.getItem('tradutema_api_url') || '';
+        let apiVersion = '?';
         let deadlineType = 'open';
 
-        // Initialize
+        // ====== INIT ======
         document.addEventListener('DOMContentLoaded', () => {
             if (apiUrl) {
                 document.getElementById('apiUrl').value = apiUrl;
                 document.getElementById('configSection').style.display = 'none';
                 loadProviders();
             }
-            
-            // Set default date to tomorrow
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             document.getElementById('deadlineDate').value = tomorrow.toISOString().split('T')[0];
+            updateVersionInfo();
         });
 
-        // Save API configuration
+        function updateVersionInfo() {
+            document.getElementById('versionInfo').textContent = `HTML v${HTML_VERSION} · API: ${apiVersion}`;
+        }
+
+        // ====== CONFIG ======
         function saveConfig() {
             const url = document.getElementById('apiUrl').value.trim();
-            if (!url) {
-                showStatus('Introduce la URL del API', 'error');
+            if (!url || !url.includes('/exec')) {
+                showStatus('URL inválida. Debe terminar en /exec', 'error');
                 return;
             }
-            
             apiUrl = url;
             localStorage.setItem('tradutema_api_url', url);
-            document.getElementById('configSection').style.display = 'none';
             loadProviders();
         }
 
-        // Load providers from API
+        function showConfig() {
+            document.getElementById('configSection').style.display = 'block';
+        }
+
+        // ====== API ======
         async function loadProviders() {
             showStatus('Cargando proveedores...', 'loading');
-            
             try {
-                const response = await fetch(`${apiUrl}?action=getProviders`);
+                const response = await fetch(apiUrl + '?action=getProviders');
                 const data = await response.json();
                 
                 if (data.success) {
                     allProviders = data.providers;
-                    populateLanguageSelects();
-                    hideStatus();
-                    showStatus(`${allProviders.length} proveedores cargados`, 'success');
+                    apiVersion = data.version || '?';
+                    updateVersionInfo();
+                    populateLanguages();
+                    document.getElementById('configSection').style.display = 'none';
+                    showStatus(`✅ ${allProviders.length} proveedores cargados`, 'success');
                     setTimeout(hideStatus, 2000);
                 } else {
-                    throw new Error(data.error || 'Error al cargar proveedores');
+                    throw new Error(data.error);
                 }
             } catch (error) {
-                showStatus('Error de conexión. Verifica la URL del API.', 'error');
+                showStatus('Error: ' + error.message, 'error');
                 document.getElementById('configSection').style.display = 'block';
             }
         }
 
-        // Populate language dropdowns
-        function populateLanguageSelects() {
-            const sourceSet = new Set();
-            const targetSet = new Set();
-            
+        // ====== LANGUAGES ======
+        function populateLanguages() {
+            const sources = new Set();
+            const targets = new Set();
             allProviders.forEach(p => {
-                if (p.idiomaOrigen) sourceSet.add(p.idiomaOrigen);
-                if (p.idiomaDestino) targetSet.add(p.idiomaDestino);
+                if (p.idiomaOrigen) sources.add(p.idiomaOrigen);
+                if (p.idiomaDestino) targets.add(p.idiomaDestino);
             });
             
-            const sourceSelect = document.getElementById('sourceLang');
-            const targetSelect = document.getElementById('targetLang');
+            const srcSelect = document.getElementById('sourceLang');
+            const tgtSelect = document.getElementById('targetLang');
+            srcSelect.innerHTML = '<option value="">Seleccionar...</option>';
+            tgtSelect.innerHTML = '<option value="">Seleccionar...</option>';
             
-            sourceSelect.innerHTML = '<option value="">Seleccionar...</option>';
-            targetSelect.innerHTML = '<option value="">Seleccionar...</option>';
-            
-            Array.from(sourceSet).sort().forEach(lang => {
-                sourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
-            });
-            
-            Array.from(targetSet).sort().forEach(lang => {
-                targetSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
-            });
+            Array.from(sources).sort().forEach(l => srcSelect.innerHTML += `<option value="${l}">${l}</option>`);
+            Array.from(targets).sort().forEach(l => tgtSelect.innerHTML += `<option value="${l}">${l}</option>`);
         }
 
-        // Filter providers by language combination
         function filterProviders() {
-            const source = document.getElementById('sourceLang').value;
-            const target = document.getElementById('targetLang').value;
-            
+            const src = document.getElementById('sourceLang').value;
+            const tgt = document.getElementById('targetLang').value;
             selectedProviders.clear();
             
-            if (!source || !target) {
-                filteredProviders = [];
-                renderProviders();
-                return;
-            }
-            
-            filteredProviders = allProviders.filter(p => 
-                p.idiomaOrigen === source && p.idiomaDestino === target
-            );
-            
+            filteredProviders = (src && tgt) ? allProviders.filter(p => p.idiomaOrigen === src && p.idiomaDestino === tgt) : [];
             renderProviders();
+            updateEstimate();
         }
 
-        // Render providers list
+        // ====== PROVIDERS ======
         function renderProviders() {
             const container = document.getElementById('providersList');
-            
             if (filteredProviders.length === 0) {
-                container.innerHTML = `
-                    <div class="no-providers">
-                        <div class="no-providers-icon">🔍</div>
-                        <div>${document.getElementById('sourceLang').value ? 'No hay proveedores para esta combinación' : 'Selecciona idioma origen y destino'}</div>
-                    </div>
-                `;
-                updateSelectedCount();
-                return;
-            }
-            
-            container.innerHTML = filteredProviders.map((p, index) => `
-                <div class="provider-item ${selectedProviders.has(index) ? 'selected' : ''}" 
-                     onclick="toggleProvider(${index})">
-                    <div class="provider-checkbox"></div>
-                    <div class="provider-info">
-                        <div class="provider-name">${p.nombre}</div>
-                        <div class="provider-email">${p.email}</div>
-                    </div>
-                    ${p.tarifaPorPalabra ? `
-                        <div class="provider-rate">
-                            <div class="provider-rate-value">${formatNumber(p.tarifaPorPalabra)} €</div>
-                            <div class="provider-rate-label">por palabra</div>
+                container.innerHTML = `<div class="no-providers"><div class="no-providers-icon">🔍</div><div>${document.getElementById('sourceLang').value ? 'No hay proveedores' : 'Selecciona idiomas'}</div></div>`;
+            } else {
+                container.innerHTML = filteredProviders.map((p, i) => `
+                    <div class="provider-item ${selectedProviders.has(i) ? 'selected' : ''}" onclick="toggleProvider(${i})">
+                        <div class="provider-checkbox"></div>
+                        <div class="provider-info">
+                            <div class="provider-name">${p.nombre}</div>
+                            <div class="provider-email">${p.email}</div>
                         </div>
-                    ` : ''}
-                </div>
-            `).join('');
-            
+                        ${p.tarifaPorPalabra ? `<div class="provider-rate"><div class="provider-rate-value">${formatNum(p.tarifaPorPalabra)} €</div><div class="provider-rate-label">por palabra</div></div>` : ''}
+                    </div>
+                `).join('');
+            }
             updateSelectedCount();
         }
 
-        // Toggle provider selection
-        function toggleProvider(index) {
-            if (selectedProviders.has(index)) {
-                selectedProviders.delete(index);
-            } else {
-                selectedProviders.add(index);
-            }
+        function toggleProvider(i) {
+            selectedProviders.has(i) ? selectedProviders.delete(i) : selectedProviders.add(i);
             renderProviders();
+            updateEstimate();
         }
 
-        // Toggle select all
         function toggleSelectAll() {
             if (selectedProviders.size === filteredProviders.length) {
                 selectedProviders.clear();
             } else {
-                filteredProviders.forEach((_, index) => selectedProviders.add(index));
+                filteredProviders.forEach((_, i) => selectedProviders.add(i));
             }
             renderProviders();
+            updateEstimate();
         }
 
-        // Update selected count
         function updateSelectedCount() {
-            document.getElementById('selectedCount').textContent = 
-                `${selectedProviders.size} seleccionados`;
+            document.getElementById('selectedCount').textContent = `${selectedProviders.size} seleccionados`;
             document.getElementById('submitBtn').disabled = selectedProviders.size === 0;
         }
 
-        // Set deadline type
+        // ====== FILES ======
+        function handleFiles(files) {
+            for (const f of files) {
+                if (!uploadedFiles.find(u => u.name === f.name)) uploadedFiles.push(f);
+            }
+            renderFiles();
+        }
+
+        function renderFiles() {
+            const container = document.getElementById('fileList');
+            const area = document.getElementById('fileUploadArea');
+            area.classList.toggle('has-files', uploadedFiles.length > 0);
+            container.innerHTML = uploadedFiles.map((f, i) => `
+                <div class="file-item">
+                    <span>📄 ${f.name}</span>
+                    <button class="file-item-remove" onclick="removeFile(${i})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function removeFile(i) {
+            uploadedFiles.splice(i, 1);
+            renderFiles();
+        }
+
+        // ====== DEADLINE ======
         function setDeadlineType(type) {
             deadlineType = type;
             document.getElementById('deadlineOpen').classList.toggle('active', type === 'open');
@@ -972,104 +494,117 @@
             document.getElementById('deadlineFields').classList.toggle('visible', type === 'fixed');
         }
 
-        // Toggle checkbox
+        // ====== UTILS ======
         function toggleCheckbox(id) {
             document.getElementById(id).classList.toggle('checked');
         }
 
-        // Format number with Spanish locale
-        function formatNumber(num) {
-            return num.toString().replace('.', ',');
+        function formatNum(n) {
+            return String(n).replace('.', ',');
         }
 
-        // Generate email content
-        function generateEmailContent(provider) {
-            const sourceLang = document.getElementById('sourceLang').value;
-            const targetLang = document.getElementById('targetLang').value;
-            const wordCount = document.getElementById('wordCount').value;
-            const comments = document.getElementById('comments').value;
-            const includePricing = document.getElementById('includePricing').classList.contains('checked');
-            const deadlineDate = document.getElementById('deadlineDate').value;
-            const deadlineTime = document.getElementById('deadlineTime').value;
+        function parseNum(n) {
+            return parseFloat(String(n).replace(',', '.'));
+        }
+
+        function updateEstimate() {
+            const words = parseInt(document.getElementById('wordCount').value) || 0;
+            const include = document.getElementById('includePricing').classList.contains('checked');
+            const container = document.getElementById('estimatedPrice');
             
-            let body = `Hola ${provider.nombre},\n\n`;
-            body += `Te escribo para solicitar tarifa y disponibilidad para una traducción:\n\n`;
-            body += `📌 Combinación: ${sourceLang} → ${targetLang}\n`;
-            
-            if (wordCount) {
-                body += `📊 Palabras estimadas: ${parseInt(wordCount).toLocaleString('es-ES')}\n`;
+            if (!include || words === 0 || selectedProviders.size === 0) {
+                container.classList.remove('visible');
+                return;
             }
+            
+            let rate = 0;
+            for (const i of selectedProviders) {
+                if (filteredProviders[i]?.tarifaPorPalabra) {
+                    rate = parseNum(filteredProviders[i].tarifaPorPalabra);
+                    break;
+                }
+            }
+            
+            if (rate > 0) {
+                document.getElementById('estimatedPriceValue').textContent = formatNum((words * rate).toFixed(2)) + ' €';
+                container.classList.add('visible');
+            } else {
+                container.classList.remove('visible');
+            }
+        }
+
+        // ====== EMAIL ======
+        function generateEmail(provider) {
+            const src = document.getElementById('sourceLang').value;
+            const tgt = document.getElementById('targetLang').value;
+            const words = document.getElementById('wordCount').value;
+            const comments = document.getElementById('comments').value;
+            const include = document.getElementById('includePricing').classList.contains('checked');
+            
+            let body = `Hola ${provider.nombre},\n\nSolicito tarifa y disponibilidad para una traducción:\n\n`;
+            body += `📌 Combinación: ${src} → ${tgt}\n`;
+            if (words) body += `📊 Palabras: ${parseInt(words).toLocaleString('es-ES')}\n`;
             
             if (deadlineType === 'open') {
                 body += `⏰ Plazo: Abierto (indícame tu mejor plazo)\n`;
             } else {
-                const formattedDate = new Date(deadlineDate).toLocaleDateString('es-ES', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long'
-                });
-                body += `⏰ Plazo requerido: ${formattedDate} a las ${deadlineTime}\n`;
+                const date = new Date(document.getElementById('deadlineDate').value);
+                const time = document.getElementById('deadlineTime').value;
+                body += `⏰ Plazo: ${date.toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'})} a las ${time}\n`;
             }
             
-            if (includePricing && provider.tarifaPorPalabra) {
-                body += `\n💶 Tarifa acordada: ${formatNumber(provider.tarifaPorPalabra)} €/palabra`;
-                if (wordCount) {
-                    const estimated = (parseInt(wordCount) * provider.tarifaPorPalabra).toFixed(2);
-                    body += ` (estimado: ${formatNumber(estimated)} €)`;
-                }
+            if (include && provider.tarifaPorPalabra) {
+                const rate = parseNum(provider.tarifaPorPalabra);
+                body += `\n💶 Tarifa acordada: ${formatNum(provider.tarifaPorPalabra)} €/palabra`;
+                if (words) body += ` (estimado: ${formatNum((parseInt(words) * rate).toFixed(2))} €)`;
                 body += `\n`;
             }
             
-            if (comments) {
-                body += `\n📝 Comentarios:\n${comments}\n`;
-            }
+            if (uploadedFiles.length) body += `\n📎 Documentos: ${uploadedFiles.map(f => f.name).join(', ')}\n`;
+            if (comments) body += `\n📝 Comentarios:\n${comments}\n`;
             
-            body += `\nPor favor, confírmame disponibilidad y tarifa.\n\n`;
-            body += `Gracias,\nTradutema`;
-            
+            body += `\nConfírmame disponibilidad y tarifa.\n\nGracias,\nTradutema`;
             return body;
         }
 
-        // Preview emails
         function previewEmails() {
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
-            const previewBody = document.getElementById('previewBody');
+            const src = document.getElementById('sourceLang').value;
+            const tgt = document.getElementById('targetLang').value;
             
-            const sourceLang = document.getElementById('sourceLang').value;
-            const targetLang = document.getElementById('targetLang').value;
-            const subject = `Solicitud de tarifa - Traducción ${sourceLang} → ${targetLang}`;
+            let html = `<div class="preview-recipient"><strong>Asunto:</strong> Solicitud de tarifa - Traducción ${src} → ${tgt}</div>`;
+            html += `<div class="preview-recipient"><strong>Destinatarios (${providers.length}):</strong><br>${providers.map(p => `${p.nombre} &lt;${p.email}&gt;`).join('<br>')}</div>`;
+            html += `<div class="preview-content">${generateEmail(providers[0])}</div>`;
             
-            let html = `<div class="preview-recipient"><strong>Asunto:</strong> ${subject}</div>`;
-            html += `<div class="preview-recipient"><strong>Destinatarios (${providers.length}):</strong><br>`;
-            html += providers.map(p => `${p.nombre} &lt;${p.email}&gt;`).join('<br>');
-            html += `</div>`;
-            
-            // Show preview for first provider (as example)
-            html += `<div class="preview-content">${generateEmailContent(providers[0])}</div>`;
-            
-            previewBody.innerHTML = html;
+            document.getElementById('previewBody').innerHTML = html;
             document.getElementById('previewModal').classList.add('visible');
         }
 
-        // Close modal
         function closeModal() {
             document.getElementById('previewModal').classList.remove('visible');
         }
 
-        // Send emails
+        function confirmSend() {
+            const count = selectedProviders.size;
+            document.getElementById('confirmText').textContent = `Se enviarán ${count} email${count > 1 ? 's' : ''} a los proveedores seleccionados.`;
+            document.getElementById('confirmModal').classList.add('visible');
+        }
+
+        function closeConfirm() {
+            document.getElementById('confirmModal').classList.remove('visible');
+        }
+
         async function sendEmails() {
-            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
-            const sendBtn = document.getElementById('sendBtn');
+            closeConfirm();
+            const btn = document.getElementById('confirmBtn');
+            btn.innerHTML = '<div class="spinner"></div>';
+            btn.disabled = true;
             
-            sendBtn.innerHTML = '<div class="spinner"></div><span>Enviando...</span>';
-            sendBtn.disabled = true;
+            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
                     body: JSON.stringify({
                         action: 'sendEmails',
                         providers: providers,
@@ -1080,7 +615,8 @@
                         deadlineTime: document.getElementById('deadlineTime').value,
                         wordCount: document.getElementById('wordCount').value,
                         comments: document.getElementById('comments').value,
-                        includePricing: document.getElementById('includePricing').classList.contains('checked')
+                        includePricing: document.getElementById('includePricing').classList.contains('checked'),
+                        files: uploadedFiles.map(f => f.name)
                     })
                 });
                 
@@ -1088,32 +624,37 @@
                 
                 if (data.success) {
                     closeModal();
-                    const successCount = data.results.filter(r => r.success).length;
-                    showStatus(`✅ ${successCount} email(s) enviado(s) correctamente`, 'success');
+                    const ok = data.results.filter(r => r.success).length;
+                    document.getElementById('successSubtext').textContent = `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`;
+                    document.getElementById('successOverlay').classList.add('visible');
                     
-                    // Reset form
-                    selectedProviders.clear();
-                    renderProviders();
-                    document.getElementById('wordCount').value = '';
-                    document.getElementById('comments').value = '';
+                    setTimeout(() => {
+                        document.getElementById('successOverlay').classList.remove('visible');
+                        selectedProviders.clear();
+                        renderProviders();
+                        document.getElementById('wordCount').value = '';
+                        document.getElementById('comments').value = '';
+                        uploadedFiles = [];
+                        renderFiles();
+                        updateEstimate();
+                    }, 2500);
                 } else {
-                    throw new Error(data.error || 'Error al enviar');
+                    throw new Error(data.error);
                 }
             } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                showStatus('Error: ' + error.message, 'error');
             }
             
-            sendBtn.innerHTML = '<span>📧</span><span>Enviar emails</span>';
-            sendBtn.disabled = false;
+            btn.innerHTML = 'Sí, enviar';
+            btn.disabled = false;
         }
 
-        // Status messages
-        function showStatus(message, type) {
+        // ====== STATUS ======
+        function showStatus(msg, type) {
             const el = document.getElementById('statusMessage');
-            el.className = `status-message visible ${type}`;
-            
             const icons = { success: '✅', error: '❌', loading: '⏳' };
-            el.innerHTML = `<span>${icons[type] || ''}</span><span>${message}</span>`;
+            el.className = `status-message visible ${type}`;
+            el.innerHTML = `<span>${icons[type] || ''}</span><span>${msg}</span>`;
         }
 
         function hideStatus() {
