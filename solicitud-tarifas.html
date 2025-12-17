@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Tradutema - Solicitud de Tarifas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --tradutema-blue: #1e3a5f;
+            --tradutema-blue-light: #2d5a8a;
+            --tradutema-blue-dark: #0f1f33;
+            --accent-gold: #d4a853;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --bg-primary: #f8f9fa;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(30,58,95,0.12);
+            --shadow-lg: 0 10px 30px rgba(30,58,95,0.15);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%);
+            color: white;
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header-content {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent-gold);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            opacity: 0.85;
+            margin-top: 4px;
+            font-weight: 400;
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--tradutema-blue);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--accent-gold);
+            border-radius: 2px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        select, input[type="text"], input[type="number"], input[type="date"], input[type="time"], textarea {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 1rem;
+            font-family: inherit;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            -webkit-appearance: none;
+        }
+
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 20px;
+            padding-right: 44px;
+        }
+
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--tradutema-blue);
+            box-shadow: 0 0 0 3px rgba(30,58,95,0.1);
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        /* Language Selector Row */
+        .language-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .language-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .arrow-icon {
+            font-size: 1.5rem;
+            color: var(--tradutema-blue);
+            margin-top: 24px;
+        }
+
+        /* Deadline Toggle */
+        .deadline-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 14px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn.active {
+            border-color: var(--tradutema-blue);
+            background: var(--tradutema-blue);
+            color: white;
+        }
+
+        .deadline-fields {
+            display: none;
+            gap: 12px;
+        }
+
+        .deadline-fields.visible {
+            display: flex;
+        }
+
+        .deadline-fields .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        /* Providers List */
+        .providers-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .provider-item {
+            display: flex;
+            align-items: center;
+            padding: 14px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--bg-card);
+        }
+
+        .provider-item:hover {
+            border-color: var(--tradutema-blue-light);
+            background: rgba(30,58,95,0.02);
+        }
+
+        .provider-item.selected {
+            border-color: var(--tradutema-blue);
+            background: rgba(30,58,95,0.05);
+        }
+
+        .provider-checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            margin-right: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+        }
+
+        .provider-item.selected .provider-checkbox {
+            background: var(--tradutema-blue);
+            border-color: var(--tradutema-blue);
+        }
+
+        .provider-checkbox::after {
+            content: '✓';
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.2s ease;
+        }
+
+        .provider-item.selected .provider-checkbox::after {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .provider-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .provider-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .provider-email {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .provider-rate {
+            text-align: right;
+            flex-shrink: 0;
+            margin-left: 10px;
+        }
+
+        .provider-rate-value {
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            color: var(--tradutema-blue);
+            font-size: 0.95rem;
+        }
+
+        .provider-rate-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .no-providers {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+        }
+
+        .no-providers-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        /* Select All */
+        .select-all-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .select-all-btn {
+            font-size: 0.85rem;
+            color: var(--tradutema-blue);
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            transition: background 0.2s;
+        }
+
+        .select-all-btn:hover {
+            background: rgba(30,58,95,0.08);
+        }
+
+        .selected-count {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Checkbox Toggle */
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+        }
+
+        .custom-checkbox {
+            position: relative;
+            width: 52px;
+            height: 28px;
+            background: var(--border-color);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .custom-checkbox.checked {
+            background: var(--tradutema-blue);
+        }
+
+        .custom-checkbox::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s;
+        }
+
+        .custom-checkbox.checked::after {
+            transform: translateX(24px);
+        }
+
+        .checkbox-label {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 18px 24px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            font-family: inherit;
+            color: white;
+            background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%);
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            width: 100%;
+            padding: 14px 20px;
+            font-size: 1rem;
+            font-weight: 500;
+            font-family: inherit;
+            color: var(--tradutema-blue);
+            background: white;
+            border: 2px solid var(--tradutema-blue);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(30,58,95,0.05);
+        }
+
+        /* Status Messages */
+        .status-message {
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .status-message.visible {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-message.success {
+            background: rgba(46,204,113,0.1);
+            color: #1e8449;
+            border: 1px solid rgba(46,204,113,0.3);
+        }
+
+        .status-message.error {
+            background: rgba(231,76,60,0.1);
+            color: #c0392b;
+            border: 1px solid rgba(231,76,60,0.3);
+        }
+
+        .status-message.loading {
+            background: rgba(30,58,95,0.08);
+            color: var(--tradutema-blue);
+            border: 1px solid rgba(30,58,95,0.2);
+        }
+
+        /* Preview Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            width: 100%;
+            max-width: 600px;
+            max-height: 85vh;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            overflow: hidden;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--bg-primary);
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: calc(85vh - 140px);
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-footer button {
+            flex: 1;
+        }
+
+        .preview-content {
+            background: var(--bg-primary);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .preview-recipient {
+            background: rgba(30,58,95,0.08);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+
+        .preview-recipient strong {
+            color: var(--tradutema-blue);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Config Section */
+        .config-section {
+            background: rgba(30,58,95,0.03);
+            border: 1px dashed var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .config-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .config-input {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        /* Responsive */
+        @media (min-width: 600px) {
+            .main {
+                padding: 30px;
+            }
+            
+            .modal {
+                border-radius: var(--radius-lg);
+                margin: auto;
+                max-height: 80vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">📋</div>
+                Tradutema
+            </div>
+            <div class="subtitle">Solicitud de Tarifas a Proveedores</div>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- Status Message -->
+        <div id="statusMessage" class="status-message"></div>
+
+        <!-- API Configuration -->
+        <div class="config-section" id="configSection">
+            <div class="config-label">⚙️ Configuración API (una sola vez)</div>
+            <input type="text" id="apiUrl" class="config-input" 
+                   placeholder="Pega aquí la URL del Google Apps Script desplegado"
+                   value="">
+            <button class="btn-secondary" onclick="saveConfig()" style="margin-top: 10px;">
+                Guardar y Conectar
+            </button>
+        </div>
+
+        <!-- Language Selection -->
+        <div class="card">
+            <div class="card-title">Combinación de idiomas</div>
+            <div class="language-row">
+                <div class="form-group">
+                    <label>Idioma origen</label>
+                    <select id="sourceLang" onchange="filterProviders()">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+                <div class="arrow-icon">→</div>
+                <div class="form-group">
+                    <label>Idioma destino</label>
+                    <select id="targetLang" onchange="filterProviders()">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deadline -->
+        <div class="card">
+            <div class="card-title">Plazo de entrega</div>
+            <div class="deadline-toggle">
+                <button class="toggle-btn active" id="deadlineOpen" onclick="setDeadlineType('open')">
+                    📅 Plazo abierto
+                </button>
+                <button class="toggle-btn" id="deadlineFixed" onclick="setDeadlineType('fixed')">
+                    ⏰ Fecha específica
+                </button>
+            </div>
+            <div class="deadline-fields" id="deadlineFields">
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="deadlineDate">
+                </div>
+                <div class="form-group">
+                    <label>Hora</label>
+                    <input type="time" id="deadlineTime" value="18:00">
+                </div>
+            </div>
+        </div>
+
+        <!-- Word Count & Options -->
+        <div class="card">
+            <div class="card-title">Detalles del encargo</div>
+            <div class="form-group">
+                <label>Número de palabras (opcional)</label>
+                <input type="number" id="wordCount" placeholder="Ej: 1500" min="0">
+            </div>
+            <div class="checkbox-row">
+                <div class="custom-checkbox" id="includePricing" onclick="toggleCheckbox('includePricing')"></div>
+                <span class="checkbox-label">Incluir tarifa acordada en el mensaje</span>
+            </div>
+            <div class="form-group" style="margin-top: 8px;">
+                <label>Comentarios adicionales</label>
+                <textarea id="comments" placeholder="Detalles sobre el documento, formato de entrega, etc."></textarea>
+            </div>
+        </div>
+
+        <!-- Providers -->
+        <div class="card">
+            <div class="card-title">Proveedores disponibles</div>
+            <div class="select-all-row">
+                <button class="select-all-btn" onclick="toggleSelectAll()">
+                    Seleccionar todos
+                </button>
+                <span class="selected-count" id="selectedCount">0 seleccionados</span>
+            </div>
+            <div class="providers-list" id="providersList">
+                <div class="no-providers">
+                    <div class="no-providers-icon">🔍</div>
+                    <div>Selecciona idioma origen y destino</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <button class="btn-primary" id="submitBtn" onclick="previewEmails()" disabled>
+            <span>👁️</span>
+            <span>Previsualizar mensaje</span>
+        </button>
+    </main>
+
+    <footer class="footer">
+        Tradutema © 2025 · Solicitud de Tarifas v1.0
+    </footer>
+
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="previewModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Vista previa del mensaje</span>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="previewBody">
+                <!-- Preview content -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn-primary" id="sendBtn" onclick="sendEmails()">
+                    <span>📧</span>
+                    <span>Enviar emails</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let allProviders = [];
+        let filteredProviders = [];
+        let selectedProviders = new Set();
+        let apiUrl = localStorage.getItem('tradutema_api_url') || '';
+        let deadlineType = 'open';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            if (apiUrl) {
+                document.getElementById('apiUrl').value = apiUrl;
+                document.getElementById('configSection').style.display = 'none';
+                loadProviders();
+            }
+            
+            // Set default date to tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('deadlineDate').value = tomorrow.toISOString().split('T')[0];
+        });
+
+        // Save API configuration
+        function saveConfig() {
+            const url = document.getElementById('apiUrl').value.trim();
+            if (!url) {
+                showStatus('Introduce la URL del API', 'error');
+                return;
+            }
+            
+            apiUrl = url;
+            localStorage.setItem('tradutema_api_url', url);
+            document.getElementById('configSection').style.display = 'none';
+            loadProviders();
+        }
+
+        // Load providers from API
+        async function loadProviders() {
+            showStatus('Cargando proveedores...', 'loading');
+            
+            try {
+                const response = await fetch(`${apiUrl}?action=getProviders`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    allProviders = data.providers;
+                    populateLanguageSelects();
+                    hideStatus();
+                    showStatus(`${allProviders.length} proveedores cargados`, 'success');
+                    setTimeout(hideStatus, 2000);
+                } else {
+                    throw new Error(data.error || 'Error al cargar proveedores');
+                }
+            } catch (error) {
+                showStatus('Error de conexión. Verifica la URL del API.', 'error');
+                document.getElementById('configSection').style.display = 'block';
+            }
+        }
+
+        // Populate language dropdowns
+        function populateLanguageSelects() {
+            const sourceSet = new Set();
+            const targetSet = new Set();
+            
+            allProviders.forEach(p => {
+                if (p.idiomaOrigen) sourceSet.add(p.idiomaOrigen);
+                if (p.idiomaDestino) targetSet.add(p.idiomaDestino);
+            });
+            
+            const sourceSelect = document.getElementById('sourceLang');
+            const targetSelect = document.getElementById('targetLang');
+            
+            sourceSelect.innerHTML = '<option value="">Seleccionar...</option>';
+            targetSelect.innerHTML = '<option value="">Seleccionar...</option>';
+            
+            Array.from(sourceSet).sort().forEach(lang => {
+                sourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+            
+            Array.from(targetSet).sort().forEach(lang => {
+                targetSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+        }
+
+        // Filter providers by language combination
+        function filterProviders() {
+            const source = document.getElementById('sourceLang').value;
+            const target = document.getElementById('targetLang').value;
+            
+            selectedProviders.clear();
+            
+            if (!source || !target) {
+                filteredProviders = [];
+                renderProviders();
+                return;
+            }
+            
+            filteredProviders = allProviders.filter(p => 
+                p.idiomaOrigen === source && p.idiomaDestino === target
+            );
+            
+            renderProviders();
+        }
+
+        // Render providers list
+        function renderProviders() {
+            const container = document.getElementById('providersList');
+            
+            if (filteredProviders.length === 0) {
+                container.innerHTML = `
+                    <div class="no-providers">
+                        <div class="no-providers-icon">🔍</div>
+                        <div>${document.getElementById('sourceLang').value ? 'No hay proveedores para esta combinación' : 'Selecciona idioma origen y destino'}</div>
+                    </div>
+                `;
+                updateSelectedCount();
+                return;
+            }
+            
+            container.innerHTML = filteredProviders.map((p, index) => `
+                <div class="provider-item ${selectedProviders.has(index) ? 'selected' : ''}" 
+                     onclick="toggleProvider(${index})">
+                    <div class="provider-checkbox"></div>
+                    <div class="provider-info">
+                        <div class="provider-name">${p.nombre}</div>
+                        <div class="provider-email">${p.email}</div>
+                    </div>
+                    ${p.tarifaPorPalabra ? `
+                        <div class="provider-rate">
+                            <div class="provider-rate-value">${formatNumber(p.tarifaPorPalabra)} €</div>
+                            <div class="provider-rate-label">por palabra</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+            
+            updateSelectedCount();
+        }
+
+        // Toggle provider selection
+        function toggleProvider(index) {
+            if (selectedProviders.has(index)) {
+                selectedProviders.delete(index);
+            } else {
+                selectedProviders.add(index);
+            }
+            renderProviders();
+        }
+
+        // Toggle select all
+        function toggleSelectAll() {
+            if (selectedProviders.size === filteredProviders.length) {
+                selectedProviders.clear();
+            } else {
+                filteredProviders.forEach((_, index) => selectedProviders.add(index));
+            }
+            renderProviders();
+        }
+
+        // Update selected count
+        function updateSelectedCount() {
+            document.getElementById('selectedCount').textContent = 
+                `${selectedProviders.size} seleccionados`;
+            document.getElementById('submitBtn').disabled = selectedProviders.size === 0;
+        }
+
+        // Set deadline type
+        function setDeadlineType(type) {
+            deadlineType = type;
+            document.getElementById('deadlineOpen').classList.toggle('active', type === 'open');
+            document.getElementById('deadlineFixed').classList.toggle('active', type === 'fixed');
+            document.getElementById('deadlineFields').classList.toggle('visible', type === 'fixed');
+        }
+
+        // Toggle checkbox
+        function toggleCheckbox(id) {
+            document.getElementById(id).classList.toggle('checked');
+        }
+
+        // Format number with Spanish locale
+        function formatNumber(num) {
+            return num.toString().replace('.', ',');
+        }
+
+        // Generate email content
+        function generateEmailContent(provider) {
+            const sourceLang = document.getElementById('sourceLang').value;
+            const targetLang = document.getElementById('targetLang').value;
+            const wordCount = document.getElementById('wordCount').value;
+            const comments = document.getElementById('comments').value;
+            const includePricing = document.getElementById('includePricing').classList.contains('checked');
+            const deadlineDate = document.getElementById('deadlineDate').value;
+            const deadlineTime = document.getElementById('deadlineTime').value;
+            
+            let body = `Hola ${provider.nombre},\n\n`;
+            body += `Te escribo para solicitar tarifa y disponibilidad para una traducción:\n\n`;
+            body += `📌 Combinación: ${sourceLang} → ${targetLang}\n`;
+            
+            if (wordCount) {
+                body += `📊 Palabras estimadas: ${parseInt(wordCount).toLocaleString('es-ES')}\n`;
+            }
+            
+            if (deadlineType === 'open') {
+                body += `⏰ Plazo: Abierto (indícame tu mejor plazo)\n`;
+            } else {
+                const formattedDate = new Date(deadlineDate).toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                });
+                body += `⏰ Plazo requerido: ${formattedDate} a las ${deadlineTime}\n`;
+            }
+            
+            if (includePricing && provider.tarifaPorPalabra) {
+                body += `\n💶 Tarifa acordada: ${formatNumber(provider.tarifaPorPalabra)} €/palabra`;
+                if (wordCount) {
+                    const estimated = (parseInt(wordCount) * provider.tarifaPorPalabra).toFixed(2);
+                    body += ` (estimado: ${formatNumber(estimated)} €)`;
+                }
+                body += `\n`;
+            }
+            
+            if (comments) {
+                body += `\n📝 Comentarios:\n${comments}\n`;
+            }
+            
+            body += `\nPor favor, confírmame disponibilidad y tarifa.\n\n`;
+            body += `Gracias,\nTradutema`;
+            
+            return body;
+        }
+
+        // Preview emails
+        function previewEmails() {
+            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
+            const previewBody = document.getElementById('previewBody');
+            
+            const sourceLang = document.getElementById('sourceLang').value;
+            const targetLang = document.getElementById('targetLang').value;
+            const subject = `Solicitud de tarifa - Traducción ${sourceLang} → ${targetLang}`;
+            
+            let html = `<div class="preview-recipient"><strong>Asunto:</strong> ${subject}</div>`;
+            html += `<div class="preview-recipient"><strong>Destinatarios (${providers.length}):</strong><br>`;
+            html += providers.map(p => `${p.nombre} &lt;${p.email}&gt;`).join('<br>');
+            html += `</div>`;
+            
+            // Show preview for first provider (as example)
+            html += `<div class="preview-content">${generateEmailContent(providers[0])}</div>`;
+            
+            previewBody.innerHTML = html;
+            document.getElementById('previewModal').classList.add('visible');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('previewModal').classList.remove('visible');
+        }
+
+        // Send emails
+        async function sendEmails() {
+            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
+            const sendBtn = document.getElementById('sendBtn');
+            
+            sendBtn.innerHTML = '<div class="spinner"></div><span>Enviando...</span>';
+            sendBtn.disabled = true;
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'sendEmails',
+                        providers: providers,
+                        sourceLang: document.getElementById('sourceLang').value,
+                        targetLang: document.getElementById('targetLang').value,
+                        deadline: deadlineType,
+                        deadlineDate: document.getElementById('deadlineDate').value,
+                        deadlineTime: document.getElementById('deadlineTime').value,
+                        wordCount: document.getElementById('wordCount').value,
+                        comments: document.getElementById('comments').value,
+                        includePricing: document.getElementById('includePricing').classList.contains('checked')
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    closeModal();
+                    const successCount = data.results.filter(r => r.success).length;
+                    showStatus(`✅ ${successCount} email(s) enviado(s) correctamente`, 'success');
+                    
+                    // Reset form
+                    selectedProviders.clear();
+                    renderProviders();
+                    document.getElementById('wordCount').value = '';
+                    document.getElementById('comments').value = '';
+                } else {
+                    throw new Error(data.error || 'Error al enviar');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+            
+            sendBtn.innerHTML = '<span>📧</span><span>Enviar emails</span>';
+            sendBtn.disabled = false;
+        }
+
+        // Status messages
+        function showStatus(message, type) {
+            const el = document.getElementById('statusMessage');
+            el.className = `status-message visible ${type}`;
+            
+            const icons = { success: '✅', error: '❌', loading: '⏳' };
+            el.innerHTML = `<span>${icons[type] || ''}</span><span>${message}</span>`;
+        }
+
+        function hideStatus() {
+            document.getElementById('statusMessage').classList.remove('visible');
+        }
+    </script>
+</body>
+</html>
