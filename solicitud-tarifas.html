@@ -71,7 +71,12 @@
         .file-input { display: none; }
         .file-list { margin-top: 12px; }
         .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: white; border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid var(--border-color); font-size: 0.9rem; }
+        .file-item-info { display: flex; flex-direction: column; }
+        .file-item-name { font-weight: 500; }
+        .file-item-size { font-size: 0.75rem; color: var(--text-secondary); }
         .file-item-remove { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.2rem; padding: 4px 8px; }
+        .file-total { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; padding: 8px 12px; background: rgba(30,58,95,0.05); border-radius: var(--radius-sm); }
+        .file-warning { font-size: 0.8rem; color: var(--accent-red); margin-top: 8px; }
         
         .providers-list { display: flex; flex-direction: column; gap: 10px; }
         .provider-item { display: flex; align-items: center; padding: 14px; border: 2px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; background: var(--bg-card); }
@@ -112,8 +117,8 @@
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .btn-secondary { width: 100%; padding: 16px 20px; font-size: 1rem; font-weight: 600; font-family: inherit; color: var(--text-secondary); background: white; border: 2px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; }
         .btn-secondary:hover { border-color: var(--tradutema-blue); color: var(--tradutema-blue); }
-        .btn-success { background: var(--accent-green); }
-        .btn-success:hover { background: #27ae60; transform: translateY(-2px); }
+        .btn-success { background: var(--accent-green) !important; }
+        .btn-success:hover { background: #27ae60 !important; }
         
         .status-message { padding: 14px 16px; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 0.9rem; display: none; align-items: center; gap: 10px; }
         .status-message.visible { display: flex; }
@@ -121,34 +126,33 @@
         .status-message.error { background: rgba(231,76,60,0.1); color: #c0392b; border: 1px solid rgba(231,76,60,0.3); }
         .status-message.loading { background: rgba(30,58,95,0.08); color: var(--tradutema-blue); border: 1px solid rgba(30,58,95,0.2); }
         
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: flex-end; justify-content: center; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px; }
         .modal-overlay.visible { display: flex; }
-        .modal { background: white; width: 100%; max-width: 600px; max-height: 85vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; overflow: hidden; animation: slideUp 0.3s ease; }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .modal-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal { background: white; width: 100%; max-width: 500px; max-height: 90vh; border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .modal-title { font-weight: 600; font-size: 1.1rem; }
         .modal-close { width: 36px; height: 36px; border: none; background: var(--bg-primary); border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .modal-body { padding: 20px; overflow-y: auto; max-height: calc(85vh - 160px); }
-        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; }
-        .modal-footer button { flex: 1; }
-        .preview-content { background: var(--bg-primary); padding: 16px; border-radius: var(--radius-md); font-family: 'Space Mono', monospace; font-size: 0.85rem; white-space: pre-wrap; line-height: 1.6; }
-        .preview-recipient { background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 0.9rem; }
-        .preview-recipient strong { color: var(--tradutema-blue); }
+        .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; flex-shrink: 0; background: var(--bg-primary); }
+        .modal-footer .btn-secondary, .modal-footer .btn-primary { padding: 14px 20px; font-size: 1rem; }
         
-        .confirm-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .preview-content { background: var(--bg-primary); padding: 16px; border-radius: var(--radius-md); font-family: 'Space Mono', monospace; font-size: 0.8rem; white-space: pre-wrap; line-height: 1.5; max-height: 250px; overflow-y: auto; }
+        .preview-recipient { background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 0.85rem; }
+        .preview-recipient strong { color: var(--tradutema-blue); }
+        .preview-attachments { background: rgba(46,204,113,0.1); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 0.85rem; color: #1e8449; }
+        
+        .confirm-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1100; display: none; align-items: center; justify-content: center; padding: 20px; }
         .confirm-modal.visible { display: flex; }
-        .confirm-box { background: white; border-radius: var(--radius-lg); padding: 24px; max-width: 400px; width: 100%; text-align: center; animation: popIn 0.2s ease; }
-        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .confirm-box { background: white; border-radius: var(--radius-lg); padding: 24px; max-width: 350px; width: 100%; text-align: center; }
         .confirm-icon { font-size: 3rem; margin-bottom: 16px; }
         .confirm-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 8px; }
-        .confirm-text { color: var(--text-secondary); margin-bottom: 24px; }
+        .confirm-text { color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; }
         .confirm-buttons { display: flex; gap: 12px; }
-        .confirm-buttons button { flex: 1; padding: 14px; }
+        .confirm-buttons button { flex: 1; padding: 14px; font-size: 1rem; }
         
         .success-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(46,204,113,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; color: white; }
         .success-overlay.visible { display: flex; }
-        .success-checkmark { font-size: 5rem; margin-bottom: 20px; animation: bounceIn 0.5s ease; }
-        @keyframes bounceIn { 0% { transform: scale(0); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        .success-checkmark { font-size: 5rem; margin-bottom: 20px; }
         .success-text { font-size: 1.5rem; font-weight: 600; }
         .success-subtext { font-size: 1rem; opacity: 0.9; margin-top: 8px; }
         
@@ -156,16 +160,16 @@
         .config-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
         .config-input { font-family: 'Space Mono', monospace; font-size: 0.85rem; }
         
-        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
         @keyframes spin { to { transform: rotate(360deg); } }
         
         .footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.75rem; }
         .footer a { color: var(--tradutema-blue); text-decoration: none; }
         .version-info { font-family: 'Space Mono', monospace; margin-top: 4px; opacity: 0.7; }
         
-        @media (min-width: 600px) {
-            .main { padding: 30px; }
-            .modal { border-radius: var(--radius-lg); margin: auto; max-height: 80vh; }
+        @media (max-width: 400px) {
+            .modal-footer { flex-direction: column; }
+            .modal-footer button { width: 100%; }
         }
     </style>
 </head>
@@ -173,7 +177,7 @@
     <header class="header">
         <div class="header-content">
             <div class="logo">
-                <div class="logo-icon">📋</div>
+                <div class="logo-icon">T</div>
                 Tradutema
             </div>
             <div class="subtitle">Solicitud de Tarifas a Proveedores</div>
@@ -184,13 +188,13 @@
         <div id="statusMessage" class="status-message"></div>
 
         <div class="config-section" id="configSection">
-            <div class="config-label">⚙️ Configuración API (una sola vez)</div>
+            <div class="config-label">Configuracion API (una sola vez)</div>
             <input type="text" id="apiUrl" class="config-input" placeholder="Pega la URL del Apps Script (termina en /exec)">
             <button class="btn-secondary" onclick="saveConfig()" style="margin-top: 10px;">Guardar y Conectar</button>
         </div>
 
         <div class="card">
-            <div class="card-title">Combinación de idiomas</div>
+            <div class="card-title">Combinacion de idiomas</div>
             <div class="language-row">
                 <div class="form-group">
                     <label>Idioma origen</label>
@@ -211,21 +215,23 @@
         <div class="card">
             <div class="card-title">Documentos a traducir</div>
             <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('fileInput').click()">
-                <div class="file-upload-icon">📎</div>
+                <div class="file-upload-icon">+</div>
                 <div class="file-upload-text">
                     <strong>Toca para adjuntar archivos</strong><br>
-                    <small>Se incluirán como referencia en el email</small>
+                    <small>Se enviaran con el email (max 20MB total)</small>
                 </div>
-                <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx" onchange="handleFiles(this.files)">
+                <input type="file" id="fileInput" class="file-input" multiple onchange="handleFiles(this.files)">
             </div>
             <div class="file-list" id="fileList"></div>
+            <div class="file-total" id="fileTotal" style="display:none;"></div>
+            <div class="file-warning" id="fileWarning" style="display:none;"></div>
         </div>
 
         <div class="card">
             <div class="card-title">Plazo de entrega</div>
             <div class="deadline-toggle">
-                <button class="toggle-btn active" id="deadlineOpen" onclick="setDeadlineType('open')">📅 Plazo abierto</button>
-                <button class="toggle-btn" id="deadlineFixed" onclick="setDeadlineType('fixed')">⏰ Fecha específica</button>
+                <button class="toggle-btn active" id="deadlineOpen" onclick="setDeadlineType('open')">Plazo abierto</button>
+                <button class="toggle-btn" id="deadlineFixed" onclick="setDeadlineType('fixed')">Fecha especifica</button>
             </div>
             <div class="deadline-fields" id="deadlineFields">
                 <div class="form-group">
@@ -242,7 +248,7 @@
         <div class="card">
             <div class="card-title">Detalles del encargo</div>
             <div class="form-group">
-                <label>Número de palabras</label>
+                <label>Numero de palabras</label>
                 <input type="number" id="wordCount" placeholder="Ej: 1500" min="0" oninput="updateEstimate()">
             </div>
             <div class="checkbox-row">
@@ -250,8 +256,8 @@
                 <span class="checkbox-label">Incluir tarifa acordada en el mensaje</span>
             </div>
             <div class="estimated-price" id="estimatedPrice">
-                <div class="estimated-price-label">💶 Precio estimado (tarifa acordada)</div>
-                <div class="estimated-price-value" id="estimatedPriceValue">0,00 €</div>
+                <div class="estimated-price-label">Precio estimado (tarifa acordada)</div>
+                <div class="estimated-price-value" id="estimatedPriceValue">0,00 EUR</div>
             </div>
             <div class="form-group" style="margin-top: 16px;">
                 <label>Comentarios adicionales</label>
@@ -267,34 +273,33 @@
             </div>
             <div class="providers-list" id="providersList">
                 <div class="no-providers">
-                    <div class="no-providers-icon">🔍</div>
+                    <div class="no-providers-icon">?</div>
                     <div>Selecciona idioma origen y destino</div>
                 </div>
             </div>
         </div>
 
         <button class="btn-primary" id="submitBtn" onclick="previewEmails()" disabled>
-            <span>👁️</span>
-            <span>Previsualizar mensaje</span>
+            Previsualizar mensaje
         </button>
     </main>
 
     <footer class="footer">
-        <div>Tradutema © 2025 · <a href="#" onclick="showConfig()">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v1.1 · API: conectando...</div>
+        <div>Tradutema 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
+        <div class="version-info" id="versionInfo">HTML v1.3 | API: ?</div>
     </footer>
 
     <!-- Modal Preview -->
     <div class="modal-overlay" id="previewModal">
         <div class="modal">
             <div class="modal-header">
-                <span class="modal-title">📧 Vista previa del mensaje</span>
-                <button class="modal-close" onclick="closeModal()">✕</button>
+                <span class="modal-title">Vista previa del mensaje</span>
+                <button class="modal-close" onclick="closeModal()">X</button>
             </div>
             <div class="modal-body" id="previewBody"></div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal()">✕ Cancelar</button>
-                <button class="btn-primary btn-success" onclick="confirmSend()">📧 Enviar</button>
+                <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn-primary btn-success" onclick="confirmSend()">Enviar emails</button>
             </div>
         </div>
     </div>
@@ -302,35 +307,40 @@
     <!-- Modal Confirm -->
     <div class="confirm-modal" id="confirmModal">
         <div class="confirm-box">
-            <div class="confirm-icon">📧</div>
-            <div class="confirm-title">¿Enviar emails?</div>
-            <div class="confirm-text" id="confirmText">Se enviarán X emails.</div>
+            <div class="confirm-icon">?</div>
+            <div class="confirm-title">Enviar emails?</div>
+            <div class="confirm-text" id="confirmText">Se enviaran X emails.</div>
             <div class="confirm-buttons">
-                <button class="btn-secondary" onclick="closeConfirm()">Cancelar</button>
-                <button class="btn-primary btn-success" id="confirmBtn" onclick="sendEmails()">Sí, enviar</button>
+                <button class="btn-secondary" onclick="closeConfirm()">No</button>
+                <button class="btn-primary btn-success" id="confirmBtn" onclick="sendEmails()">Si, enviar</button>
             </div>
         </div>
     </div>
 
     <!-- Success Overlay -->
     <div class="success-overlay" id="successOverlay">
-        <div class="success-checkmark">✓</div>
-        <div class="success-text">¡Emails enviados!</div>
+        <div class="success-checkmark">OK</div>
+        <div class="success-text">Emails enviados</div>
         <div class="success-subtext" id="successSubtext">X proveedores notificados</div>
     </div>
 
     <script>
-        // ══════════════════════════════════════════════════════════════════
-        // TRADUTEMA - Solicitud de Tarifas a Proveedores
-        // HTML Version: 1.1
-        // Fecha: 17/12/2025 18:00
-        // ══════════════════════════════════════════════════════════════════
+        /**
+         * TRADUTEMA - Solicitud de Tarifas
+         * HTML Version: 1.3
+         * Fecha: 17/12/2025 20:00
+         * 
+         * Novedades v1.3:
+         * - Archivos adjuntos reales (se envian con el email)
+         */
 
-        const HTML_VERSION = '1.1';
+        const HTML_VERSION = '1.3';
+        const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB max total
+        
         let allProviders = [];
         let filteredProviders = [];
         let selectedProviders = new Set();
-        let uploadedFiles = [];
+        let uploadedFiles = []; // {file: File, name: string, size: number, type: string, content: base64}
         let apiUrl = localStorage.getItem('tradutema_api_url') || '';
         let apiVersion = '?';
         let deadlineType = 'open';
@@ -349,14 +359,14 @@
         });
 
         function updateVersionInfo() {
-            document.getElementById('versionInfo').textContent = `HTML v${HTML_VERSION} · API: ${apiVersion}`;
+            document.getElementById('versionInfo').textContent = 'HTML v' + HTML_VERSION + ' | API: ' + apiVersion;
         }
 
         // ====== CONFIG ======
         function saveConfig() {
             const url = document.getElementById('apiUrl').value.trim();
             if (!url || !url.includes('/exec')) {
-                showStatus('URL inválida. Debe terminar en /exec', 'error');
+                showStatus('URL invalida. Debe terminar en /exec', 'error');
                 return;
             }
             apiUrl = url;
@@ -381,7 +391,7 @@
                     updateVersionInfo();
                     populateLanguages();
                     document.getElementById('configSection').style.display = 'none';
-                    showStatus(`✅ ${allProviders.length} proveedores cargados`, 'success');
+                    showStatus(allProviders.length + ' proveedores cargados', 'success');
                     setTimeout(hideStatus, 2000);
                 } else {
                     throw new Error(data.error);
@@ -406,8 +416,8 @@
             srcSelect.innerHTML = '<option value="">Seleccionar...</option>';
             tgtSelect.innerHTML = '<option value="">Seleccionar...</option>';
             
-            Array.from(sources).sort().forEach(l => srcSelect.innerHTML += `<option value="${l}">${l}</option>`);
-            Array.from(targets).sort().forEach(l => tgtSelect.innerHTML += `<option value="${l}">${l}</option>`);
+            Array.from(sources).sort().forEach(l => srcSelect.innerHTML += '<option value="' + l + '">' + l + '</option>');
+            Array.from(targets).sort().forEach(l => tgtSelect.innerHTML += '<option value="' + l + '">' + l + '</option>');
         }
 
         function filterProviders() {
@@ -424,18 +434,19 @@
         function renderProviders() {
             const container = document.getElementById('providersList');
             if (filteredProviders.length === 0) {
-                container.innerHTML = `<div class="no-providers"><div class="no-providers-icon">🔍</div><div>${document.getElementById('sourceLang').value ? 'No hay proveedores' : 'Selecciona idiomas'}</div></div>`;
+                container.innerHTML = '<div class="no-providers"><div class="no-providers-icon">?</div><div>' + 
+                    (document.getElementById('sourceLang').value ? 'No hay proveedores' : 'Selecciona idiomas') + '</div></div>';
             } else {
-                container.innerHTML = filteredProviders.map((p, i) => `
-                    <div class="provider-item ${selectedProviders.has(i) ? 'selected' : ''}" onclick="toggleProvider(${i})">
-                        <div class="provider-checkbox"></div>
-                        <div class="provider-info">
-                            <div class="provider-name">${p.nombre}</div>
-                            <div class="provider-email">${p.email}</div>
-                        </div>
-                        ${p.tarifaPorPalabra ? `<div class="provider-rate"><div class="provider-rate-value">${formatNum(p.tarifaPorPalabra)} €</div><div class="provider-rate-label">por palabra</div></div>` : ''}
-                    </div>
-                `).join('');
+                container.innerHTML = filteredProviders.map((p, i) => 
+                    '<div class="provider-item ' + (selectedProviders.has(i) ? 'selected' : '') + '" onclick="toggleProvider(' + i + ')">' +
+                        '<div class="provider-checkbox"></div>' +
+                        '<div class="provider-info">' +
+                            '<div class="provider-name">' + p.nombre + '</div>' +
+                            '<div class="provider-email">' + p.email + '</div>' +
+                        '</div>' +
+                        (p.tarifaPorPalabra ? '<div class="provider-rate"><div class="provider-rate-value">' + formatNum(p.tarifaPorPalabra) + ' EUR</div><div class="provider-rate-label">por palabra</div></div>' : '') +
+                    '</div>'
+                ).join('');
             }
             updateSelectedCount();
         }
@@ -457,28 +468,83 @@
         }
 
         function updateSelectedCount() {
-            document.getElementById('selectedCount').textContent = `${selectedProviders.size} seleccionados`;
+            document.getElementById('selectedCount').textContent = selectedProviders.size + ' seleccionados';
             document.getElementById('submitBtn').disabled = selectedProviders.size === 0;
         }
 
-        // ====== FILES ======
-        function handleFiles(files) {
-            for (const f of files) {
-                if (!uploadedFiles.find(u => u.name === f.name)) uploadedFiles.push(f);
+        // ====== FILES (con lectura Base64) ======
+        async function handleFiles(fileList) {
+            for (const file of fileList) {
+                if (!uploadedFiles.find(u => u.name === file.name)) {
+                    // Leer archivo como Base64
+                    const content = await readFileAsBase64(file);
+                    uploadedFiles.push({
+                        file: file,
+                        name: file.name,
+                        size: file.size,
+                        type: file.type || 'application/octet-stream',
+                        content: content
+                    });
+                }
             }
             renderFiles();
+        }
+
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    // Resultado es "data:mime;base64,XXXX", extraemos solo el Base64
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
         }
 
         function renderFiles() {
             const container = document.getElementById('fileList');
             const area = document.getElementById('fileUploadArea');
+            const totalEl = document.getElementById('fileTotal');
+            const warningEl = document.getElementById('fileWarning');
+            
             area.classList.toggle('has-files', uploadedFiles.length > 0);
-            container.innerHTML = uploadedFiles.map((f, i) => `
-                <div class="file-item">
-                    <span>📄 ${f.name}</span>
-                    <button class="file-item-remove" onclick="removeFile(${i})">✕</button>
-                </div>
-            `).join('');
+            
+            // Calcular tamaño total
+            const totalSize = uploadedFiles.reduce((sum, f) => sum + f.size, 0);
+            const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+            
+            if (uploadedFiles.length > 0) {
+                totalEl.style.display = 'block';
+                totalEl.textContent = uploadedFiles.length + ' archivo(s) - ' + totalSizeMB + ' MB total';
+                
+                if (totalSize > MAX_FILE_SIZE) {
+                    warningEl.style.display = 'block';
+                    warningEl.textContent = 'Aviso: El tamaño total supera 20MB. Puede fallar el envio.';
+                } else {
+                    warningEl.style.display = 'none';
+                }
+            } else {
+                totalEl.style.display = 'none';
+                warningEl.style.display = 'none';
+            }
+            
+            container.innerHTML = uploadedFiles.map((f, i) => 
+                '<div class="file-item">' +
+                    '<div class="file-item-info">' +
+                        '<span class="file-item-name">' + f.name + '</span>' +
+                        '<span class="file-item-size">' + formatFileSize(f.size) + '</span>' +
+                    '</div>' +
+                    '<button class="file-item-remove" onclick="removeFile(' + i + ')">X</button>' +
+                '</div>'
+            ).join('');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
         }
 
         function removeFile(i) {
@@ -500,15 +566,21 @@
         }
 
         function formatNum(n) {
-            return String(n).replace('.', ',');
+            if (n === null || n === undefined || n === '') return '0,00';
+            let num = typeof n === 'string' ? parseFloat(n.replace(',', '.')) : parseFloat(n);
+            if (isNaN(num)) return '0,00';
+            return num.toFixed(2).replace('.', ',');
         }
 
         function parseNum(n) {
-            return parseFloat(String(n).replace(',', '.'));
+            if (n === null || n === undefined || n === '') return 0;
+            let num = typeof n === 'string' ? parseFloat(n.replace(',', '.')) : parseFloat(n);
+            return isNaN(num) ? 0 : num;
         }
 
         function updateEstimate() {
-            const words = parseInt(document.getElementById('wordCount').value) || 0;
+            const wordsStr = document.getElementById('wordCount').value;
+            const words = parseInt(wordsStr) || 0;
             const include = document.getElementById('includePricing').classList.contains('checked');
             const container = document.getElementById('estimatedPrice');
             
@@ -519,14 +591,15 @@
             
             let rate = 0;
             for (const i of selectedProviders) {
-                if (filteredProviders[i]?.tarifaPorPalabra) {
+                if (filteredProviders[i] && filteredProviders[i].tarifaPorPalabra) {
                     rate = parseNum(filteredProviders[i].tarifaPorPalabra);
-                    break;
+                    if (rate > 0) break;
                 }
             }
             
             if (rate > 0) {
-                document.getElementById('estimatedPriceValue').textContent = formatNum((words * rate).toFixed(2)) + ' €';
+                const estimated = (words * rate).toFixed(2).replace('.', ',');
+                document.getElementById('estimatedPriceValue').textContent = estimated + ' EUR';
                 container.classList.add('visible');
             } else {
                 container.classList.remove('visible');
@@ -534,36 +607,60 @@
         }
 
         // ====== EMAIL ======
-        function generateEmail(provider) {
+        function generateEmailPreview(provider) {
             const src = document.getElementById('sourceLang').value;
             const tgt = document.getElementById('targetLang').value;
-            const words = document.getElementById('wordCount').value;
+            const wordsStr = document.getElementById('wordCount').value;
+            const words = parseInt(wordsStr) || 0;
             const comments = document.getElementById('comments').value;
             const include = document.getElementById('includePricing').classList.contains('checked');
             
-            let body = `Hola ${provider.nombre},\n\nSolicito tarifa y disponibilidad para una traducción:\n\n`;
-            body += `📌 Combinación: ${src} → ${tgt}\n`;
-            if (words) body += `📊 Palabras: ${parseInt(words).toLocaleString('es-ES')}\n`;
+            let body = 'Hola ' + provider.nombre + ',\n\n';
+            body += 'Te escribo para solicitar tarifa y disponibilidad para una traduccion.\n\n';
+            body += 'DETALLES DEL ENCARGO\n';
+            body += '--------------------\n';
+            body += '* Combinacion: ' + src + ' > ' + tgt + '\n';
+            
+            if (words > 0) {
+                body += '* Palabras estimadas: ' + words.toLocaleString('es-ES') + '\n';
+            }
             
             if (deadlineType === 'open') {
-                body += `⏰ Plazo: Abierto (indícame tu mejor plazo)\n`;
+                body += '* Plazo: Abierto (indicame tu mejor plazo)\n';
             } else {
                 const date = new Date(document.getElementById('deadlineDate').value);
                 const time = document.getElementById('deadlineTime').value;
-                body += `⏰ Plazo: ${date.toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'})} a las ${time}\n`;
+                const dateStr = date.toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+                body += '* Plazo requerido: ' + dateStr + ' a las ' + time + '\n';
             }
             
             if (include && provider.tarifaPorPalabra) {
                 const rate = parseNum(provider.tarifaPorPalabra);
-                body += `\n💶 Tarifa acordada: ${formatNum(provider.tarifaPorPalabra)} €/palabra`;
-                if (words) body += ` (estimado: ${formatNum((parseInt(words) * rate).toFixed(2))} €)`;
-                body += `\n`;
+                if (rate > 0) {
+                    body += '\n* Tarifa acordada: ' + rate.toFixed(2).replace('.', ',') + ' EUR/palabra';
+                    if (words > 0) {
+                        const estimated = (words * rate).toFixed(2).replace('.', ',');
+                        body += ' (estimado: ' + estimated + ' EUR)';
+                    }
+                    body += '\n';
+                }
             }
             
-            if (uploadedFiles.length) body += `\n📎 Documentos: ${uploadedFiles.map(f => f.name).join(', ')}\n`;
-            if (comments) body += `\n📝 Comentarios:\n${comments}\n`;
+            if (uploadedFiles.length > 0) {
+                body += '\nDOCUMENTOS ADJUNTOS\n';
+                body += '--------------------\n';
+                uploadedFiles.forEach(f => body += '* ' + f.name + '\n');
+            }
             
-            body += `\nConfírmame disponibilidad y tarifa.\n\nGracias,\nTradutema`;
+            if (comments.trim()) {
+                body += '\nCOMENTARIOS\n';
+                body += '--------------------\n';
+                body += comments + '\n';
+            }
+            
+            body += '\n--------------------\n';
+            body += 'Por favor, confirmame disponibilidad y tarifa.\n\n';
+            body += 'Gracias,\nTradutema';
             return body;
         }
 
@@ -572,9 +669,15 @@
             const src = document.getElementById('sourceLang').value;
             const tgt = document.getElementById('targetLang').value;
             
-            let html = `<div class="preview-recipient"><strong>Asunto:</strong> Solicitud de tarifa - Traducción ${src} → ${tgt}</div>`;
-            html += `<div class="preview-recipient"><strong>Destinatarios (${providers.length}):</strong><br>${providers.map(p => `${p.nombre} &lt;${p.email}&gt;`).join('<br>')}</div>`;
-            html += `<div class="preview-content">${generateEmail(providers[0])}</div>`;
+            let html = '<div class="preview-recipient"><strong>Asunto:</strong> Solicitud de tarifa - Traduccion ' + src + ' > ' + tgt + '</div>';
+            html += '<div class="preview-recipient"><strong>Destinatarios (' + providers.length + '):</strong><br>' + providers.map(p => p.nombre + ' &lt;' + p.email + '&gt;').join('<br>') + '</div>';
+            
+            if (uploadedFiles.length > 0) {
+                const totalSize = uploadedFiles.reduce((sum, f) => sum + f.size, 0);
+                html += '<div class="preview-attachments"><strong>Archivos adjuntos (' + uploadedFiles.length + '):</strong> ' + formatFileSize(totalSize) + ' total<br>' + uploadedFiles.map(f => f.name).join(', ') + '</div>';
+            }
+            
+            html += '<div class="preview-content">' + generateEmailPreview(providers[0]) + '</div>';
             
             document.getElementById('previewBody').innerHTML = html;
             document.getElementById('previewModal').classList.add('visible');
@@ -586,7 +689,12 @@
 
         function confirmSend() {
             const count = selectedProviders.size;
-            document.getElementById('confirmText').textContent = `Se enviarán ${count} email${count > 1 ? 's' : ''} a los proveedores seleccionados.`;
+            let text = 'Se enviara' + (count > 1 ? 'n ' + count + ' emails' : ' 1 email');
+            if (uploadedFiles.length > 0) {
+                text += ' con ' + uploadedFiles.length + ' archivo(s) adjunto(s)';
+            }
+            text += '.';
+            document.getElementById('confirmText').textContent = text;
             document.getElementById('confirmModal').classList.add('visible');
         }
 
@@ -597,12 +705,21 @@
         async function sendEmails() {
             closeConfirm();
             const btn = document.getElementById('confirmBtn');
-            btn.innerHTML = '<div class="spinner"></div>';
+            btn.innerHTML = '<span class="spinner"></span>';
             btn.disabled = true;
             
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             
+            // Preparar archivos para enviar
+            const filesToSend = uploadedFiles.map(f => ({
+                name: f.name,
+                type: f.type,
+                content: f.content // Base64
+            }));
+            
             try {
+                showStatus('Enviando emails' + (filesToSend.length > 0 ? ' con adjuntos...' : '...'), 'loading');
+                
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -616,7 +733,7 @@
                         wordCount: document.getElementById('wordCount').value,
                         comments: document.getElementById('comments').value,
                         includePricing: document.getElementById('includePricing').classList.contains('checked'),
-                        files: uploadedFiles.map(f => f.name)
+                        files: filesToSend
                     })
                 });
                 
@@ -624,8 +741,13 @@
                 
                 if (data.success) {
                     closeModal();
+                    hideStatus();
                     const ok = data.results.filter(r => r.success).length;
-                    document.getElementById('successSubtext').textContent = `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`;
+                    let subtext = ok + ' proveedor' + (ok > 1 ? 'es' : '') + ' notificado' + (ok > 1 ? 's' : '');
+                    if (data.attachmentsSent > 0) {
+                        subtext += ' con ' + data.attachmentsSent + ' adjunto(s)';
+                    }
+                    document.getElementById('successSubtext').textContent = subtext;
                     document.getElementById('successOverlay').classList.add('visible');
                     
                     setTimeout(() => {
@@ -643,18 +765,18 @@
                 }
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
+                closeModal();
             }
             
-            btn.innerHTML = 'Sí, enviar';
+            btn.innerHTML = 'Si, enviar';
             btn.disabled = false;
         }
 
         // ====== STATUS ======
         function showStatus(msg, type) {
             const el = document.getElementById('statusMessage');
-            const icons = { success: '✅', error: '❌', loading: '⏳' };
-            el.className = `status-message visible ${type}`;
-            el.innerHTML = `<span>${icons[type] || ''}</span><span>${msg}</span>`;
+            el.className = 'status-message visible ' + type;
+            el.innerHTML = msg;
         }
 
         function hideStatus() {
