@@ -1,0 +1,1453 @@
+<!--
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║   TRADUTEMA - GESTOR DE PRESUPUESTOS                            ║
+║                                                                  ║
+║   VERSIÓN: 2.0.1                                                ║
+║   FECHA:   26/12/2025 - 12:30                                   ║
+║                                                                  ║
+║   CAMBIOS EN ESTA VERSIÓN:                                      ║
+║   - Añadida cabecera de versión visible                         ║
+║   - Versión con fecha/hora en footer de la app                  ║
+║                                                                  ║
+║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Tradutema - Gestor de Presupuestos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --tradutema-blue: #1e3a5f;
+            --tradutema-blue-light: #2d5a8a;
+            --tradutema-blue-dark: #0f1f33;
+            --accent-gold: #d4a853;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --accent-orange: #f39c12;
+            --bg-primary: #f8f9fa;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow-md: 0 4px 12px rgba(30,58,95,0.12);
+            --shadow-lg: 0 10px 30px rgba(30,58,95,0.15);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.5; }
+        
+        /* HEADER */
+        .header { background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%); color: white; padding: 16px 20px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-lg); }
+        .header-content { max-width: 700px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-family: 'Space Mono', monospace; font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 32px; height: 32px; background: var(--accent-gold); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+        .budget-id { font-family: 'Space Mono', monospace; font-size: 1rem; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: var(--radius-sm); }
+        .budget-id.active { background: var(--accent-gold); color: var(--tradutema-blue-dark); }
+        
+        /* PROGRESS STEPS */
+        .progress-container { background: white; border-bottom: 1px solid var(--border-color); padding: 12px 20px; position: sticky; top: 64px; z-index: 99; }
+        .progress-steps { max-width: 700px; margin: 0 auto; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+        .progress-step { flex: 1; min-width: 80px; text-align: center; padding: 8px 4px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); background: var(--bg-primary); transition: all 0.3s; cursor: pointer; }
+        .progress-step.active { background: var(--tradutema-blue); color: white; }
+        .progress-step.completed { background: var(--accent-green); color: white; }
+        .progress-step.locked { opacity: 0.5; cursor: not-allowed; }
+        .step-num { display: block; font-size: 1rem; font-weight: 700; }
+        
+        /* MAIN */
+        .main { max-width: 700px; margin: 0 auto; padding: 20px; }
+        
+        /* CARDS */
+        .card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); }
+        .card.hidden { display: none; }
+        .card-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--tradutema-blue); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .card-title::before { content: ''; width: 4px; height: 16px; background: var(--accent-gold); border-radius: 2px; }
+        .card-title .step-badge { background: var(--tradutema-blue); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; margin-left: auto; }
+        
+        /* FORM ELEMENTS */
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
+        select, input[type="text"], input[type="number"], input[type="email"], input[type="date"], input[type="time"], textarea {
+            width: 100%; padding: 14px 16px; font-size: 1rem; font-family: inherit;
+            border: 2px solid var(--border-color); border-radius: var(--radius-md);
+            background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;
+        }
+        select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 20px; padding-right: 44px; -webkit-appearance: none; }
+        select:focus, input:focus, textarea:focus { outline: none; border-color: var(--tradutema-blue); box-shadow: 0 0 0 3px rgba(30,58,95,0.1); }
+        textarea { min-height: 80px; resize: vertical; }
+        
+        /* LANGUAGE ROW */
+        .language-row { display: flex; gap: 12px; align-items: center; }
+        .language-row .form-group { flex: 1; margin-bottom: 0; }
+        .arrow-icon { font-size: 1.5rem; color: var(--tradutema-blue); margin-top: 24px; }
+        
+        /* CHANNEL SELECTOR */
+        .channel-selector { display: flex; gap: 8px; margin-top: 16px; }
+        .channel-btn { flex: 1; padding: 14px 8px; border: 2px solid var(--border-color); background: white; border-radius: var(--radius-md); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .channel-btn:hover { border-color: var(--tradutema-blue-light); }
+        .channel-btn.selected { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.05); }
+        .channel-btn .channel-icon { font-size: 1.5rem; }
+        .channel-btn.whatsapp.selected { border-color: #25d366; background: rgba(37,211,102,0.1); }
+        .channel-btn.mail.selected { border-color: #ea4335; background: rgba(234,67,53,0.1); }
+        .channel-btn.form.selected { border-color: var(--accent-gold); background: rgba(212,168,83,0.1); }
+        
+        /* FILE UPLOAD */
+        .file-upload-area { border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg-primary); }
+        .file-upload-area:hover { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.03); }
+        .file-upload-area.has-files { border-color: var(--accent-green); background: rgba(46,204,113,0.05); }
+        .file-upload-icon { font-size: 2.5rem; margin-bottom: 8px; }
+        .file-upload-text { color: var(--text-secondary); font-size: 0.9rem; }
+        .file-upload-text strong { color: var(--tradutema-blue); }
+        .file-input { display: none; }
+        .file-list { margin-top: 12px; }
+        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: white; border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid var(--border-color); font-size: 0.85rem; }
+        .file-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .file-item-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-item-size { font-size: 0.75rem; color: var(--text-secondary); }
+        .file-item-remove { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.2rem; padding: 4px 8px; }
+        .file-total { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; padding: 8px 12px; background: rgba(30,58,95,0.05); border-radius: var(--radius-sm); }
+        
+        /* BUTTONS */
+        .btn { padding: 16px 24px; font-size: 1rem; font-weight: 600; font-family: inherit; border: none; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { width: 100%; color: white; background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%); box-shadow: var(--shadow-md); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { color: var(--text-secondary); background: white; border: 2px solid var(--border-color); }
+        .btn-secondary:hover { border-color: var(--tradutema-blue); color: var(--tradutema-blue); }
+        .btn-success { background: var(--accent-green) !important; }
+        .btn-gold { background: linear-gradient(135deg, var(--accent-gold) 0%, #c4983f 100%) !important; }
+        .btn-orange { background: linear-gradient(135deg, var(--accent-orange) 0%, #e67e22 100%) !important; }
+        
+        .btn-row { display: flex; gap: 12px; margin-top: 16px; }
+        .btn-row .btn { flex: 1; }
+        
+        /* ACTION BUTTON (Big) */
+        .action-btn { width: 100%; padding: 20px; font-size: 1.1rem; margin-top: 8px; }
+        
+        /* RESULTS BOX */
+        .results-box { background: linear-gradient(135deg, rgba(30,58,95,0.05) 0%, rgba(212,168,83,0.1) 100%); border-radius: var(--radius-md); padding: 16px; margin-top: 16px; }
+        .results-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px; }
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .result-item { background: white; padding: 12px; border-radius: var(--radius-sm); }
+        .result-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+        .result-value { font-family: 'Space Mono', monospace; font-size: 1.2rem; font-weight: 700; color: var(--tradutema-blue); }
+        .result-item.highlight { background: var(--tradutema-blue); }
+        .result-item.highlight .result-label { color: rgba(255,255,255,0.7); }
+        .result-item.highlight .result-value { color: white; }
+        .result-item.full-width { grid-column: 1 / -1; }
+        
+        /* WORD COUNT TABLE */
+        .word-count-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
+        .word-count-table th, .word-count-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .word-count-table th { background: var(--bg-primary); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); }
+        .word-count-table td.number { font-family: 'Space Mono', monospace; text-align: right; }
+        .word-count-table tr.total { background: var(--tradutema-blue); color: white; font-weight: 600; }
+        .word-count-table tr.total td { border-bottom: none; }
+        
+        /* TARIFF EDITOR */
+        .tariff-editor { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.1); border-radius: var(--radius-sm); }
+        .tariff-editor label { margin-bottom: 0; flex-shrink: 0; }
+        .tariff-editor input { width: 100px; padding: 8px 12px; text-align: right; font-family: 'Space Mono', monospace; }
+        .tariff-editor .tariff-unit { color: var(--text-secondary); font-size: 0.85rem; }
+        
+        /* PROVIDERS */
+        .providers-list { display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; }
+        .provider-item { display: flex; align-items: center; padding: 14px; border: 2px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; background: var(--bg-card); }
+        .provider-item:hover { border-color: var(--tradutema-blue-light); }
+        .provider-item.selected { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.05); }
+        .provider-checkbox { width: 24px; height: 24px; border: 2px solid var(--border-color); border-radius: 6px; margin-right: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+        .provider-item.selected .provider-checkbox { background: var(--tradutema-blue); border-color: var(--tradutema-blue); }
+        .provider-checkbox::after { content: '✓'; color: white; font-weight: 700; font-size: 14px; opacity: 0; }
+        .provider-item.selected .provider-checkbox::after { opacity: 1; }
+        .provider-info { flex: 1; min-width: 0; }
+        .provider-name { font-weight: 600; color: var(--text-primary); }
+        .provider-email { font-size: 0.8rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
+        .select-all-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
+        .select-all-btn { font-size: 0.85rem; color: var(--tradutema-blue); background: none; border: none; font-family: inherit; font-weight: 500; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); }
+        .select-all-btn:hover { background: rgba(30,58,95,0.08); }
+        .selected-count { font-size: 0.85rem; color: var(--text-secondary); }
+        .no-providers { text-align: center; padding: 30px; color: var(--text-secondary); }
+        
+        /* DEADLINE */
+        .deadline-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+        .toggle-btn { flex: 1; padding: 14px; border: 2px solid var(--border-color); background: var(--bg-card); border-radius: var(--radius-md); font-family: inherit; font-size: 0.9rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+        .toggle-btn.active { border-color: var(--tradutema-blue); background: var(--tradutema-blue); color: white; }
+        .deadline-fields { display: none; gap: 12px; }
+        .deadline-fields.visible { display: flex; }
+        .deadline-fields .form-group { flex: 1; margin-bottom: 0; }
+        
+        /* CHECKBOXES */
+        .checkbox-row { display: flex; align-items: center; padding: 12px 0; }
+        .custom-checkbox { position: relative; width: 52px; height: 28px; background: var(--border-color); border-radius: 14px; cursor: pointer; transition: background 0.3s; margin-right: 12px; flex-shrink: 0; }
+        .custom-checkbox.checked { background: var(--tradutema-blue); }
+        .custom-checkbox::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: transform 0.3s; }
+        .custom-checkbox.checked::after { transform: translateX(24px); }
+        .checkbox-label { font-size: 0.9rem; }
+        
+        /* CLIENT MESSAGE */
+        .message-preview { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; font-size: 0.85rem; white-space: pre-wrap; line-height: 1.6; max-height: 300px; overflow-y: auto; margin-top: 12px; }
+        .copy-buttons { display: flex; gap: 8px; margin-top: 12px; }
+        .copy-btn { flex: 1; padding: 14px; font-size: 0.9rem; }
+        .copy-btn.whatsapp { background: #25d366; color: white; border: none; }
+        .copy-btn.email { background: #ea4335; color: white; border: none; }
+        
+        /* STATUS */
+        .status-message { padding: 14px 16px; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 0.9rem; display: none; align-items: center; gap: 10px; }
+        .status-message.visible { display: flex; }
+        .status-message.success { background: rgba(46,204,113,0.1); color: #1e8449; border: 1px solid rgba(46,204,113,0.3); }
+        .status-message.error { background: rgba(231,76,60,0.1); color: #c0392b; border: 1px solid rgba(231,76,60,0.3); }
+        .status-message.loading { background: rgba(30,58,95,0.08); color: var(--tradutema-blue); border: 1px solid rgba(30,58,95,0.2); }
+        .status-message.warning { background: rgba(243,156,18,0.1); color: #d68910; border: 1px solid rgba(243,156,18,0.3); }
+        
+        /* MODALS */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px; }
+        .modal-overlay.visible { display: flex; }
+        .modal { background: white; width: 100%; max-width: 500px; max-height: 90vh; border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .modal-title { font-weight: 600; font-size: 1.1rem; }
+        .modal-close { width: 36px; height: 36px; border: none; background: var(--bg-primary); border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; flex-shrink: 0; background: var(--bg-primary); }
+        .modal-footer .btn { flex: 1; }
+        
+        /* SUCCESS OVERLAY */
+        .success-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(46,204,113,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; color: white; }
+        .success-overlay.visible { display: flex; }
+        .success-checkmark { font-size: 5rem; margin-bottom: 20px; }
+        .success-text { font-size: 1.5rem; font-weight: 600; }
+        .success-subtext { font-size: 1rem; opacity: 0.9; margin-top: 8px; text-align: center; padding: 0 20px; }
+        
+        /* CONFIG */
+        .config-section { background: rgba(30,58,95,0.03); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
+        .config-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .config-input { font-family: 'Space Mono', monospace; font-size: 0.85rem; }
+        
+        /* SPINNER */
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+        .spinner.dark { border-color: rgba(30,58,95,0.2); border-top-color: var(--tradutema-blue); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* FOOTER */
+        .footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.75rem; }
+        .footer a { color: var(--tradutema-blue); text-decoration: none; }
+        .version-info { font-family: 'Space Mono', monospace; margin-top: 4px; opacity: 0.7; }
+        
+        /* LANGUAGE TOGGLE */
+        .lang-toggle { display: flex; gap: 4px; margin-bottom: 12px; }
+        .lang-toggle button { padding: 8px 16px; border: 1px solid var(--border-color); background: white; font-family: inherit; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+        .lang-toggle button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+        .lang-toggle button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+        .lang-toggle button.active { background: var(--tradutema-blue); color: white; border-color: var(--tradutema-blue); }
+        
+        /* QUOTE FORM */
+        .quote-row { display: flex; gap: 12px; }
+        .quote-row .form-group { flex: 1; }
+        
+        /* LINK TO FOLDER */
+        .folder-link { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: rgba(46,204,113,0.1); border-radius: var(--radius-sm); margin-top: 12px; text-decoration: none; color: var(--accent-green); font-weight: 500; transition: all 0.2s; }
+        .folder-link:hover { background: rgba(46,204,113,0.2); }
+        .folder-link-icon { font-size: 1.2rem; }
+
+        /* Responsive */
+        @media (max-width: 500px) {
+            .progress-step { min-width: 60px; font-size: 0.65rem; }
+            .step-num { font-size: 0.9rem; }
+            .results-grid { grid-template-columns: 1fr; }
+            .quote-row { flex-direction: column; gap: 0; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">T</div>
+                Presupuestos
+            </div>
+            <div class="budget-id" id="budgetIdDisplay">Sin crear</div>
+        </div>
+    </header>
+
+    <div class="progress-container">
+        <div class="progress-steps">
+            <div class="progress-step active" data-step="1" onclick="goToStep(1)">
+                <span class="step-num">1</span>
+                Idiomas
+            </div>
+            <div class="progress-step locked" data-step="2" onclick="goToStep(2)">
+                <span class="step-num">2</span>
+                Archivos
+            </div>
+            <div class="progress-step locked" data-step="3" onclick="goToStep(3)">
+                <span class="step-num">3</span>
+                Carpeta
+            </div>
+            <div class="progress-step locked" data-step="4" onclick="goToStep(4)">
+                <span class="step-num">4</span>
+                Palabras
+            </div>
+            <div class="progress-step locked" data-step="5" onclick="goToStep(5)">
+                <span class="step-num">5</span>
+                Tasación
+            </div>
+            <div class="progress-step locked" data-step="6" onclick="goToStep(6)">
+                <span class="step-num">6</span>
+                Cliente
+            </div>
+        </div>
+    </div>
+
+    <main class="main">
+        <div id="statusMessage" class="status-message"></div>
+
+        <!-- CONFIG (initially visible if no API) -->
+        <div class="config-section" id="configSection">
+            <div class="config-label">Configuración API (una sola vez)</div>
+            <input type="text" id="apiUrl" class="config-input" placeholder="Pega la URL del Apps Script (termina en /exec)">
+            <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">Guardar y Conectar</button>
+        </div>
+
+        <!-- STEP 1: IDIOMAS -->
+        <div class="card" id="step1Card">
+            <div class="card-title">
+                Combinación de idiomas
+                <span class="step-badge">PASO 1</span>
+            </div>
+            <div class="language-row">
+                <div class="form-group">
+                    <label>Idioma origen</label>
+                    <select id="sourceLang" onchange="onLanguageChange()">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+                <div class="arrow-icon">→</div>
+                <div class="form-group">
+                    <label>Idioma destino</label>
+                    <select id="targetLang" onchange="onLanguageChange()">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+                <label>Canal de contacto</label>
+                <div class="channel-selector">
+                    <button class="channel-btn whatsapp" data-channel="W" onclick="selectChannel('W')">
+                        <span class="channel-icon">📱</span>
+                        WhatsApp
+                    </button>
+                    <button class="channel-btn mail" data-channel="M" onclick="selectChannel('M')">
+                        <span class="channel-icon">📧</span>
+                        Mail
+                    </button>
+                    <button class="channel-btn form" data-channel="F" onclick="selectChannel('F')">
+                        <span class="channel-icon">📝</span>
+                        Formulario
+                    </button>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary action-btn" id="step1Btn" onclick="completeStep1()" disabled>
+                Continuar a Archivos →
+            </button>
+        </div>
+
+        <!-- STEP 2: ARCHIVOS -->
+        <div class="card hidden" id="step2Card">
+            <div class="card-title">
+                Documentos a traducir
+                <span class="step-badge">PASO 2</span>
+            </div>
+            <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('fileInput').click()">
+                <div class="file-upload-icon">📄</div>
+                <div class="file-upload-text">
+                    <strong>Toca para adjuntar archivos</strong><br>
+                    <small>PDF, imágenes, Word (max 20MB total)</small>
+                </div>
+                <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.tiff,.bmp" onchange="handleFiles(this.files)">
+            </div>
+            <div class="file-list" id="fileList"></div>
+            <div class="file-total" id="fileTotal" style="display:none;"></div>
+            
+            <button class="btn btn-primary action-btn" id="step2Btn" onclick="completeStep2()" disabled>
+                Continuar a Crear Carpeta →
+            </button>
+        </div>
+
+        <!-- STEP 3: CREAR CARPETA -->
+        <div class="card hidden" id="step3Card">
+            <div class="card-title">
+                Crear carpeta de presupuesto
+                <span class="step-badge">PASO 3</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                Se creará una carpeta en Google Drive con el ID del presupuesto y se subirán los archivos.
+            </p>
+            
+            <div class="results-box" id="folderPreview">
+                <div class="results-title">Vista previa</div>
+                <div class="results-grid">
+                    <div class="result-item full-width">
+                        <div class="result-label">ID Presupuesto</div>
+                        <div class="result-value" id="previewBudgetId">--</div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary btn-gold action-btn" id="step3Btn" onclick="createFolder()">
+                📁 Crear Carpeta en Drive
+            </button>
+            
+            <a href="#" class="folder-link hidden" id="folderLink" target="_blank">
+                <span class="folder-link-icon">📂</span>
+                <span>Abrir carpeta en Google Drive</span>
+            </a>
+        </div>
+
+        <!-- STEP 4: CONTAR PALABRAS -->
+        <div class="card hidden" id="step4Card">
+            <div class="card-title">
+                Recuento de palabras
+                <span class="step-badge">PASO 4 - Opcional</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                Analiza los documentos para contar palabras y páginas. El informe se guarda en la carpeta del presupuesto.
+            </p>
+            
+            <button class="btn btn-primary btn-orange action-btn" id="countWordsBtn" onclick="countWords()">
+                🔢 Contar Palabras
+            </button>
+            
+            <div class="results-box hidden" id="wordCountResults">
+                <div class="results-title">Resultado del análisis</div>
+                <table class="word-count-table" id="wordCountTable">
+                    <thead>
+                        <tr>
+                            <th>Archivo</th>
+                            <th style="text-align:right">Palabras</th>
+                            <th style="text-align:right">Páginas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="wordCountBody"></tbody>
+                </table>
+                
+                <div class="tariff-editor">
+                    <label>Tarifa:</label>
+                    <input type="number" id="customTariff" step="0.01" min="0" onchange="updateTotalPrice()">
+                    <span class="tariff-unit">€/palabra</span>
+                </div>
+                
+                <div class="results-grid" style="margin-top: 12px;">
+                    <div class="result-item">
+                        <div class="result-label">Por palabras</div>
+                        <div class="result-value" id="priceByWords">0,00 €</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Por páginas</div>
+                        <div class="result-value" id="priceByPages">0,00 €</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="btn-row" style="margin-top: 16px;">
+                <button class="btn btn-secondary" onclick="skipToStep(5)">Saltar</button>
+                <button class="btn btn-primary" onclick="completeStep4()">Continuar →</button>
+            </div>
+        </div>
+
+        <!-- STEP 5: TASACIÓN PROVEEDORES -->
+        <div class="card hidden" id="step5Card">
+            <div class="card-title">
+                Solicitar tasación a proveedores
+                <span class="step-badge">PASO 5 - Opcional</span>
+            </div>
+            
+            <!-- Opciones de la tasación -->
+            <div class="form-group">
+                <label>Plazo de entrega</label>
+                <div class="deadline-toggle">
+                    <button class="toggle-btn active" id="deadlineOpen" onclick="setDeadlineType('open')">Plazo abierto</button>
+                    <button class="toggle-btn" id="deadlineFixed" onclick="setDeadlineType('fixed')">Fecha específica</button>
+                </div>
+                <div class="deadline-fields" id="deadlineFields">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="deadlineDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Hora</label>
+                        <input type="time" id="deadlineTime" value="18:00">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="checkbox-row">
+                <div class="custom-checkbox" id="includeWordCount" onclick="toggleCheckbox('includeWordCount')"></div>
+                <span class="checkbox-label">Incluir recuento de palabras/páginas</span>
+            </div>
+            
+            <div class="checkbox-row">
+                <div class="custom-checkbox" id="includeAgreedRate" onclick="toggleCheckbox('includeAgreedRate')"></div>
+                <span class="checkbox-label">Incluir tarifa acordada</span>
+            </div>
+            
+            <div class="form-group">
+                <label>Comentarios adicionales</label>
+                <textarea id="providerComments" placeholder="Detalles sobre el documento, formato de entrega, etc."></textarea>
+            </div>
+            
+            <!-- Proveedores -->
+            <div style="margin-top: 20px;">
+                <div class="card-title" style="margin-bottom: 12px;">Seleccionar proveedores</div>
+                <div class="select-all-row">
+                    <button class="select-all-btn" onclick="toggleSelectAll()">Seleccionar todos</button>
+                    <span class="selected-count" id="selectedCount">0 seleccionados</span>
+                </div>
+                <div class="providers-list" id="providersList">
+                    <div class="no-providers">
+                        <div>Cargando proveedores...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary action-btn" id="sendQuoteBtn" onclick="previewProviderEmail()" disabled>
+                ✉️ Previsualizar y Enviar Tasación
+            </button>
+            
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="skipToStep(6)">Saltar a Cliente</button>
+            </div>
+        </div>
+
+        <!-- STEP 6: PRESUPUESTO CLIENTE -->
+        <div class="card hidden" id="step6Card">
+            <div class="card-title">
+                Enviar presupuesto al cliente
+                <span class="step-badge">PASO 6</span>
+            </div>
+            
+            <div class="lang-toggle">
+                <button class="active" onclick="setMessageLang('es')">Español</button>
+                <button onclick="setMessageLang('en')">English</button>
+            </div>
+            
+            <div class="quote-row">
+                <div class="form-group">
+                    <label>Importe (€, IVA incluido)</label>
+                    <input type="number" id="quoteAmount" step="0.01" min="0" placeholder="Ej: 85.00" onchange="updateClientMessage()">
+                </div>
+                <div class="form-group">
+                    <label>Plazo (días laborables)</label>
+                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
+                </div>
+            </div>
+            
+            <div class="quote-row">
+                <div class="form-group">
+                    <label>Recargo urgencia (€, opcional)</label>
+                    <input type="number" id="quoteUrgency" step="0.01" min="0" placeholder="Ej: 15.00" onchange="updateClientMessage()">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Email del cliente (opcional, para envío directo)</label>
+                <input type="email" id="clientEmail" placeholder="cliente@email.com">
+            </div>
+            
+            <div class="message-preview" id="clientMessagePreview"></div>
+            
+            <div class="copy-buttons">
+                <button class="btn copy-btn whatsapp" onclick="copyForWhatsApp()">
+                    📱 Copiar WhatsApp
+                </button>
+                <button class="btn copy-btn email" onclick="copyForEmail()">
+                    📧 Copiar Email
+                </button>
+            </div>
+            
+            <button class="btn btn-primary btn-success action-btn" id="sendClientBtn" onclick="sendClientEmail()" style="margin-top: 12px;">
+                ✉️ Enviar Email al Cliente
+            </button>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div>Tradutema 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
+        <div class="version-info" id="versionInfo">HTML v2.0.1 (26/12 12:30) | API: ?</div>
+    </footer>
+
+    <!-- Modal Preview Proveedor -->
+    <div class="modal-overlay" id="providerPreviewModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Vista previa - Tasación</span>
+                <button class="modal-close" onclick="closeProviderModal()">✕</button>
+            </div>
+            <div class="modal-body" id="providerPreviewBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeProviderModal()">Cancelar</button>
+                <button class="btn btn-primary btn-success" onclick="sendProviderEmails()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Overlay -->
+    <div class="success-overlay" id="successOverlay">
+        <div class="success-checkmark">✓</div>
+        <div class="success-text" id="successText">¡Completado!</div>
+        <div class="success-subtext" id="successSubtext"></div>
+    </div>
+
+    <script>
+        /**
+         * TRADUTEMA - Gestor de Presupuestos
+         * HTML Version: 2.0.1
+         * Fecha: 26/12/2025 12:30
+         */
+
+        const HTML_VERSION = '2.0.1 (26/12 12:30)';
+        const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+        // State
+        let apiUrl = localStorage.getItem('tradutema_api_url') || '';
+        let apiVersion = '?';
+        let allProviders = [];
+        let allTariffs = [];
+        let filteredProviders = [];
+        let selectedProviders = new Set();
+        let uploadedFiles = [];
+        let currentStep = 1;
+        let completedSteps = new Set();
+        
+        // Budget data
+        let budgetData = {
+            id: null,
+            folderId: null,
+            folderUrl: null,
+            sourceLang: '',
+            targetLang: '',
+            channel: '',
+            wordCount: null,
+            pageCount: null,
+            fileAnalysis: [],
+            tariffPerWord: 0,
+            tariffPage1: 0,
+            tariffPage2: 0
+        };
+        
+        let deadlineType = 'open';
+        let messageLang = 'es';
+
+        // ====== INIT ======
+        document.addEventListener('DOMContentLoaded', () => {
+            if (apiUrl) {
+                document.getElementById('configSection').style.display = 'none';
+                loadData();
+            }
+            updateClientMessage();
+        });
+
+        // ====== CONFIG ======
+        function saveConfig() {
+            const url = document.getElementById('apiUrl').value.trim();
+            if (!url || !url.includes('/exec')) {
+                showStatus('URL inválida. Debe terminar en /exec', 'error');
+                return;
+            }
+            apiUrl = url;
+            localStorage.setItem('tradutema_api_url', url);
+            document.getElementById('configSection').style.display = 'none';
+            loadData();
+        }
+
+        function showConfig() {
+            document.getElementById('configSection').style.display = 'block';
+            document.getElementById('apiUrl').value = apiUrl;
+        }
+
+        // ====== LOAD DATA ======
+        async function loadData() {
+            showStatus('Conectando...', 'loading');
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                if (data.success) {
+                    allProviders = data.providers || [];
+                    allTariffs = data.tariffs || [];
+                    apiVersion = data.version || '?';
+                    document.getElementById('versionInfo').textContent = `HTML v${HTML_VERSION} | API: ${apiVersion}`;
+                    
+                    populateLanguages();
+                    hideStatus();
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        // ====== LANGUAGES ======
+        function populateLanguages() {
+            const sourceSet = new Set();
+            const targetSet = new Set();
+            
+            allTariffs.forEach(t => {
+                if (t.idiomaOrigen) sourceSet.add(t.idiomaOrigen);
+                if (t.idiomaDestino) targetSet.add(t.idiomaDestino);
+            });
+            
+            const sourceSelect = document.getElementById('sourceLang');
+            const targetSelect = document.getElementById('targetLang');
+            
+            sourceSelect.innerHTML = '<option value="">Seleccionar...</option>';
+            targetSelect.innerHTML = '<option value="">Seleccionar...</option>';
+            
+            [...sourceSet].sort().forEach(lang => {
+                sourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+            
+            [...targetSet].sort().forEach(lang => {
+                targetSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+        }
+
+        function onLanguageChange() {
+            const src = document.getElementById('sourceLang').value;
+            const tgt = document.getElementById('targetLang').value;
+            
+            budgetData.sourceLang = src;
+            budgetData.targetLang = tgt;
+            
+            // Find tariff for this combination
+            if (src && tgt) {
+                const tariff = allTariffs.find(t => t.idiomaOrigen === src && t.idiomaDestino === tgt);
+                if (tariff) {
+                    budgetData.tariffPerWord = parseFloat(String(tariff.tarifaPorPalabra).replace(',', '.')) || 0;
+                    budgetData.tariffPage1 = parseFloat(String(tariff.tarifaPagina1).replace(',', '.')) || 0;
+                    budgetData.tariffPage2 = parseFloat(String(tariff.tarifaPagina2).replace(',', '.')) || 0;
+                }
+            }
+            
+            // Filter providers
+            filterProviders();
+            checkStep1Complete();
+        }
+
+        function filterProviders() {
+            const src = document.getElementById('sourceLang').value;
+            const tgt = document.getElementById('targetLang').value;
+            
+            if (!src || !tgt) {
+                filteredProviders = [];
+            } else {
+                filteredProviders = allProviders.filter(p => 
+                    p.idiomaOrigen === src && p.idiomaDestino === tgt
+                );
+            }
+            
+            selectedProviders.clear();
+            renderProviders();
+        }
+
+        // ====== CHANNEL ======
+        function selectChannel(channel) {
+            document.querySelectorAll('.channel-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.channel === channel);
+            });
+            budgetData.channel = channel;
+            checkStep1Complete();
+        }
+
+        // ====== STEP NAVIGATION ======
+        function checkStep1Complete() {
+            const src = document.getElementById('sourceLang').value;
+            const tgt = document.getElementById('targetLang').value;
+            const channel = budgetData.channel;
+            
+            const complete = src && tgt && channel;
+            document.getElementById('step1Btn').disabled = !complete;
+        }
+
+        function completeStep1() {
+            completedSteps.add(1);
+            updateProgressSteps();
+            showCard(2);
+        }
+
+        function completeStep2() {
+            if (uploadedFiles.length === 0) {
+                showStatus('Adjunta al menos un archivo', 'warning');
+                return;
+            }
+            completedSteps.add(2);
+            updateProgressSteps();
+            showCard(3);
+            updateFolderPreview();
+        }
+
+        function completeStep4() {
+            completedSteps.add(4);
+            updateProgressSteps();
+            showCard(5);
+            
+            // Auto-check include word count if we have data
+            if (budgetData.wordCount) {
+                document.getElementById('includeWordCount').classList.add('checked');
+            }
+        }
+
+        function skipToStep(step) {
+            showCard(step);
+        }
+
+        function goToStep(step) {
+            const stepEl = document.querySelector(`.progress-step[data-step="${step}"]`);
+            if (stepEl.classList.contains('locked')) return;
+            showCard(step);
+        }
+
+        function showCard(step) {
+            currentStep = step;
+            
+            // Hide all cards
+            for (let i = 1; i <= 6; i++) {
+                const card = document.getElementById(`step${i}Card`);
+                if (card) card.classList.add('hidden');
+            }
+            
+            // Show current card
+            const currentCard = document.getElementById(`step${step}Card`);
+            if (currentCard) currentCard.classList.remove('hidden');
+            
+            // Update progress steps visual
+            document.querySelectorAll('.progress-step').forEach(el => {
+                const s = parseInt(el.dataset.step);
+                el.classList.remove('active');
+                if (s === step) el.classList.add('active');
+            });
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function updateProgressSteps() {
+            document.querySelectorAll('.progress-step').forEach(el => {
+                const step = parseInt(el.dataset.step);
+                
+                if (completedSteps.has(step)) {
+                    el.classList.add('completed');
+                    el.classList.remove('locked');
+                }
+                
+                // Unlock next step
+                const maxCompleted = Math.max(...completedSteps, 0);
+                if (step <= maxCompleted + 1) {
+                    el.classList.remove('locked');
+                }
+            });
+        }
+
+        // ====== FILES ======
+        function handleFiles(files) {
+            for (const file of files) {
+                if (uploadedFiles.some(f => f.name === file.name)) continue;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result.split(',')[1];
+                    uploadedFiles.push({
+                        name: file.name,
+                        size: file.size,
+                        type: file.type || 'application/octet-stream',
+                        content: base64
+                    });
+                    renderFiles();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function renderFiles() {
+            const list = document.getElementById('fileList');
+            const total = document.getElementById('fileTotal');
+            const area = document.getElementById('fileUploadArea');
+            const btn = document.getElementById('step2Btn');
+            
+            if (uploadedFiles.length === 0) {
+                list.innerHTML = '';
+                total.style.display = 'none';
+                area.classList.remove('has-files');
+                btn.disabled = true;
+                return;
+            }
+            
+            area.classList.add('has-files');
+            btn.disabled = false;
+            
+            let html = '';
+            let totalSize = 0;
+            
+            uploadedFiles.forEach((f, i) => {
+                totalSize += f.size;
+                html += `
+                    <div class="file-item">
+                        <div class="file-item-info">
+                            <span class="file-item-name">${f.name}</span>
+                            <span class="file-item-size">${formatFileSize(f.size)}</span>
+                        </div>
+                        <button class="file-item-remove" onclick="removeFile(${i})">✕</button>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+            total.innerHTML = `<strong>${uploadedFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total`;
+            total.style.display = 'block';
+        }
+
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            renderFiles();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        // ====== FOLDER CREATION ======
+        function updateFolderPreview() {
+            const today = new Date();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const preview = `${mm}${dd}-XX-${budgetData.channel}`;
+            document.getElementById('previewBudgetId').textContent = preview;
+        }
+
+        async function createFolder() {
+            const btn = document.getElementById('step3Btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Creando...';
+            
+            try {
+                showStatus('Creando carpeta y subiendo archivos...', 'loading');
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'createBudgetFolder',
+                        channel: budgetData.channel,
+                        sourceLang: budgetData.sourceLang,
+                        targetLang: budgetData.targetLang,
+                        files: uploadedFiles
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    budgetData.id = data.budgetId;
+                    budgetData.folderId = data.folderId;
+                    budgetData.folderUrl = data.folderUrl;
+                    
+                    // Update UI
+                    document.getElementById('budgetIdDisplay').textContent = budgetData.id;
+                    document.getElementById('budgetIdDisplay').classList.add('active');
+                    document.getElementById('previewBudgetId').textContent = budgetData.id;
+                    
+                    // Show folder link
+                    const folderLink = document.getElementById('folderLink');
+                    folderLink.href = budgetData.folderUrl;
+                    folderLink.classList.remove('hidden');
+                    
+                    completedSteps.add(3);
+                    updateProgressSteps();
+                    
+                    showSuccess('Carpeta creada', budgetData.id);
+                    
+                    setTimeout(() => {
+                        hideSuccess();
+                        showCard(4);
+                    }, 1500);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '📁 Crear Carpeta en Drive';
+        }
+
+        // ====== WORD COUNT ======
+        async function countWords() {
+            if (!budgetData.folderId) {
+                showStatus('Primero crea la carpeta del presupuesto', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('countWordsBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Analizando...';
+            
+            try {
+                showStatus('Analizando documentos (puede tardar unos segundos)...', 'loading');
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'countWords',
+                        folderId: budgetData.folderId,
+                        budgetId: budgetData.id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    budgetData.fileAnalysis = data.analysis || [];
+                    budgetData.wordCount = data.totalWords || 0;
+                    budgetData.pageCount = data.totalPages || 0;
+                    
+                    // Display results
+                    displayWordCountResults(data);
+                    hideStatus();
+                    
+                    // Set custom tariff from config
+                    document.getElementById('customTariff').value = budgetData.tariffPerWord.toFixed(2);
+                    updateTotalPrice();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '🔢 Contar Palabras';
+        }
+
+        function displayWordCountResults(data) {
+            const resultsBox = document.getElementById('wordCountResults');
+            const tbody = document.getElementById('wordCountBody');
+            
+            let html = '';
+            data.analysis.forEach(file => {
+                html += `
+                    <tr>
+                        <td>${file.name}</td>
+                        <td class="number">${file.words.toLocaleString('es-ES')}</td>
+                        <td class="number">${file.pages}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                <tr class="total">
+                    <td>TOTAL</td>
+                    <td class="number">${data.totalWords.toLocaleString('es-ES')}</td>
+                    <td class="number">${data.totalPages}</td>
+                </tr>
+            `;
+            
+            tbody.innerHTML = html;
+            resultsBox.classList.remove('hidden');
+        }
+
+        function updateTotalPrice() {
+            const tariff = parseFloat(document.getElementById('customTariff').value) || 0;
+            const words = budgetData.wordCount || 0;
+            const pages = budgetData.pageCount || 0;
+            
+            // Price by words
+            const priceByWords = (words * tariff).toFixed(2).replace('.', ',');
+            document.getElementById('priceByWords').textContent = priceByWords + ' €';
+            
+            // Price by pages
+            const page1 = budgetData.tariffPage1 || 0;
+            const page2 = budgetData.tariffPage2 || 0;
+            let priceByPages = 0;
+            if (pages > 0) {
+                priceByPages = page1 + Math.max(0, pages - 1) * page2;
+            }
+            document.getElementById('priceByPages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
+        }
+
+        // ====== PROVIDERS ======
+        function renderProviders() {
+            const list = document.getElementById('providersList');
+            
+            if (filteredProviders.length === 0) {
+                list.innerHTML = `
+                    <div class="no-providers">
+                        <div>No hay proveedores para esta combinación</div>
+                    </div>
+                `;
+                updateSelectedCount();
+                return;
+            }
+            
+            let html = '';
+            filteredProviders.forEach((p, i) => {
+                const selected = selectedProviders.has(i) ? 'selected' : '';
+                html += `
+                    <div class="provider-item ${selected}" onclick="toggleProvider(${i})">
+                        <div class="provider-checkbox"></div>
+                        <div class="provider-info">
+                            <div class="provider-name">${p.nombre}</div>
+                            <div class="provider-email">${p.email}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+            updateSelectedCount();
+        }
+
+        function toggleProvider(index) {
+            if (selectedProviders.has(index)) {
+                selectedProviders.delete(index);
+            } else {
+                selectedProviders.add(index);
+            }
+            renderProviders();
+        }
+
+        function toggleSelectAll() {
+            if (selectedProviders.size === filteredProviders.length) {
+                selectedProviders.clear();
+            } else {
+                filteredProviders.forEach((_, i) => selectedProviders.add(i));
+            }
+            renderProviders();
+        }
+
+        function updateSelectedCount() {
+            document.getElementById('selectedCount').textContent = selectedProviders.size + ' seleccionados';
+            document.getElementById('sendQuoteBtn').disabled = selectedProviders.size === 0;
+        }
+
+        // ====== DEADLINE ======
+        function setDeadlineType(type) {
+            deadlineType = type;
+            document.getElementById('deadlineOpen').classList.toggle('active', type === 'open');
+            document.getElementById('deadlineFixed').classList.toggle('active', type === 'fixed');
+            document.getElementById('deadlineFields').classList.toggle('visible', type === 'fixed');
+        }
+
+        // ====== CHECKBOXES ======
+        function toggleCheckbox(id) {
+            document.getElementById(id).classList.toggle('checked');
+        }
+
+        // ====== PROVIDER EMAIL ======
+        function previewProviderEmail() {
+            if (selectedProviders.size === 0) return;
+            
+            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
+            const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
+            const includeRate = document.getElementById('includeAgreedRate').classList.contains('checked');
+            
+            let html = `
+                <div style="background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
+                    <strong>Destinatarios (${providers.length}):</strong><br>
+                    ${providers.map(p => p.nombre + ' &lt;' + p.email + '&gt;').join('<br>')}
+                </div>
+            `;
+            
+            if (uploadedFiles.length > 0) {
+                html += `
+                    <div style="background: rgba(46,204,113,0.1); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem; color: #1e8449;">
+                        <strong>Archivos adjuntos:</strong> ${uploadedFiles.map(f => f.name).join(', ')}
+                    </div>
+                `;
+            }
+            
+            html += `<div style="background: var(--bg-primary); padding: 16px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 0.8rem; white-space: pre-wrap; line-height: 1.5;">`;
+            html += generateProviderEmailPreview(providers[0], includeWords, includeRate);
+            html += `</div>`;
+            
+            document.getElementById('providerPreviewBody').innerHTML = html;
+            document.getElementById('providerPreviewModal').classList.add('visible');
+        }
+
+        function generateProviderEmailPreview(provider, includeWords, includeRate) {
+            let body = `Hola ${provider.nombre},\n\n`;
+            body += `Te escribo para solicitar tarifa y disponibilidad para una traducción.\n\n`;
+            body += `DETALLES DEL ENCARGO\n`;
+            body += `--------------------\n`;
+            body += `* Combinación: ${budgetData.sourceLang} > ${budgetData.targetLang}\n`;
+            
+            if (includeWords && budgetData.wordCount) {
+                body += `* Palabras: ${budgetData.wordCount.toLocaleString('es-ES')}\n`;
+                body += `* Páginas: ${budgetData.pageCount}\n`;
+            }
+            
+            if (deadlineType === 'open') {
+                body += `* Plazo: Abierto (indícame tu mejor plazo)\n`;
+            } else {
+                const date = document.getElementById('deadlineDate').value;
+                const time = document.getElementById('deadlineTime').value || '18:00';
+                if (date) {
+                    const dateObj = new Date(date);
+                    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+                    body += `* Plazo requerido: ${dateObj.toLocaleDateString('es-ES', options)} a las ${time}\n`;
+                }
+            }
+            
+            if (includeRate && budgetData.tariffPerWord > 0) {
+                body += `\n* Tarifa acordada: ${budgetData.tariffPerWord.toFixed(2).replace('.', ',')} EUR/palabra\n`;
+            }
+            
+            const comments = document.getElementById('providerComments').value.trim();
+            if (comments) {
+                body += `\nCOMENTARIOS\n`;
+                body += `--------------------\n`;
+                body += `${comments}\n`;
+            }
+            
+            body += `\n--------------------\n`;
+            body += `Por favor, confírmame disponibilidad y tarifa.\n\n`;
+            body += `Gracias,\nTradutema`;
+            
+            return body;
+        }
+
+        function closeProviderModal() {
+            document.getElementById('providerPreviewModal').classList.remove('visible');
+        }
+
+        async function sendProviderEmails() {
+            closeProviderModal();
+            
+            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
+            const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
+            const includeRate = document.getElementById('includeAgreedRate').classList.contains('checked');
+            
+            showStatus('Enviando emails a proveedores...', 'loading');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'sendProviderEmails',
+                        providers: providers,
+                        budgetId: budgetData.id,
+                        folderId: budgetData.folderId,
+                        sourceLang: budgetData.sourceLang,
+                        targetLang: budgetData.targetLang,
+                        deadline: deadlineType,
+                        deadlineDate: document.getElementById('deadlineDate').value,
+                        deadlineTime: document.getElementById('deadlineTime').value,
+                        wordCount: includeWords ? budgetData.wordCount : null,
+                        pageCount: includeWords ? budgetData.pageCount : null,
+                        includeRate: includeRate,
+                        tariffPerWord: budgetData.tariffPerWord,
+                        comments: document.getElementById('providerComments').value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const ok = data.results.filter(r => r.success).length;
+                    showSuccess('Emails enviados', `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`);
+                    
+                    completedSteps.add(5);
+                    updateProgressSteps();
+                    
+                    setTimeout(() => {
+                        hideSuccess();
+                        showCard(6);
+                    }, 2000);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        // ====== CLIENT MESSAGE ======
+        function setMessageLang(lang) {
+            messageLang = lang;
+            document.querySelectorAll('.lang-toggle button').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(lang === 'es' ? 'español' : 'english'));
+            });
+            updateClientMessage();
+        }
+
+        function updateClientMessage() {
+            const amount = document.getElementById('quoteAmount').value || 'XXX';
+            const days = document.getElementById('quoteDays').value || 'X';
+            const urgency = document.getElementById('quoteUrgency').value || '';
+            const refId = budgetData.id || 'REFERENCIA';
+            
+            // Calculate delivery date
+            let deliveryDate = 'X días laborables desde hoy';
+            if (days && !isNaN(parseInt(days))) {
+                const d = new Date();
+                let added = 0;
+                while (added < parseInt(days)) {
+                    d.setDate(d.getDate() + 1);
+                    if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+                }
+                deliveryDate = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+            }
+            
+            let message;
+            
+            if (messageLang === 'es') {
+                message = `Hola,
+
+La tarifa para la traducción jurada del documento enviado es de ${amount} EUR (IVA incluido).
+
+Plazo aproximado: ${days} días laborables${urgency ? ` (si lo necesitas antes, es posible, con un recargo por urgencia de ${urgency} EUR)` : ''}.
+
+Para realizar el pedido:
+1. Haz clic en https://tradutema.com/cotizacion-personalizada/
+2. Selecciona los idiomas. En Referencia Cotización, introduce ${refId}. En Importe indica ${amount} EUR, indica Cómo quieres recibir la traducción, en plazo indica la fecha de ${deliveryDate} y Carga los documentos.
+3. Carrito situado arriba a la derecha de la página.
+4. Haz clic en AÑADIR AL CARRITO y ve al carrito para finalizar la compra.
+
+Muchas gracias,
+
+Javier Pardo Furness
+Traductor Jurado Nº 2098
+Coordinador en Tradutema.com
+info@tradutema.com
++34 670 91 78 60
+
+Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI`;
+            } else {
+                message = `Hello,
+
+The fee for the sworn translation of the document sent is ${amount} EUR (VAT included).
+
+Estimated delivery: ${days} working days${urgency ? ` (if you need it sooner, it's possible with an urgency surcharge of ${urgency} EUR)` : ''}.
+
+To place your order:
+1. Click on https://tradutema.com/cotizacion-personalizada/
+2. Select the languages. In Quote Reference, enter ${refId}. In Amount enter ${amount} EUR, indicate how you want to receive the translation, in deadline enter the date ${deliveryDate} and upload the documents.
+3. Shopping cart located at the top right of the page.
+4. Click ADD TO CART and go to cart to complete your purchase.
+
+Thank you very much,
+
+Javier Pardo Furness
+Sworn Translator No. 2098
+Coordinator at Tradutema.com
+info@tradutema.com
++34 670 91 78 60
+
+Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
+            }
+            
+            document.getElementById('clientMessagePreview').textContent = message;
+        }
+
+        function copyForWhatsApp() {
+            const message = document.getElementById('clientMessagePreview').textContent;
+            navigator.clipboard.writeText(message).then(() => {
+                showStatus('Copiado para WhatsApp ✓', 'success');
+                setTimeout(hideStatus, 2000);
+            });
+        }
+
+        function copyForEmail() {
+            const message = document.getElementById('clientMessagePreview').textContent;
+            navigator.clipboard.writeText(message).then(() => {
+                showStatus('Copiado para Email ✓', 'success');
+                setTimeout(hideStatus, 2000);
+            });
+        }
+
+        async function sendClientEmail() {
+            const email = document.getElementById('clientEmail').value.trim();
+            if (!email) {
+                showStatus('Introduce el email del cliente', 'warning');
+                return;
+            }
+            
+            const amount = document.getElementById('quoteAmount').value;
+            if (!amount) {
+                showStatus('Introduce el importe del presupuesto', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('sendClientBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Enviando...';
+            
+            try {
+                showStatus('Enviando presupuesto al cliente...', 'loading');
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'sendClientEmail',
+                        clientEmail: email,
+                        budgetId: budgetData.id,
+                        amount: amount,
+                        days: document.getElementById('quoteDays').value,
+                        urgency: document.getElementById('quoteUrgency').value,
+                        language: messageLang,
+                        sourceLang: budgetData.sourceLang,
+                        targetLang: budgetData.targetLang
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    completedSteps.add(6);
+                    updateProgressSteps();
+                    showSuccess('¡Presupuesto enviado!', `Email enviado a ${email}`);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '✉️ Enviar Email al Cliente';
+        }
+
+        // ====== STATUS & SUCCESS ======
+        function showStatus(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.className = 'status-message visible ' + type;
+            el.innerHTML = type === 'loading' ? '<span class="spinner dark"></span> ' + msg : msg;
+        }
+
+        function hideStatus() {
+            document.getElementById('statusMessage').classList.remove('visible');
+        }
+
+        function showSuccess(title, subtitle) {
+            document.getElementById('successText').textContent = title;
+            document.getElementById('successSubtext').textContent = subtitle;
+            document.getElementById('successOverlay').classList.add('visible');
+        }
+
+        function hideSuccess() {
+            document.getElementById('successOverlay').classList.remove('visible');
+        }
+    </script>
+</body>
+</html>
