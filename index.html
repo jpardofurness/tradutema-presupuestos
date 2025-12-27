@@ -3,18 +3,15 @@
 ║                                                                  ║
 ║   TRADUTEMA - GESTOR DE PRESUPUESTOS                            ║
 ║                                                                  ║
-║   VERSIÓN: 2.1.0                                                ║
-║   FECHA:   26/12/2025 - 13:45                                   ║
+║   VERSIÓN: 2.2.0                                                ║
+║   FECHA:   27/12/2025 - 12:00                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - "Incluir tarifa acordada" → "Incluir Proposición Tarifa"    ║
-║   - Campo editable tarifa/total en tasación proveedores         ║
-║   - Asunto email: "Nueva Tasación Traducción Jurada..."         ║
-║   - Firma completa Javier Pardo en emails                       ║
-║   - Fix: mensajes de estado se ocultan correctamente            ║
-║   - Fix: drag & drop en archivos                                ║
-║   - Presupuesto cliente: idiomas + nº documentos en texto       ║
-║   - Validación campos obligatorios antes de copiar/enviar       ║
+║   - Nueva pantalla inicial: Nueva Tasación / Retomar            ║
+║   - Lista de presupuestos pendientes con filtros                ║
+║   - Filtros: fecha, canal, idiomas, estado                      ║
+║   - Cargar presupuesto anterior y continuar en cualquier paso   ║
+║   - Más datos guardados en hoja para retomar completo           ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -249,6 +246,39 @@
         .footer a { color: var(--tradutema-blue); text-decoration: none; }
         .version-info { font-family: 'Space Mono', monospace; margin-top: 4px; opacity: 0.7; }
         
+        /* HOME SCREEN */
+        .home-screen { padding: 20px; }
+        .home-buttons { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+        .home-btn { padding: 24px 20px; border: 2px solid var(--border-color); background: var(--bg-card); border-radius: var(--radius-lg); font-family: inherit; font-size: 1rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 16px; text-align: left; }
+        .home-btn:hover { border-color: var(--tradutema-blue); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(30,58,95,0.15); }
+        .home-btn-icon { font-size: 2rem; }
+        .home-btn-text { flex: 1; }
+        .home-btn-title { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+        .home-btn-desc { font-size: 0.85rem; color: var(--text-secondary); }
+        
+        /* BUDGET LIST */
+        .budget-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; padding: 16px; background: var(--bg-primary); border-radius: var(--radius-md); }
+        .budget-filters .form-group { margin-bottom: 0; }
+        .budget-filters label { font-size: 0.75rem; }
+        .budget-filters select, .budget-filters input { padding: 10px 12px; font-size: 0.85rem; }
+        .budget-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+        .budget-item { padding: 14px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer; transition: all 0.2s; }
+        .budget-item:hover { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.02); }
+        .budget-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .budget-item-id { font-weight: 600; font-family: 'Space Mono', monospace; color: var(--tradutema-blue); }
+        .budget-item-status { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; font-weight: 500; }
+        .budget-item-status.pendiente { background: rgba(243,156,18,0.15); color: #d68910; }
+        .budget-item-status.tasacion { background: rgba(52,152,219,0.15); color: #2980b9; }
+        .budget-item-status.enviado { background: rgba(46,204,113,0.15); color: #1e8449; }
+        .budget-item-details { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; color: var(--text-secondary); }
+        .budget-item-detail { display: flex; align-items: center; gap: 4px; }
+        .no-budgets { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+        .back-btn { background: none; border: none; color: var(--tradutema-blue); font-family: inherit; font-size: 0.9rem; cursor: pointer; padding: 8px 0; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        .back-btn:hover { text-decoration: underline; }
+        
+        /* Hide elements */
+        .hidden { display: none !important; }
+        
         /* LANGUAGE TOGGLE */
         .lang-toggle { display: flex; gap: 4px; margin-bottom: 12px; }
         .lang-toggle button { padding: 8px 16px; border: 1px solid var(--border-color); background: white; font-family: inherit; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
@@ -285,7 +315,7 @@
         </div>
     </header>
 
-    <div class="progress-container">
+    <div class="progress-container hidden" id="progressContainer">
         <div class="progress-steps">
             <div class="progress-step active" data-step="1" onclick="goToStep(1)">
                 <span class="step-num">1</span>
@@ -324,8 +354,70 @@
             <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">Guardar y Conectar</button>
         </div>
 
+        <!-- HOME SCREEN -->
+        <div class="home-screen" id="homeScreen">
+            <div class="home-buttons">
+                <button class="home-btn" onclick="startNewBudget()">
+                    <span class="home-btn-icon">🆕</span>
+                    <div class="home-btn-text">
+                        <div class="home-btn-title">Nueva Tasación</div>
+                        <div class="home-btn-desc">Empezar desde cero con un nuevo presupuesto</div>
+                    </div>
+                </button>
+                <button class="home-btn" onclick="showBudgetList()">
+                    <span class="home-btn-icon">📂</span>
+                    <div class="home-btn-text">
+                        <div class="home-btn-title">Retomar Tasación</div>
+                        <div class="home-btn-desc">Cargar un presupuesto pendiente</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- BUDGET LIST SCREEN -->
+        <div class="card hidden" id="budgetListScreen">
+            <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
+            
+            <div class="card-title">Presupuestos</div>
+            
+            <div class="budget-filters">
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select id="filterStatus" onchange="filterBudgets()">
+                        <option value="">Todos</option>
+                        <option value="Pendiente" selected>Pendiente</option>
+                        <option value="Tasación enviada">Tasación enviada</option>
+                        <option value="Enviado">Enviado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Canal</label>
+                    <select id="filterChannel" onchange="filterBudgets()">
+                        <option value="">Todos</option>
+                        <option value="W">WhatsApp</option>
+                        <option value="M">Mail</option>
+                        <option value="F">Formulario</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Idioma origen</label>
+                    <select id="filterSource" onchange="filterBudgets()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Desde fecha</label>
+                    <input type="date" id="filterDateFrom" onchange="filterBudgets()">
+                </div>
+            </div>
+            
+            <div class="budget-list" id="budgetList">
+                <div class="no-budgets">Cargando presupuestos...</div>
+            </div>
+        </div>
+
         <!-- STEP 1: IDIOMAS -->
-        <div class="card" id="step1Card">
+        <div class="card hidden" id="step1Card">
             <div class="card-title">
                 Combinación de idiomas
                 <span class="step-badge">PASO 1</span>
@@ -603,7 +695,7 @@
 
     <footer class="footer">
         <div>Tradutema 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.1.0 (26/12 13:45) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.2.0 (27/12 12:00) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -631,11 +723,11 @@
     <script>
         /**
          * TRADUTEMA - Gestor de Presupuestos
-         * HTML Version: 2.1.0
-         * Fecha: 26/12/2025 13:45
+         * HTML Version: 2.2.0
+         * Fecha: 27/12/2025 12:00
          */
 
-        const HTML_VERSION = '2.1.0 (26/12 13:45)';
+        const HTML_VERSION = '2.2.0 (27/12 12:00)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -643,11 +735,14 @@
         let apiVersion = '?';
         let allProviders = [];
         let allTariffs = [];
+        let allBudgets = [];
+        let filteredBudgets = [];
         let filteredProviders = [];
         let selectedProviders = new Set();
         let uploadedFiles = [];
         let currentStep = 1;
         let completedSteps = new Set();
+        let isResuming = false;
         
         // Budget data
         let budgetData = {
@@ -718,6 +813,226 @@
         function showConfig() {
             document.getElementById('configSection').style.display = 'block';
             document.getElementById('apiUrl').value = apiUrl;
+        }
+
+        // ====== HOME SCREEN ======
+        function showHomeScreen() {
+            document.getElementById('homeScreen').classList.remove('hidden');
+            document.getElementById('budgetListScreen').classList.add('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
+            document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
+            
+            // Reset state
+            resetBudgetState();
+        }
+
+        function resetBudgetState() {
+            budgetData = {
+                id: null, folderId: null, folderUrl: null,
+                sourceLang: '', targetLang: '', channel: '',
+                wordCount: null, pageCount: null, fileAnalysis: [],
+                tariffPerWord: 0, tariffPage1: 0, tariffPage2: 0
+            };
+            uploadedFiles = [];
+            selectedProviders.clear();
+            completedSteps.clear();
+            currentStep = 1;
+            isResuming = false;
+            
+            // Reset UI
+            document.getElementById('sourceLang').value = '';
+            document.getElementById('targetLang').value = '';
+            document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('fileList').innerHTML = '';
+            document.getElementById('filesTotal').style.display = 'none';
+            document.getElementById('folderCreated').classList.add('hidden');
+            document.getElementById('wordCountResults').classList.add('hidden');
+            updateProgressSteps();
+        }
+
+        function startNewBudget() {
+            resetBudgetState();
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('budgetListScreen').classList.add('hidden');
+            document.getElementById('progressContainer').classList.remove('hidden');
+            document.getElementById('step1Card').classList.remove('hidden');
+            updateProgressSteps();
+        }
+
+        async function showBudgetList() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('budgetListScreen').classList.remove('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            
+            await loadBudgets();
+        }
+
+        async function loadBudgets() {
+            document.getElementById('budgetList').innerHTML = '<div class="no-budgets"><span class="spinner dark"></span> Cargando...</div>';
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'getBudgets' })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    allBudgets = data.budgets || [];
+                    populateFilterLanguages();
+                    filterBudgets();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                document.getElementById('budgetList').innerHTML = `<div class="no-budgets">Error: ${error.message}</div>`;
+            }
+        }
+
+        function populateFilterLanguages() {
+            const langs = new Set();
+            allBudgets.forEach(b => {
+                if (b.origen) langs.add(b.origen);
+            });
+            
+            const select = document.getElementById('filterSource');
+            select.innerHTML = '<option value="">Todos</option>';
+            [...langs].sort().forEach(lang => {
+                select.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+        }
+
+        function filterBudgets() {
+            const status = document.getElementById('filterStatus').value;
+            const channel = document.getElementById('filterChannel').value;
+            const source = document.getElementById('filterSource').value;
+            const dateFrom = document.getElementById('filterDateFrom').value;
+            
+            filteredBudgets = allBudgets.filter(b => {
+                if (status && b.estado !== status) return false;
+                if (channel && b.canal !== channel) return false;
+                if (source && b.origen !== source) return false;
+                if (dateFrom) {
+                    const budgetDate = new Date(b.fecha);
+                    const filterDate = new Date(dateFrom);
+                    if (budgetDate < filterDate) return false;
+                }
+                return true;
+            });
+            
+            renderBudgetList();
+        }
+
+        function renderBudgetList() {
+            const container = document.getElementById('budgetList');
+            
+            if (filteredBudgets.length === 0) {
+                container.innerHTML = '<div class="no-budgets">No hay presupuestos con estos filtros</div>';
+                return;
+            }
+            
+            let html = '';
+            filteredBudgets.forEach(b => {
+                const statusClass = b.estado === 'Pendiente' ? 'pendiente' : 
+                                   b.estado === 'Tasación enviada' ? 'tasacion' : 'enviado';
+                const fecha = new Date(b.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                const canal = b.canal === 'W' ? '📱 WhatsApp' : b.canal === 'M' ? '📧 Mail' : '📝 Form';
+                
+                html += `
+                    <div class="budget-item" onclick="loadBudget('${b.id}')">
+                        <div class="budget-item-header">
+                            <span class="budget-item-id">${b.id}</span>
+                            <span class="budget-item-status ${statusClass}">${b.estado}</span>
+                        </div>
+                        <div class="budget-item-details">
+                            <span class="budget-item-detail">📅 ${fecha}</span>
+                            <span class="budget-item-detail">${canal}</span>
+                            <span class="budget-item-detail">🌐 ${b.origen} → ${b.destino}</span>
+                            ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} palabras</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        async function loadBudget(budgetId) {
+            showStatus('Cargando presupuesto...', 'loading');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'getBudget', budgetId: budgetId })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    const b = data.budget;
+                    
+                    // Restore budget data
+                    budgetData.id = b.id;
+                    budgetData.folderId = b.folderId;
+                    budgetData.folderUrl = b.folderUrl;
+                    budgetData.sourceLang = b.origen;
+                    budgetData.targetLang = b.destino;
+                    budgetData.channel = b.canal;
+                    budgetData.wordCount = b.palabras ? parseInt(b.palabras) : null;
+                    budgetData.pageCount = b.paginas ? parseInt(b.paginas) : null;
+                    budgetData.tariffPerWord = b.tarifa ? parseFloat(b.tarifa) : 0;
+                    
+                    isResuming = true;
+                    
+                    // Set completed steps based on what data exists
+                    completedSteps.clear();
+                    completedSteps.add(1); // Languages always done
+                    completedSteps.add(2); // Files always uploaded
+                    completedSteps.add(3); // Folder always created
+                    if (budgetData.wordCount) completedSteps.add(4);
+                    if (b.estado === 'Tasación enviada' || b.estado === 'Enviado') completedSteps.add(5);
+                    if (b.estado === 'Enviado') completedSteps.add(6);
+                    
+                    // Update UI
+                    document.getElementById('sourceLang').value = budgetData.sourceLang;
+                    document.getElementById('targetLang').value = budgetData.targetLang;
+                    document.querySelectorAll('.channel-btn').forEach(btn => {
+                        btn.classList.toggle('selected', btn.dataset.channel === budgetData.channel);
+                    });
+                    document.getElementById('budgetIdDisplay').textContent = budgetData.id;
+                    
+                    // Show folder link
+                    if (budgetData.folderUrl) {
+                        document.getElementById('folderLink').href = budgetData.folderUrl;
+                        document.getElementById('createdBudgetId').textContent = budgetData.id;
+                        document.getElementById('folderCreated').classList.remove('hidden');
+                    }
+                    
+                    // Update tariff
+                    onLanguageChange();
+                    
+                    // Show workflow
+                    document.getElementById('homeScreen').classList.add('hidden');
+                    document.getElementById('budgetListScreen').classList.add('hidden');
+                    document.getElementById('progressContainer').classList.remove('hidden');
+                    
+                    updateProgressSteps();
+                    hideStatus();
+                    
+                    // Go to the appropriate step
+                    let targetStep = 6; // Default to client step
+                    if (!budgetData.wordCount) targetStep = 4;
+                    if (b.estado === 'Enviado') targetStep = 6;
+                    
+                    showCard(targetStep);
+                    updateClientMessage();
+                    
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
         }
 
         // ====== LOAD DATA ======
