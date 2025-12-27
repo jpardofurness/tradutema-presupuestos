@@ -3,15 +3,11 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.5.1                                                ║
-║   FECHA:   27/12/2025 - 23:15                                   ║
+║   VERSIÓN: 2.5.2                                                ║
+║   FECHA:   28/12/2025 - 01:05                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Datos se guardan al hacer clic en CUALQUIER botón:          ║
-║     * Copiar WhatsApp                                           ║
-║     * Copiar Email                                              ║
-║     * Enviar Email                                              ║
-║   - Estado cambia a "Enviado" en todos los casos                ║
+║   - Fix: Filtro WhatsApp ahora funciona (conversión a string)   ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -778,7 +774,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.5.1 (27/12 23:15) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.5.2 (28/12 01:05) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -806,11 +802,11 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.5.1
-         * Fecha: 27/12/2025 23:15
+         * HTML Version: 2.5.2
+         * Fecha: 28/12/2025 01:05
          */
 
-        const HTML_VERSION = '2.5.1 (27/12 23:15)';
+        const HTML_VERSION = '2.5.2 (28/12 01:05)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1273,8 +1269,8 @@
                 if (channel && b.canal !== channel) return false;
                 if (source && b.origen !== source) return false;
                 if (target && b.destino !== target) return false;
-                if (email && (!b.emailCliente || !b.emailCliente.toLowerCase().includes(email))) return false;
-                if (whatsapp && (!b.whatsappCliente || !b.whatsappCliente.includes(whatsapp))) return false;
+                if (email && (!b.emailCliente || !String(b.emailCliente).toLowerCase().includes(email))) return false;
+                if (whatsapp && (!b.whatsappCliente || !String(b.whatsappCliente).includes(whatsapp))) return false;
                 if (dateFrom) {
                     const budgetDate = new Date(b.fecha);
                     const filterDate = new Date(dateFrom);
