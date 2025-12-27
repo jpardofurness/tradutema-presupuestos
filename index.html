@@ -3,14 +3,16 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.3.0                                                ║
-║   FECHA:   27/12/2025 - 19:30                                   ║
+║   VERSIÓN: 2.4.0                                                ║
+║   FECHA:   27/12/2025 - 20:00                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Nuevo diseño blanco y negro con logo Tradutema              ║
-║   - Favicon añadido                                             ║
-║   - Título cambiado a "Tradutema QUOTES"                        ║
-║   - Fix: Error al hacer clic en Nueva Tasación                  ║
+║   - Colores azul Tradutema restaurados                          ║
+║   - Botón Inicio visible en todos los pasos                     ║
+║   - Campos Email y WhatsApp del cliente                         ║
+║   - Filtros por Email y WhatsApp en Retomar Tasación            ║
+║   - Filtro por defecto = Todos (no solo Pendiente)              ║
+║   - Al enviar presupuesto vuelve al inicio automáticamente      ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -23,25 +25,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Tradutema QUOTES</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23222'/><text x='50' y='65' font-size='45' font-weight='bold' text-anchor='middle' fill='white'>TT</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%233498db'/><text x='50' y='65' font-size='45' font-weight='bold' text-anchor='middle' fill='white'>TT</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --tradutema-primary: #1a1a1a;
-            --tradutema-secondary: #333333;
-            --tradutema-light: #555555;
-            --accent-gold: #222222;
+            --tradutema-blue: #3498db;
+            --tradutema-blue-dark: #2980b9;
+            --tradutema-gray: #5d6d7e;
             --accent-green: #2ecc71;
             --accent-red: #e74c3c;
             --accent-orange: #f39c12;
-            --bg-primary: #fafafa;
+            --bg-primary: #f8f9fa;
             --bg-card: #ffffff;
-            --text-primary: #1a1a1a;
-            --text-secondary: #666666;
+            --text-primary: #2c3e50;
+            --text-secondary: #7f8c8d;
             --border-color: #e5e7eb;
-            --shadow-md: 0 4px 12px rgba(30,58,95,0.12);
-            --shadow-lg: 0 10px 30px rgba(30,58,95,0.15);
+            --shadow-md: 0 4px 12px rgba(52,152,219,0.15);
+            --shadow-lg: 0 10px 30px rgba(52,152,219,0.2);
             --radius-sm: 8px;
             --radius-md: 12px;
             --radius-lg: 16px;
@@ -50,19 +51,21 @@
         body { font-family: 'DM Sans', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.5; }
         
         /* HEADER */
-        .header { background: #1a1a1a; color: white; padding: 16px 20px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-lg); }
+        .header { background: var(--tradutema-blue); color: white; padding: 16px 20px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-lg); }
         .header-content { max-width: 700px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
         .logo { font-family: 'Space Mono', monospace; font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 10px; letter-spacing: 2px; }
         .logo-icon-svg { flex-shrink: 0; }
         .logo-text { color: white; }
-        .budget-id { font-family: 'Space Mono', monospace; font-size: 0.85rem; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: var(--radius-sm); }
-        .budget-id.active { background: white; color: #1a1a1a; }
+        .budget-id { font-family: 'Space Mono', monospace; font-size: 0.85rem; background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: var(--radius-sm); }
+        .budget-id.active { background: white; color: var(--tradutema-blue); }
+        .home-link { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .home-link:hover { background: rgba(255,255,255,0.3); }
         
         /* PROGRESS STEPS */
         .progress-container { background: white; border-bottom: 1px solid var(--border-color); padding: 12px 20px; position: sticky; top: 64px; z-index: 99; }
         .progress-steps { max-width: 700px; margin: 0 auto; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
         .progress-step { flex: 1; min-width: 80px; text-align: center; padding: 8px 4px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); background: var(--bg-primary); transition: all 0.3s; cursor: pointer; }
-        .progress-step.active { background: var(--tradutema-primary); color: white; }
+        .progress-step.active { background: var(--tradutema-blue); color: white; }
         .progress-step.completed { background: var(--accent-green); color: white; }
         .progress-step.locked { opacity: 0.5; cursor: not-allowed; }
         .step-num { display: block; font-size: 1rem; font-weight: 700; }
@@ -73,9 +76,9 @@
         /* CARDS */
         .card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); }
         .card.hidden { display: none; }
-        .card-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--tradutema-primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-        .card-title::before { content: ''; width: 4px; height: 16px; background: #1a1a1a; border-radius: 2px; }
-        .card-title .step-badge { background: #1a1a1a; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; margin-left: auto; }
+        .card-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--tradutema-blue); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .card-title::before { content: ''; width: 4px; height: 16px; background: var(--tradutema-blue); border-radius: 2px; }
+        .card-title .step-badge { background: var(--tradutema-blue); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; margin-left: auto; }
         
         /* FORM ELEMENTS */
         .form-group { margin-bottom: 16px; }
@@ -86,19 +89,19 @@
             background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;
         }
         select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 20px; padding-right: 44px; -webkit-appearance: none; }
-        select:focus, input:focus, textarea:focus { outline: none; border-color: var(--tradutema-primary); box-shadow: 0 0 0 3px rgba(30,58,95,0.1); }
+        select:focus, input:focus, textarea:focus { outline: none; border-color: var(--tradutema-blue); box-shadow: 0 0 0 3px rgba(52,152,219,0.1); }
         textarea { min-height: 80px; resize: vertical; }
         
         /* LANGUAGE ROW */
         .language-row { display: flex; gap: 12px; align-items: center; }
         .language-row .form-group { flex: 1; margin-bottom: 0; }
-        .arrow-icon { font-size: 1.5rem; color: var(--tradutema-primary); margin-top: 24px; }
+        .arrow-icon { font-size: 1.5rem; color: var(--tradutema-blue); margin-top: 24px; }
         
         /* CHANNEL SELECTOR */
         .channel-selector { display: flex; gap: 8px; margin-top: 16px; }
         .channel-btn { flex: 1; padding: 14px 8px; border: 2px solid var(--border-color); background: white; border-radius: var(--radius-md); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .channel-btn:hover { border-color: var(--tradutema-secondary); }
-        .channel-btn.selected { border-color: var(--tradutema-primary); background: rgba(30,58,95,0.05); }
+        .channel-btn:hover { border-color: var(--tradutema-blue-dark); }
+        .channel-btn.selected { border-color: var(--tradutema-blue); background: rgba(52,152,219,0.05); }
         .channel-btn .channel-icon { font-size: 1.5rem; }
         .channel-btn.whatsapp.selected { border-color: #25d366; background: rgba(37,211,102,0.1); }
         .channel-btn.mail.selected { border-color: #ea4335; background: rgba(234,67,53,0.1); }
@@ -106,11 +109,11 @@
         
         /* FILE UPLOAD */
         .file-upload-area { border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg-primary); }
-        .file-upload-area:hover, .file-upload-area.dragover { border-color: var(--tradutema-primary); background: rgba(30,58,95,0.03); }
+        .file-upload-area:hover, .file-upload-area.dragover { border-color: var(--tradutema-blue); background: rgba(52,152,219,0.03); }
         .file-upload-area.has-files { border-color: var(--accent-green); background: rgba(46,204,113,0.05); }
         .file-upload-icon { font-size: 2.5rem; margin-bottom: 8px; }
         .file-upload-text { color: var(--text-secondary); font-size: 0.9rem; }
-        .file-upload-text strong { color: var(--tradutema-primary); }
+        .file-upload-text strong { color: var(--tradutema-blue); }
         .file-input { display: none; }
         .file-list { margin-top: 12px; }
         .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: white; border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid var(--border-color); font-size: 0.85rem; }
@@ -118,15 +121,15 @@
         .file-item-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-item-size { font-size: 0.75rem; color: var(--text-secondary); }
         .file-item-remove { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.2rem; padding: 4px 8px; }
-        .file-total { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; padding: 8px 12px; background: rgba(30,58,95,0.05); border-radius: var(--radius-sm); }
+        .file-total { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; padding: 8px 12px; background: rgba(52,152,219,0.05); border-radius: var(--radius-sm); }
         
         /* BUTTONS */
         .btn { padding: 16px 24px; font-size: 1rem; font-weight: 600; font-family: inherit; border: none; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-primary { width: 100%; color: white; background: linear-gradient(135deg, var(--tradutema-primary) 0%, var(--tradutema-dark) 100%); box-shadow: var(--shadow-md); }
+        .btn-primary { width: 100%; color: white; background: linear-gradient(135deg, var(--tradutema-blue) 0%, var(--tradutema-blue-dark) 100%); box-shadow: var(--shadow-md); }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .btn-secondary { color: var(--text-secondary); background: white; border: 2px solid var(--border-color); }
-        .btn-secondary:hover { border-color: var(--tradutema-primary); color: var(--tradutema-primary); }
+        .btn-secondary:hover { border-color: var(--tradutema-blue); color: var(--tradutema-blue); }
         .btn-success { background: var(--accent-green) !important; }
         .btn-gold { background: linear-gradient(135deg, var(--accent-gold) 0%, #c4983f 100%) !important; }
         .btn-orange { background: linear-gradient(135deg, var(--accent-orange) 0%, #e67e22 100%) !important; }
@@ -138,13 +141,13 @@
         .action-btn { width: 100%; padding: 20px; font-size: 1.1rem; margin-top: 8px; }
         
         /* RESULTS BOX */
-        .results-box { background: linear-gradient(135deg, rgba(30,58,95,0.05) 0%, rgba(212,168,83,0.1) 100%); border-radius: var(--radius-md); padding: 16px; margin-top: 16px; }
+        .results-box { background: linear-gradient(135deg, rgba(52,152,219,0.05) 0%, rgba(212,168,83,0.1) 100%); border-radius: var(--radius-md); padding: 16px; margin-top: 16px; }
         .results-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px; }
         .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .result-item { background: white; padding: 12px; border-radius: var(--radius-sm); }
         .result-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
-        .result-value { font-family: 'Space Mono', monospace; font-size: 1.2rem; font-weight: 700; color: var(--tradutema-primary); }
-        .result-item.highlight { background: var(--tradutema-primary); }
+        .result-value { font-family: 'Space Mono', monospace; font-size: 1.2rem; font-weight: 700; color: var(--tradutema-blue); }
+        .result-item.highlight { background: var(--tradutema-blue); }
         .result-item.highlight .result-label { color: rgba(255,255,255,0.7); }
         .result-item.highlight .result-value { color: white; }
         .result-item.full-width { grid-column: 1 / -1; }
@@ -154,7 +157,7 @@
         .word-count-table th, .word-count-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
         .word-count-table th { background: var(--bg-primary); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); }
         .word-count-table td.number { font-family: 'Space Mono', monospace; text-align: right; }
-        .word-count-table tr.total { background: var(--tradutema-primary); color: white; font-weight: 600; }
+        .word-count-table tr.total { background: var(--tradutema-blue); color: white; font-weight: 600; }
         .word-count-table tr.total td { border-bottom: none; }
         
         /* TARIFF EDITOR */
@@ -168,25 +171,25 @@
         /* PROVIDERS */
         .providers-list { display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; }
         .provider-item { display: flex; align-items: center; padding: 14px; border: 2px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; background: var(--bg-card); }
-        .provider-item:hover { border-color: var(--tradutema-secondary); }
-        .provider-item.selected { border-color: var(--tradutema-primary); background: rgba(30,58,95,0.05); }
+        .provider-item:hover { border-color: var(--tradutema-blue-dark); }
+        .provider-item.selected { border-color: var(--tradutema-blue); background: rgba(52,152,219,0.05); }
         .provider-checkbox { width: 24px; height: 24px; border: 2px solid var(--border-color); border-radius: 6px; margin-right: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
-        .provider-item.selected .provider-checkbox { background: var(--tradutema-primary); border-color: var(--tradutema-primary); }
+        .provider-item.selected .provider-checkbox { background: var(--tradutema-blue); border-color: var(--tradutema-blue); }
         .provider-checkbox::after { content: '✓'; color: white; font-weight: 700; font-size: 14px; opacity: 0; }
         .provider-item.selected .provider-checkbox::after { opacity: 1; }
         .provider-info { flex: 1; min-width: 0; }
         .provider-name { font-weight: 600; color: var(--text-primary); }
         .provider-email { font-size: 0.8rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
         .select-all-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
-        .select-all-btn { font-size: 0.85rem; color: var(--tradutema-primary); background: none; border: none; font-family: inherit; font-weight: 500; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); }
-        .select-all-btn:hover { background: rgba(30,58,95,0.08); }
+        .select-all-btn { font-size: 0.85rem; color: var(--tradutema-blue); background: none; border: none; font-family: inherit; font-weight: 500; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); }
+        .select-all-btn:hover { background: rgba(52,152,219,0.08); }
         .selected-count { font-size: 0.85rem; color: var(--text-secondary); }
         .no-providers { text-align: center; padding: 30px; color: var(--text-secondary); }
         
         /* DEADLINE */
         .deadline-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
         .toggle-btn { flex: 1; padding: 14px; border: 2px solid var(--border-color); background: var(--bg-card); border-radius: var(--radius-md); font-family: inherit; font-size: 0.9rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
-        .toggle-btn.active { border-color: var(--tradutema-primary); background: var(--tradutema-primary); color: white; }
+        .toggle-btn.active { border-color: var(--tradutema-blue); background: var(--tradutema-blue); color: white; }
         .deadline-fields { display: none; gap: 12px; }
         .deadline-fields.visible { display: flex; }
         .deadline-fields .form-group { flex: 1; margin-bottom: 0; }
@@ -194,7 +197,7 @@
         /* CHECKBOXES */
         .checkbox-row { display: flex; align-items: center; padding: 12px 0; }
         .custom-checkbox { position: relative; width: 52px; height: 28px; background: var(--border-color); border-radius: 14px; cursor: pointer; transition: background 0.3s; margin-right: 12px; flex-shrink: 0; }
-        .custom-checkbox.checked { background: var(--tradutema-primary); }
+        .custom-checkbox.checked { background: var(--tradutema-blue); }
         .custom-checkbox::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: transform 0.3s; }
         .custom-checkbox.checked::after { transform: translateX(24px); }
         .checkbox-label { font-size: 0.9rem; }
@@ -211,7 +214,7 @@
         .status-message.visible { display: flex; }
         .status-message.success { background: rgba(46,204,113,0.1); color: #1e8449; border: 1px solid rgba(46,204,113,0.3); }
         .status-message.error { background: rgba(231,76,60,0.1); color: #c0392b; border: 1px solid rgba(231,76,60,0.3); }
-        .status-message.loading { background: rgba(30,58,95,0.08); color: var(--tradutema-primary); border: 1px solid rgba(30,58,95,0.2); }
+        .status-message.loading { background: rgba(52,152,219,0.08); color: var(--tradutema-blue); border: 1px solid rgba(52,152,219,0.2); }
         .status-message.warning { background: rgba(243,156,18,0.1); color: #d68910; border: 1px solid rgba(243,156,18,0.3); }
         
         /* MODALS */
@@ -233,25 +236,25 @@
         .success-subtext { font-size: 1rem; opacity: 0.9; margin-top: 8px; text-align: center; padding: 0 20px; }
         
         /* CONFIG */
-        .config-section { background: rgba(30,58,95,0.03); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
+        .config-section { background: rgba(52,152,219,0.03); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
         .config-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
         .config-input { font-family: 'Space Mono', monospace; font-size: 0.85rem; }
         
         /* SPINNER */
         .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
-        .spinner.dark { border-color: rgba(30,58,95,0.2); border-top-color: var(--tradutema-primary); }
+        .spinner.dark { border-color: rgba(52,152,219,0.2); border-top-color: var(--tradutema-blue); }
         @keyframes spin { to { transform: rotate(360deg); } }
         
         /* FOOTER */
         .footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.75rem; }
-        .footer a { color: var(--tradutema-primary); text-decoration: none; }
+        .footer a { color: var(--tradutema-blue); text-decoration: none; }
         .version-info { font-family: 'Space Mono', monospace; margin-top: 4px; opacity: 0.7; }
         
         /* HOME SCREEN */
         .home-screen { padding: 20px; max-width: 700px; margin: 0 auto; }
         .home-buttons { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
         .home-btn { padding: 24px 20px; border: 2px solid var(--border-color); background: var(--bg-card); border-radius: var(--radius-lg); font-family: inherit; font-size: 1rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 16px; text-align: left; }
-        .home-btn:hover { border-color: #1a1a1a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .home-btn:hover { border-color: var(--tradutema-blue); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(52,152,219,0.2); }
         .home-btn-icon { font-size: 2rem; }
         .home-btn-text { flex: 1; }
         .home-btn-title { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
@@ -264,17 +267,17 @@
         .budget-filters select, .budget-filters input { padding: 10px 12px; font-size: 0.85rem; }
         .budget-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
         .budget-item { padding: 14px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer; transition: all 0.2s; }
-        .budget-item:hover { border-color: #1a1a1a; background: rgba(0,0,0,0.02); }
+        .budget-item:hover { border-color: var(--tradutema-blue); background: rgba(52,152,219,0.03); }
         .budget-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .budget-item-id { font-weight: 600; font-family: 'Space Mono', monospace; color: #1a1a1a; }
+        .budget-item-id { font-weight: 600; font-family: 'Space Mono', monospace; color: var(--tradutema-blue); }
         .budget-item-status { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; font-weight: 500; }
         .budget-item-status.pendiente { background: rgba(243,156,18,0.15); color: #d68910; }
-        .budget-item-status.tasacion { background: rgba(100,100,100,0.15); color: #555; }
+        .budget-item-status.tasacion { background: rgba(52,152,219,0.15); color: #2980b9; }
         .budget-item-status.enviado { background: rgba(46,204,113,0.15); color: #1e8449; }
         .budget-item-details { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; color: var(--text-secondary); }
         .budget-item-detail { display: flex; align-items: center; gap: 4px; }
         .no-budgets { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
-        .back-btn { background: none; border: none; color: #1a1a1a; font-family: inherit; font-size: 0.9rem; cursor: pointer; padding: 8px 0; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        .back-btn { background: none; border: none; color: var(--tradutema-blue); font-family: inherit; font-size: 0.9rem; cursor: pointer; padding: 8px 0; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
         .back-btn:hover { text-decoration: underline; }
         
         /* Hide elements */
@@ -285,7 +288,7 @@
         .lang-toggle button { padding: 8px 16px; border: 1px solid var(--border-color); background: white; font-family: inherit; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
         .lang-toggle button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
         .lang-toggle button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-        .lang-toggle button.active { background: var(--tradutema-primary); color: white; border-color: var(--tradutema-primary); }
+        .lang-toggle button.active { background: var(--tradutema-blue); color: white; border-color: var(--tradutema-blue); }
         
         /* QUOTE FORM */
         .quote-row { display: flex; gap: 12px; }
@@ -308,14 +311,17 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <div class="logo">
+            <div class="logo" onclick="showHomeScreen()" style="cursor: pointer;">
                 <svg class="logo-icon-svg" viewBox="0 0 40 40" width="36" height="36">
-                    <circle cx="20" cy="20" r="18" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="2"/>
+                    <circle cx="20" cy="20" r="18" fill="#3498db" stroke="#5d6d7e" stroke-width="2"/>
                     <text x="20" y="27" font-size="18" font-weight="bold" text-anchor="middle" fill="white" font-family="serif">TT</text>
                 </svg>
                 <span class="logo-text">QUOTES</span>
             </div>
-            <div class="budget-id" id="budgetIdDisplay">Sin crear</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button class="home-link" onclick="showHomeScreen()" id="homeBtn" style="display: none;">🏠 Inicio</button>
+                <div class="budget-id" id="budgetIdDisplay">Sin crear</div>
+            </div>
         </div>
     </header>
 
@@ -388,8 +394,8 @@
                 <div class="form-group">
                     <label>Estado</label>
                     <select id="filterStatus" onchange="filterBudgets()">
-                        <option value="">Todos</option>
-                        <option value="Pendiente" selected>Pendiente</option>
+                        <option value="" selected>Todos</option>
+                        <option value="Pendiente">Pendiente</option>
                         <option value="Tasación enviada">Tasación enviada</option>
                         <option value="Enviado">Enviado</option>
                     </select>
@@ -408,6 +414,14 @@
                     <select id="filterSource" onchange="filterBudgets()">
                         <option value="">Todos</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label>Email cliente</label>
+                    <input type="text" id="filterEmail" placeholder="Buscar..." oninput="filterBudgets()">
+                </div>
+                <div class="form-group">
+                    <label>WhatsApp cliente</label>
+                    <input type="text" id="filterWhatsApp" placeholder="Buscar..." oninput="filterBudgets()">
                 </div>
                 <div class="form-group">
                     <label>Desde fecha</label>
@@ -457,6 +471,19 @@
                         <span class="channel-icon">📝</span>
                         Formulario
                     </button>
+                </div>
+            </div>
+            
+            <!-- Campos de contacto del cliente -->
+            <div class="form-group" style="margin-top: 16px;" id="clientContactFields">
+                <label>Contacto del cliente (opcional)</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+                    <div>
+                        <input type="email" id="clientEmail" placeholder="Email del cliente" oninput="onContactChange()">
+                    </div>
+                    <div>
+                        <input type="tel" id="clientWhatsApp" placeholder="WhatsApp (+34...)" oninput="onContactChange()">
+                    </div>
                 </div>
             </div>
             
@@ -699,7 +726,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.3.0 (27/12 19:30) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.4.0 (27/12 20:00) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -727,11 +754,11 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.3.0
-         * Fecha: 27/12/2025 19:30
+         * HTML Version: 2.4.0
+         * Fecha: 27/12/2025 20:00
          */
 
-        const HTML_VERSION = '2.3.0 (27/12 19:30)';
+        const HTML_VERSION = '2.4.0 (27/12 20:00)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -756,6 +783,8 @@
             sourceLang: '',
             targetLang: '',
             channel: '',
+            clientEmail: '',
+            clientWhatsApp: '',
             wordCount: null,
             pageCount: null,
             fileAnalysis: [],
@@ -826,6 +855,7 @@
             document.getElementById('progressContainer').classList.add('hidden');
             document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
             document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
+            document.getElementById('homeBtn').style.display = 'none';
             
             // Reset state
             resetBudgetState();
@@ -835,6 +865,7 @@
             budgetData = {
                 id: null, folderId: null, folderUrl: null,
                 sourceLang: '', targetLang: '', channel: '',
+                clientEmail: '', clientWhatsApp: '',
                 wordCount: null, pageCount: null, fileAnalysis: [],
                 tariffPerWord: 0, tariffPage1: 0, tariffPage2: 0
             };
@@ -847,6 +878,8 @@
             // Reset UI - con verificación de existencia
             const sourceLang = document.getElementById('sourceLang');
             const targetLang = document.getElementById('targetLang');
+            const clientEmail = document.getElementById('clientEmail');
+            const clientWhatsApp = document.getElementById('clientWhatsApp');
             const fileList = document.getElementById('fileList');
             const filesTotal = document.getElementById('filesTotal');
             const folderCreated = document.getElementById('folderCreated');
@@ -854,6 +887,8 @@
             
             if (sourceLang) sourceLang.value = '';
             if (targetLang) targetLang.value = '';
+            if (clientEmail) clientEmail.value = '';
+            if (clientWhatsApp) clientWhatsApp.value = '';
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
             if (fileList) fileList.innerHTML = '';
             if (filesTotal) filesTotal.style.display = 'none';
@@ -869,6 +904,7 @@
             document.getElementById('budgetListScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.remove('hidden');
             document.getElementById('step1Card').classList.remove('hidden');
+            document.getElementById('homeBtn').style.display = 'flex';
             updateProgressSteps();
         }
 
@@ -876,8 +912,17 @@
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.remove('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('homeBtn').style.display = 'flex';
             
             await loadBudgets();
+        }
+
+        // Guardar contacto del cliente
+        function onContactChange() {
+            const email = document.getElementById('clientEmail');
+            const whatsapp = document.getElementById('clientWhatsApp');
+            if (email) budgetData.clientEmail = email.value.trim();
+            if (whatsapp) budgetData.clientWhatsApp = whatsapp.value.trim();
         }
 
         async function loadBudgets() {
@@ -919,12 +964,16 @@
             const status = document.getElementById('filterStatus').value;
             const channel = document.getElementById('filterChannel').value;
             const source = document.getElementById('filterSource').value;
+            const email = document.getElementById('filterEmail').value.toLowerCase().trim();
+            const whatsapp = document.getElementById('filterWhatsApp').value.trim();
             const dateFrom = document.getElementById('filterDateFrom').value;
             
             filteredBudgets = allBudgets.filter(b => {
                 if (status && b.estado !== status) return false;
                 if (channel && b.canal !== channel) return false;
                 if (source && b.origen !== source) return false;
+                if (email && (!b.emailCliente || !b.emailCliente.toLowerCase().includes(email))) return false;
+                if (whatsapp && (!b.whatsappCliente || !b.whatsappCliente.includes(whatsapp))) return false;
                 if (dateFrom) {
                     const budgetDate = new Date(b.fecha);
                     const filterDate = new Date(dateFrom);
@@ -1324,6 +1373,8 @@
                         channel: budgetData.channel,
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
+                        clientEmail: budgetData.clientEmail,
+                        clientWhatsApp: budgetData.clientWhatsApp,
                         files: uploadedFiles
                     })
                 });
@@ -1558,10 +1609,10 @@
             const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
             
             let html = `
-                <div style="background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
+                <div style="background: rgba(52,152,219,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
                     <strong>Asunto:</strong> Nueva Tasación Traducción Jurada ${budgetData.sourceLang} > ${budgetData.targetLang} [${budgetData.id}]
                 </div>
-                <div style="background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
+                <div style="background: rgba(52,152,219,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
                     <strong>Destinatarios (${providers.length}):</strong><br>
                     ${providers.map(p => p.nombre + ' &lt;' + p.email + '&gt;').join('<br>')}
                 </div>
@@ -1858,7 +1909,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                     hideStatus();
                     completedSteps.add(6);
                     updateProgressSteps();
-                    showSuccess('¡Presupuesto enviado!', `Email enviado a ${email}`);
+                    showSuccess('¡Presupuesto enviado!', `Email enviado a ${email}`, true);
                 } else {
                     throw new Error(data.error);
                 }
@@ -1882,10 +1933,18 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             document.getElementById('statusMessage').classList.remove('visible');
         }
 
-        function showSuccess(title, subtitle) {
+        function showSuccess(title, subtitle, returnToHome = false) {
             document.getElementById('successText').textContent = title;
             document.getElementById('successSubtext').textContent = subtitle;
             document.getElementById('successOverlay').classList.add('visible');
+            
+            // Auto-hide after 2.5 seconds
+            setTimeout(() => {
+                hideSuccess();
+                if (returnToHome) {
+                    showHomeScreen();
+                }
+            }, 2500);
         }
 
         function hideSuccess() {
