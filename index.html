@@ -3,13 +3,14 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.4.2                                                ║
-║   FECHA:   27/12/2025 - 21:00                                   ║
+║   VERSIÓN: 2.5.0                                                ║
+║   FECHA:   27/12/2025 - 23:00                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Email/WhatsApp visible en listado de presupuestos           ║
-║   - Reset campos Importe/Plazo/Urgencia al nuevo presupuesto    ║
-║   - Reset preview mensaje cliente                               ║
+║   - Filtro Idioma Destino en Retomar Tasación                   ║
+║   - Nueva opción "Contar Palabras" rápido en Inicio             ║
+║   - Fix: Cargar presupuesto existente (error null)              ║
+║   - WhatsApp se guarda al enviar email al cliente               ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -379,6 +380,60 @@
                         <div class="home-btn-desc">Cargar un presupuesto pendiente</div>
                     </div>
                 </button>
+                <button class="home-btn" onclick="showQuickCount()">
+                    <span class="home-btn-icon">🔢</span>
+                    <div class="home-btn-text">
+                        <div class="home-btn-title">Contar Palabras</div>
+                        <div class="home-btn-desc">Recuento rápido sin crear presupuesto</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- QUICK WORD COUNT SCREEN -->
+        <div class="card hidden" id="quickCountScreen">
+            <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
+            
+            <div class="card-title">Contar Palabras Rápido</div>
+            
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                Arrastra archivos para contar palabras sin crear carpeta ni presupuesto.
+            </p>
+            
+            <div class="file-upload-area" id="quickUploadArea" onclick="document.getElementById('quickFileInput').click()">
+                <div class="file-upload-icon">📄</div>
+                <div class="file-upload-text">
+                    <strong>Arrastra archivos aquí o toca para seleccionar</strong><br>
+                    <small>PDF, imágenes, Word (max 20MB total)</small>
+                </div>
+                <input type="file" id="quickFileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.tiff,.bmp" onchange="handleQuickFiles(this.files)">
+            </div>
+            
+            <div class="file-list" id="quickFileList"></div>
+            <div class="file-total" id="quickFileTotal" style="display:none;"></div>
+            
+            <button class="btn btn-primary btn-orange action-btn" id="quickCountBtn" onclick="doQuickCount()" style="display:none;">
+                🔢 Contar Palabras
+            </button>
+            
+            <div class="results-box hidden" id="quickCountResults">
+                <div class="results-title">Resultado del análisis</div>
+                <table class="word-count-table" id="quickCountTable">
+                    <thead>
+                        <tr>
+                            <th>Archivo</th>
+                            <th style="text-align:right">Palabras</th>
+                            <th style="text-align:right">Páginas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quickCountBody"></tbody>
+                </table>
+                
+                <div class="totals-row" id="quickCountTotals"></div>
+                
+                <button class="btn btn-primary action-btn" onclick="copyQuickResults()" style="margin-top: 12px;">
+                    📋 Copiar Resultado
+                </button>
             </div>
         </div>
 
@@ -410,6 +465,12 @@
                 <div class="form-group">
                     <label>Idioma origen</label>
                     <select id="filterSource" onchange="filterBudgets()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Idioma destino</label>
+                    <select id="filterTarget" onchange="filterBudgets()">
                         <option value="">Todos</option>
                     </select>
                 </div>
@@ -716,7 +777,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.4.2 (27/12 21:00) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.5.0 (27/12 23:00) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -744,11 +805,11 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.4.2
-         * Fecha: 27/12/2025 21:00
+         * HTML Version: 2.5.0
+         * Fecha: 27/12/2025 23:00
          */
 
-        const HTML_VERSION = '2.4.2 (27/12 21:00)';
+        const HTML_VERSION = '2.5.0 (27/12 23:00)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -818,6 +879,26 @@
                 const files = e.dataTransfer.files;
                 handleFiles(files);
             }, false);
+            
+            // Setup drag & drop for quick count
+            const quickDropArea = document.getElementById('quickUploadArea');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                quickDropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                quickDropArea.addEventListener(eventName, () => quickDropArea.classList.add('dragover'), false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                quickDropArea.addEventListener(eventName, () => quickDropArea.classList.remove('dragover'), false);
+            });
+            
+            quickDropArea.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                handleQuickFiles(files);
+            }, false);
         });
 
         // ====== CONFIG ======
@@ -843,6 +924,7 @@
             document.getElementById('homeScreen').classList.remove('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('quickCountScreen').classList.add('hidden');
             document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
             document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
             document.getElementById('homeBtn').style.display = 'none';
@@ -935,10 +1017,194 @@
         async function showBudgetList() {
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.remove('hidden');
+            document.getElementById('quickCountScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
             
             await loadBudgets();
+        }
+
+        // ====== QUICK WORD COUNT ======
+        let quickFiles = [];
+        
+        function showQuickCount() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('budgetListScreen').classList.add('hidden');
+            document.getElementById('quickCountScreen').classList.remove('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('homeBtn').style.display = 'flex';
+            
+            // Reset quick count state
+            quickFiles = [];
+            document.getElementById('quickFileList').innerHTML = '';
+            document.getElementById('quickFileTotal').style.display = 'none';
+            document.getElementById('quickCountBtn').style.display = 'none';
+            document.getElementById('quickCountResults').classList.add('hidden');
+            document.getElementById('quickFileInput').value = '';
+            document.getElementById('quickUploadArea').classList.remove('has-files');
+        }
+        
+        function handleQuickFiles(files) {
+            for (const file of files) {
+                if (quickFiles.some(f => f.name === file.name)) continue;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result.split(',')[1];
+                    quickFiles.push({
+                        name: file.name,
+                        size: file.size,
+                        type: file.type || 'application/octet-stream',
+                        content: base64
+                    });
+                    renderQuickFiles();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        function renderQuickFiles() {
+            const list = document.getElementById('quickFileList');
+            const total = document.getElementById('quickFileTotal');
+            const area = document.getElementById('quickUploadArea');
+            const btn = document.getElementById('quickCountBtn');
+            
+            if (quickFiles.length === 0) {
+                list.innerHTML = '';
+                total.style.display = 'none';
+                area.classList.remove('has-files');
+                btn.style.display = 'none';
+                return;
+            }
+            
+            area.classList.add('has-files');
+            btn.style.display = 'block';
+            
+            let html = '';
+            let totalSize = 0;
+            quickFiles.forEach((file, idx) => {
+                totalSize += file.size;
+                const sizeStr = file.size > 1024*1024 
+                    ? (file.size / (1024*1024)).toFixed(1) + ' MB'
+                    : (file.size / 1024).toFixed(0) + ' KB';
+                html += `
+                    <div class="file-item">
+                        <div class="file-item-info">
+                            <span class="file-item-name">${file.name}</span>
+                            <span class="file-item-size">${sizeStr}</span>
+                        </div>
+                        <button class="file-remove" onclick="removeQuickFile(${idx})">✕</button>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+            
+            const totalStr = totalSize > 1024*1024 
+                ? (totalSize / (1024*1024)).toFixed(1) + ' MB'
+                : (totalSize / 1024).toFixed(0) + ' KB';
+            total.innerHTML = `${quickFiles.length} archivo(s) - <strong>${totalStr}</strong> total`;
+            total.style.display = 'block';
+        }
+        
+        function removeQuickFile(idx) {
+            quickFiles.splice(idx, 1);
+            renderQuickFiles();
+        }
+        
+        async function doQuickCount() {
+            if (quickFiles.length === 0) return;
+            
+            const btn = document.getElementById('quickCountBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Contando...';
+            
+            try {
+                showStatus('Analizando documentos...', 'loading');
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'quickCount',
+                        files: quickFiles
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    hideStatus();
+                    
+                    // Render results table
+                    const tbody = document.getElementById('quickCountBody');
+                    let html = '';
+                    let totalWords = 0;
+                    let totalPages = 0;
+                    
+                    data.files.forEach(f => {
+                        totalWords += f.words || 0;
+                        totalPages += f.pages || 0;
+                        html += `
+                            <tr>
+                                <td>${f.name}</td>
+                                <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
+                                <td style="text-align:right">${f.pages || 0}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                    
+                    // Totals
+                    document.getElementById('quickCountTotals').innerHTML = `
+                        <div class="results-grid">
+                            <div class="result-item">
+                                <div class="result-label">Total palabras</div>
+                                <div class="result-value">${totalWords.toLocaleString('es-ES')}</div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-label">Total páginas</div>
+                                <div class="result-value">${totalPages}</div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('quickCountResults').classList.remove('hidden');
+                    
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '🔢 Contar Palabras';
+        }
+        
+        function copyQuickResults() {
+            const tbody = document.getElementById('quickCountBody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            let text = 'Archivo\tPalabras\tPáginas\n';
+            let totalWords = 0;
+            let totalPages = 0;
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const name = cells[0].textContent;
+                const words = parseInt(cells[1].textContent.replace(/\./g, '')) || 0;
+                const pages = parseInt(cells[2].textContent) || 0;
+                totalWords += words;
+                totalPages += pages;
+                text += `${name}\t${words}\t${pages}\n`;
+            });
+            
+            text += `\nTOTAL\t${totalWords}\t${totalPages}`;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                showStatus('✓ Copiado al portapapeles', 'success');
+                setTimeout(hideStatus, 2000);
+            });
         }
 
         // Guardar contacto del cliente
@@ -972,15 +1238,23 @@
         }
 
         function populateFilterLanguages() {
-            const langs = new Set();
+            const sourceLangs = new Set();
+            const targetLangs = new Set();
             allBudgets.forEach(b => {
-                if (b.origen) langs.add(b.origen);
+                if (b.origen) sourceLangs.add(b.origen);
+                if (b.destino) targetLangs.add(b.destino);
             });
             
-            const select = document.getElementById('filterSource');
-            select.innerHTML = '<option value="">Todos</option>';
-            [...langs].sort().forEach(lang => {
-                select.innerHTML += `<option value="${lang}">${lang}</option>`;
+            const selectSource = document.getElementById('filterSource');
+            selectSource.innerHTML = '<option value="">Todos</option>';
+            [...sourceLangs].sort().forEach(lang => {
+                selectSource.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+            
+            const selectTarget = document.getElementById('filterTarget');
+            selectTarget.innerHTML = '<option value="">Todos</option>';
+            [...targetLangs].sort().forEach(lang => {
+                selectTarget.innerHTML += `<option value="${lang}">${lang}</option>`;
             });
         }
 
@@ -988,6 +1262,7 @@
             const status = document.getElementById('filterStatus').value;
             const channel = document.getElementById('filterChannel').value;
             const source = document.getElementById('filterSource').value;
+            const target = document.getElementById('filterTarget').value;
             const email = document.getElementById('filterEmail').value.toLowerCase().trim();
             const whatsapp = document.getElementById('filterWhatsApp').value.trim();
             const dateFrom = document.getElementById('filterDateFrom').value;
@@ -996,6 +1271,7 @@
                 if (status && b.estado !== status) return false;
                 if (channel && b.canal !== channel) return false;
                 if (source && b.origen !== source) return false;
+                if (target && b.destino !== target) return false;
                 if (email && (!b.emailCliente || !b.emailCliente.toLowerCase().includes(email))) return false;
                 if (whatsapp && (!b.whatsappCliente || !b.whatsappCliente.includes(whatsapp))) return false;
                 if (dateFrom) {
@@ -1098,9 +1374,13 @@
                     
                     // Show folder link
                     if (budgetData.folderUrl) {
-                        document.getElementById('folderLink').href = budgetData.folderUrl;
-                        document.getElementById('createdBudgetId').textContent = budgetData.id;
-                        document.getElementById('folderCreated').classList.remove('hidden');
+                        const folderLink = document.getElementById('folderLink');
+                        if (folderLink) {
+                            folderLink.href = budgetData.folderUrl;
+                            folderLink.classList.remove('hidden');
+                        }
+                        const previewId = document.getElementById('previewBudgetId');
+                        if (previewId) previewId.textContent = budgetData.id;
                     }
                     
                     // Update tariff
@@ -1110,6 +1390,7 @@
                     document.getElementById('homeScreen').classList.add('hidden');
                     document.getElementById('budgetListScreen').classList.add('hidden');
                     document.getElementById('progressContainer').classList.remove('hidden');
+                    document.getElementById('homeBtn').style.display = 'flex';
                     
                     updateProgressSteps();
                     hideStatus();
@@ -1913,6 +2194,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
 
         async function sendClientEmail() {
             const email = document.getElementById('clientEmail').value.trim();
+            const whatsapp = document.getElementById('clientWhatsApp').value.trim();
+            
             if (!email) {
                 showStatus('Introduce el email del cliente', 'warning');
                 setTimeout(hideStatus, 3000);
@@ -1933,6 +2216,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                     body: JSON.stringify({
                         action: 'sendClientEmail',
                         clientEmail: email,
+                        clientWhatsApp: whatsapp,
                         budgetId: budgetData.id,
                         amount: document.getElementById('quoteAmount').value,
                         days: document.getElementById('quoteDays').value,
