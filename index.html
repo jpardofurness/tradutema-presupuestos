@@ -3,12 +3,18 @@
 ║                                                                  ║
 ║   TRADUTEMA - GESTOR DE PRESUPUESTOS                            ║
 ║                                                                  ║
-║   VERSIÓN: 2.0.1                                                ║
-║   FECHA:   26/12/2025 - 12:30                                   ║
+║   VERSIÓN: 2.1.0                                                ║
+║   FECHA:   26/12/2025 - 13:45                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Añadida cabecera de versión visible                         ║
-║   - Versión con fecha/hora en footer de la app                  ║
+║   - "Incluir tarifa acordada" → "Incluir Proposición Tarifa"    ║
+║   - Campo editable tarifa/total en tasación proveedores         ║
+║   - Asunto email: "Nueva Tasación Traducción Jurada..."         ║
+║   - Firma completa Javier Pardo en emails                       ║
+║   - Fix: mensajes de estado se ocultan correctamente            ║
+║   - Fix: drag & drop en archivos                                ║
+║   - Presupuesto cliente: idiomas + nº documentos en texto       ║
+║   - Validación campos obligatorios antes de copiar/enviar       ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -102,7 +108,7 @@
         
         /* FILE UPLOAD */
         .file-upload-area { border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg-primary); }
-        .file-upload-area:hover { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.03); }
+        .file-upload-area:hover, .file-upload-area.dragover { border-color: var(--tradutema-blue); background: rgba(30,58,95,0.03); }
         .file-upload-area.has-files { border-color: var(--accent-green); background: rgba(46,204,113,0.05); }
         .file-upload-icon { font-size: 2.5rem; margin-bottom: 8px; }
         .file-upload-text { color: var(--text-secondary); font-size: 0.9rem; }
@@ -155,9 +161,11 @@
         
         /* TARIFF EDITOR */
         .tariff-editor { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.1); border-radius: var(--radius-sm); }
-        .tariff-editor label { margin-bottom: 0; flex-shrink: 0; }
+        .tariff-editor label { margin-bottom: 0; flex-shrink: 0; font-size: 0.85rem; }
         .tariff-editor input { width: 100px; padding: 8px 12px; text-align: right; font-family: 'Space Mono', monospace; }
         .tariff-editor .tariff-unit { color: var(--text-secondary); font-size: 0.85rem; }
+        .proposed-rate-fields { margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.05); border-radius: var(--radius-md); border: 1px solid rgba(212,168,83,0.3); }
+        .proposed-rate-fields.hidden { display: none; }
         
         /* PROVIDERS */
         .providers-list { display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; }
@@ -496,8 +504,21 @@
             </div>
             
             <div class="checkbox-row">
-                <div class="custom-checkbox" id="includeAgreedRate" onclick="toggleCheckbox('includeAgreedRate')"></div>
-                <span class="checkbox-label">Incluir tarifa acordada</span>
+                <div class="custom-checkbox" id="includeProposedRate" onclick="toggleCheckbox('includeProposedRate'); toggleProposedRateFields()"></div>
+                <span class="checkbox-label">Incluir Proposición Tarifa</span>
+            </div>
+            
+            <div class="proposed-rate-fields hidden" id="proposedRateFields">
+                <div class="tariff-editor">
+                    <label>Tarifa:</label>
+                    <input type="number" id="proposedTariff" step="0.01" min="0" onchange="updateProposedTotal()">
+                    <span class="tariff-unit">€/palabra</span>
+                </div>
+                <div class="tariff-editor" style="margin-top: 8px;">
+                    <label>Total:</label>
+                    <input type="number" id="proposedTotal" step="0.01" min="0">
+                    <span class="tariff-unit">€</span>
+                </div>
             </div>
             
             <div class="form-group">
@@ -582,7 +603,7 @@
 
     <footer class="footer">
         <div>Tradutema 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.0.1 (26/12 12:30) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.1.0 (26/12 13:45) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -610,11 +631,11 @@
     <script>
         /**
          * TRADUTEMA - Gestor de Presupuestos
-         * HTML Version: 2.0.1
-         * Fecha: 26/12/2025 12:30
+         * HTML Version: 2.1.0
+         * Fecha: 26/12/2025 13:45
          */
 
-        const HTML_VERSION = '2.0.1 (26/12 12:30)';
+        const HTML_VERSION = '2.1.0 (26/12 13:45)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -654,6 +675,31 @@
                 loadData();
             }
             updateClientMessage();
+            
+            // Setup drag & drop for file upload
+            const dropArea = document.getElementById('fileUploadArea');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+            });
+            
+            dropArea.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            }, false);
         });
 
         // ====== CONFIG ======
@@ -1154,15 +1200,40 @@
             document.getElementById(id).classList.toggle('checked');
         }
 
+        function toggleProposedRateFields() {
+            const isChecked = document.getElementById('includeProposedRate').classList.contains('checked');
+            const fields = document.getElementById('proposedRateFields');
+            
+            if (isChecked) {
+                fields.classList.remove('hidden');
+                // Auto-fill with tariff and calculated total
+                const tariff = budgetData.tariffPerWord || 0;
+                const words = budgetData.wordCount || 0;
+                document.getElementById('proposedTariff').value = tariff.toFixed(2);
+                document.getElementById('proposedTotal').value = (tariff * words).toFixed(2);
+            } else {
+                fields.classList.add('hidden');
+            }
+        }
+
+        function updateProposedTotal() {
+            const tariff = parseFloat(document.getElementById('proposedTariff').value) || 0;
+            const words = budgetData.wordCount || 0;
+            document.getElementById('proposedTotal').value = (tariff * words).toFixed(2);
+        }
+
         // ====== PROVIDER EMAIL ======
         function previewProviderEmail() {
             if (selectedProviders.size === 0) return;
             
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
-            const includeRate = document.getElementById('includeAgreedRate').classList.contains('checked');
+            const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
             
             let html = `
+                <div style="background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
+                    <strong>Asunto:</strong> Nueva Tasación Traducción Jurada ${budgetData.sourceLang} > ${budgetData.targetLang} [${budgetData.id}]
+                </div>
                 <div style="background: rgba(30,58,95,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
                     <strong>Destinatarios (${providers.length}):</strong><br>
                     ${providers.map(p => p.nombre + ' &lt;' + p.email + '&gt;').join('<br>')}
@@ -1178,14 +1249,14 @@
             }
             
             html += `<div style="background: var(--bg-primary); padding: 16px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 0.8rem; white-space: pre-wrap; line-height: 1.5;">`;
-            html += generateProviderEmailPreview(providers[0], includeWords, includeRate);
+            html += generateProviderEmailPreview(providers[0], includeWords, includeProposedRate);
             html += `</div>`;
             
             document.getElementById('providerPreviewBody').innerHTML = html;
             document.getElementById('providerPreviewModal').classList.add('visible');
         }
 
-        function generateProviderEmailPreview(provider, includeWords, includeRate) {
+        function generateProviderEmailPreview(provider, includeWords, includeProposedRate) {
             let body = `Hola ${provider.nombre},\n\n`;
             body += `Te escribo para solicitar tarifa y disponibilidad para una traducción.\n\n`;
             body += `DETALLES DEL ENCARGO\n`;
@@ -1209,8 +1280,15 @@
                 }
             }
             
-            if (includeRate && budgetData.tariffPerWord > 0) {
-                body += `\n* Tarifa acordada: ${budgetData.tariffPerWord.toFixed(2).replace('.', ',')} EUR/palabra\n`;
+            if (includeProposedRate) {
+                const proposedTariff = parseFloat(document.getElementById('proposedTariff').value) || 0;
+                const proposedTotal = parseFloat(document.getElementById('proposedTotal').value) || 0;
+                if (proposedTariff > 0) {
+                    body += `\n* Tarifa propuesta: ${proposedTariff.toFixed(2).replace('.', ',')} EUR/palabra\n`;
+                }
+                if (proposedTotal > 0) {
+                    body += `* Total propuesto: ${proposedTotal.toFixed(2).replace('.', ',')} EUR\n`;
+                }
             }
             
             const comments = document.getElementById('providerComments').value.trim();
@@ -1221,8 +1299,15 @@
             }
             
             body += `\n--------------------\n`;
+            body += `Referencia: ${budgetData.id}\n\n`;
             body += `Por favor, confírmame disponibilidad y tarifa.\n\n`;
-            body += `Gracias,\nTradutema`;
+            body += `Gracias,\n\n`;
+            body += `Javier Pardo Furness\n`;
+            body += `Traductor Jurado Nº 2098\n`;
+            body += `Coordinador en Tradutema.com\n`;
+            body += `info@tradutema.com\n`;
+            body += `+34 670 91 78 60\n\n`;
+            body += `Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI`;
             
             return body;
         }
@@ -1236,7 +1321,7 @@
             
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
-            const includeRate = document.getElementById('includeAgreedRate').classList.contains('checked');
+            const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
             
             showStatus('Enviando emails a proveedores...', 'loading');
             
@@ -1255,8 +1340,9 @@
                         deadlineTime: document.getElementById('deadlineTime').value,
                         wordCount: includeWords ? budgetData.wordCount : null,
                         pageCount: includeWords ? budgetData.pageCount : null,
-                        includeRate: includeRate,
-                        tariffPerWord: budgetData.tariffPerWord,
+                        includeProposedRate: includeProposedRate,
+                        proposedTariff: parseFloat(document.getElementById('proposedTariff').value) || 0,
+                        proposedTotal: parseFloat(document.getElementById('proposedTotal').value) || 0,
                         comments: document.getElementById('providerComments').value
                     })
                 });
@@ -1264,6 +1350,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    hideStatus();
                     const ok = data.results.filter(r => r.success).length;
                     showSuccess('Emails enviados', `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`);
                     
@@ -1279,6 +1366,7 @@
                 }
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
             }
         }
 
@@ -1296,6 +1384,12 @@
             const days = document.getElementById('quoteDays').value || 'X';
             const urgency = document.getElementById('quoteUrgency').value || '';
             const refId = budgetData.id || 'REFERENCIA';
+            const srcLang = budgetData.sourceLang || 'origen';
+            const tgtLang = budgetData.targetLang || 'destino';
+            const numDocs = uploadedFiles.length || 1;
+            
+            // Document text
+            const docText = numDocs > 1 ? `de los ${numDocs} documentos enviados` : 'del documento enviado';
             
             // Calculate delivery date
             let deliveryDate = 'X días laborables desde hoy';
@@ -1314,7 +1408,7 @@
             if (messageLang === 'es') {
                 message = `Hola,
 
-La tarifa para la traducción jurada del documento enviado es de ${amount} EUR (IVA incluido).
+La tarifa para la traducción jurada de ${srcLang} a ${tgtLang} ${docText} es de ${amount} EUR (IVA incluido).
 
 Plazo aproximado: ${days} días laborables${urgency ? ` (si lo necesitas antes, es posible, con un recargo por urgencia de ${urgency} EUR)` : ''}.
 
@@ -1334,9 +1428,10 @@ info@tradutema.com
 
 Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI`;
             } else {
+                const docTextEn = numDocs > 1 ? `of the ${numDocs} documents sent` : 'of the document sent';
                 message = `Hello,
 
-The fee for the sworn translation of the document sent is ${amount} EUR (VAT included).
+The fee for the sworn translation from ${srcLang} to ${tgtLang} ${docTextEn} is ${amount} EUR (VAT included).
 
 Estimated delivery: ${days} working days${urgency ? ` (if you need it sooner, it's possible with an urgency surcharge of ${urgency} EUR)` : ''}.
 
@@ -1360,7 +1455,26 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             document.getElementById('clientMessagePreview').textContent = message;
         }
 
+        function validateClientFields() {
+            const amount = document.getElementById('quoteAmount').value;
+            const days = document.getElementById('quoteDays').value;
+            
+            if (!amount) {
+                showStatus('Introduce el importe del presupuesto', 'warning');
+                setTimeout(hideStatus, 3000);
+                return false;
+            }
+            if (!days) {
+                showStatus('Introduce el plazo en días laborables', 'warning');
+                setTimeout(hideStatus, 3000);
+                return false;
+            }
+            return true;
+        }
+
         function copyForWhatsApp() {
+            if (!validateClientFields()) return;
+            
             const message = document.getElementById('clientMessagePreview').textContent;
             navigator.clipboard.writeText(message).then(() => {
                 showStatus('Copiado para WhatsApp ✓', 'success');
@@ -1369,6 +1483,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         function copyForEmail() {
+            if (!validateClientFields()) return;
+            
             const message = document.getElementById('clientMessagePreview').textContent;
             navigator.clipboard.writeText(message).then(() => {
                 showStatus('Copiado para Email ✓', 'success');
@@ -1380,14 +1496,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const email = document.getElementById('clientEmail').value.trim();
             if (!email) {
                 showStatus('Introduce el email del cliente', 'warning');
+                setTimeout(hideStatus, 3000);
                 return;
             }
             
-            const amount = document.getElementById('quoteAmount').value;
-            if (!amount) {
-                showStatus('Introduce el importe del presupuesto', 'warning');
-                return;
-            }
+            if (!validateClientFields()) return;
             
             const btn = document.getElementById('sendClientBtn');
             btn.disabled = true;
@@ -1402,18 +1515,20 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         action: 'sendClientEmail',
                         clientEmail: email,
                         budgetId: budgetData.id,
-                        amount: amount,
+                        amount: document.getElementById('quoteAmount').value,
                         days: document.getElementById('quoteDays').value,
                         urgency: document.getElementById('quoteUrgency').value,
                         language: messageLang,
                         sourceLang: budgetData.sourceLang,
-                        targetLang: budgetData.targetLang
+                        targetLang: budgetData.targetLang,
+                        numDocs: uploadedFiles.length
                     })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
+                    hideStatus();
                     completedSteps.add(6);
                     updateProgressSteps();
                     showSuccess('¡Presupuesto enviado!', `Email enviado a ${email}`);
@@ -1422,6 +1537,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 }
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
             }
             
             btn.disabled = false;
