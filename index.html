@@ -3,14 +3,15 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.5.0                                                ║
-║   FECHA:   27/12/2025 - 23:00                                   ║
+║   VERSIÓN: 2.5.1                                                ║
+║   FECHA:   27/12/2025 - 23:15                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Filtro Idioma Destino en Retomar Tasación                   ║
-║   - Nueva opción "Contar Palabras" rápido en Inicio             ║
-║   - Fix: Cargar presupuesto existente (error null)              ║
-║   - WhatsApp se guarda al enviar email al cliente               ║
+║   - Datos se guardan al hacer clic en CUALQUIER botón:          ║
+║     * Copiar WhatsApp                                           ║
+║     * Copiar Email                                              ║
+║     * Enviar Email                                              ║
+║   - Estado cambia a "Enviado" en todos los casos                ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -777,7 +778,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.5.0 (27/12 23:00) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.5.1 (27/12 23:15) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -805,11 +806,11 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.5.0
-         * Fecha: 27/12/2025 23:00
+         * HTML Version: 2.5.1
+         * Fecha: 27/12/2025 23:15
          */
 
-        const HTML_VERSION = '2.5.0 (27/12 23:00)';
+        const HTML_VERSION = '2.5.1 (27/12 23:15)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2172,22 +2173,54 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             return true;
         }
 
-        function copyForWhatsApp() {
+        // Guardar datos del cliente en la hoja (sin enviar email)
+        async function saveClientData() {
+            const email = document.getElementById('clientEmail').value.trim();
+            const whatsapp = document.getElementById('clientWhatsApp').value.trim();
+            const amount = document.getElementById('quoteAmount').value;
+            
+            if (!budgetData.id) return;
+            
+            try {
+                await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'saveClientData',
+                        budgetId: budgetData.id,
+                        clientEmail: email,
+                        clientWhatsApp: whatsapp,
+                        amount: amount
+                    })
+                });
+            } catch (error) {
+                console.log('Error guardando datos cliente:', error);
+            }
+        }
+
+        async function copyForWhatsApp() {
             if (!validateClientFields()) return;
             
             const message = document.getElementById('clientMessagePreview').textContent;
-            navigator.clipboard.writeText(message).then(() => {
+            navigator.clipboard.writeText(message).then(async () => {
                 showStatus('Copiado para WhatsApp ✓', 'success');
+                // Guardar datos del cliente
+                await saveClientData();
+                completedSteps.add(6);
+                updateProgressSteps();
                 setTimeout(hideStatus, 2000);
             });
         }
 
-        function copyForEmail() {
+        async function copyForEmail() {
             if (!validateClientFields()) return;
             
             const message = document.getElementById('clientMessagePreview').textContent;
-            navigator.clipboard.writeText(message).then(() => {
+            navigator.clipboard.writeText(message).then(async () => {
                 showStatus('Copiado para Email ✓', 'success');
+                // Guardar datos del cliente
+                await saveClientData();
+                completedSteps.add(6);
+                updateProgressSteps();
                 setTimeout(hideStatus, 2000);
             });
         }
