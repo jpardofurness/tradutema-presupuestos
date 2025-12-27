@@ -3,15 +3,11 @@
 ║                                                                  ║
 ║   TRADUTEMA - GESTOR DE PRESUPUESTOS                            ║
 ║                                                                  ║
-║   VERSIÓN: 2.2.0                                                ║
-║   FECHA:   27/12/2025 - 12:00                                   ║
+║   VERSIÓN: 2.2.1                                                ║
+║   FECHA:   27/12/2025 - 12:45                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Nueva pantalla inicial: Nueva Tasación / Retomar            ║
-║   - Lista de presupuestos pendientes con filtros                ║
-║   - Filtros: fecha, canal, idiomas, estado                      ║
-║   - Cargar presupuesto anterior y continuar en cualquier paso   ║
-║   - Más datos guardados en hoja para retomar completo           ║
+║   - Fix: Error al hacer clic en Nueva Tasación                  ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -695,7 +691,7 @@
 
     <footer class="footer">
         <div>Tradutema 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.2.0 (27/12 12:00) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.2.1 (27/12 12:45) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -723,11 +719,11 @@
     <script>
         /**
          * TRADUTEMA - Gestor de Presupuestos
-         * HTML Version: 2.2.0
-         * Fecha: 27/12/2025 12:00
+         * HTML Version: 2.2.1
+         * Fecha: 27/12/2025 12:45
          */
 
-        const HTML_VERSION = '2.2.0 (27/12 12:00)';
+        const HTML_VERSION = '2.2.1 (27/12 12:45)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -840,14 +836,22 @@
             currentStep = 1;
             isResuming = false;
             
-            // Reset UI
-            document.getElementById('sourceLang').value = '';
-            document.getElementById('targetLang').value = '';
+            // Reset UI - con verificación de existencia
+            const sourceLang = document.getElementById('sourceLang');
+            const targetLang = document.getElementById('targetLang');
+            const fileList = document.getElementById('fileList');
+            const filesTotal = document.getElementById('filesTotal');
+            const folderCreated = document.getElementById('folderCreated');
+            const wordCountResults = document.getElementById('wordCountResults');
+            
+            if (sourceLang) sourceLang.value = '';
+            if (targetLang) targetLang.value = '';
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById('fileList').innerHTML = '';
-            document.getElementById('filesTotal').style.display = 'none';
-            document.getElementById('folderCreated').classList.add('hidden');
-            document.getElementById('wordCountResults').classList.add('hidden');
+            if (fileList) fileList.innerHTML = '';
+            if (filesTotal) filesTotal.style.display = 'none';
+            if (folderCreated) folderCreated.classList.add('hidden');
+            if (wordCountResults) wordCountResults.classList.add('hidden');
+            
             updateProgressSteps();
         }
 
