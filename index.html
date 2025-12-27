@@ -3,15 +3,13 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.4.1                                                ║
-║   FECHA:   27/12/2025 - 20:30                                   ║
+║   VERSIÓN: 2.4.2                                                ║
+║   FECHA:   27/12/2025 - 21:00                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Fix: Botón visible en paso 3 (color gold restaurado)        ║
-║   - Email/WhatsApp movidos a paso 6 (no paso 1)                 ║
-║   - Fix: Reset completo al volver a inicio                      ║
-║   - Fix: Progress steps vuelven a azul (no quedan verde)        ║
-║   - Fix: Área de archivos se reinicia correctamente             ║
+║   - Email/WhatsApp visible en listado de presupuestos           ║
+║   - Reset campos Importe/Plazo/Urgencia al nuevo presupuesto    ║
+║   - Reset preview mensaje cliente                               ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -718,7 +716,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.4.1 (27/12 20:30) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.4.2 (27/12 21:00) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -746,11 +744,11 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.4.1
-         * Fecha: 27/12/2025 20:30
+         * HTML Version: 2.4.2
+         * Fecha: 27/12/2025 21:00
          */
 
-        const HTML_VERSION = '2.4.1 (27/12 20:30)';
+        const HTML_VERSION = '2.4.2 (27/12 21:00)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -881,6 +879,12 @@
             const step1Btn = document.getElementById('step1Btn');
             const step2Btn = document.getElementById('step2Btn');
             
+            // Reset paso 6 fields
+            const quoteAmount = document.getElementById('quoteAmount');
+            const quoteDays = document.getElementById('quoteDays');
+            const quoteUrgency = document.getElementById('quoteUrgency');
+            const clientMessagePreview = document.getElementById('clientMessagePreview');
+            
             // Reset form fields
             if (sourceLang) sourceLang.value = '';
             if (targetLang) targetLang.value = '';
@@ -899,6 +903,12 @@
             
             // Reset word count results
             if (wordCountResults) wordCountResults.classList.add('hidden');
+            
+            // Reset paso 6 fields
+            if (quoteAmount) quoteAmount.value = '';
+            if (quoteDays) quoteDays.value = '';
+            if (quoteUrgency) quoteUrgency.value = '';
+            if (clientMessagePreview) clientMessagePreview.innerHTML = '';
             
             // Reset buttons
             if (step1Btn) step1Btn.disabled = true;
@@ -1014,6 +1024,15 @@
                 const fecha = new Date(b.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
                 const canal = b.canal === 'W' ? '📱 WhatsApp' : b.canal === 'M' ? '📧 Mail' : '📝 Form';
                 
+                // Mostrar contacto del cliente si existe
+                let contactoHtml = '';
+                if (b.emailCliente) {
+                    contactoHtml += `<span class="budget-item-detail">✉️ ${b.emailCliente}</span>`;
+                }
+                if (b.whatsappCliente) {
+                    contactoHtml += `<span class="budget-item-detail">📞 ${b.whatsappCliente}</span>`;
+                }
+                
                 html += `
                     <div class="budget-item" onclick="loadBudget('${b.id}')">
                         <div class="budget-item-header">
@@ -1025,6 +1044,7 @@
                             <span class="budget-item-detail">${canal}</span>
                             <span class="budget-item-detail">🌐 ${b.origen} → ${b.destino}</span>
                             ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} palabras</span>` : ''}
+                            ${contactoHtml}
                         </div>
                     </div>
                 `;
