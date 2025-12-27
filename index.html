@@ -3,16 +3,15 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.4.0                                                ║
-║   FECHA:   27/12/2025 - 20:00                                   ║
+║   VERSIÓN: 2.4.1                                                ║
+║   FECHA:   27/12/2025 - 20:30                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Colores azul Tradutema restaurados                          ║
-║   - Botón Inicio visible en todos los pasos                     ║
-║   - Campos Email y WhatsApp del cliente                         ║
-║   - Filtros por Email y WhatsApp en Retomar Tasación            ║
-║   - Filtro por defecto = Todos (no solo Pendiente)              ║
-║   - Al enviar presupuesto vuelve al inicio automáticamente      ║
+║   - Fix: Botón visible en paso 3 (color gold restaurado)        ║
+║   - Email/WhatsApp movidos a paso 6 (no paso 1)                 ║
+║   - Fix: Reset completo al volver a inicio                      ║
+║   - Fix: Progress steps vuelven a azul (no quedan verde)        ║
+║   - Fix: Área de archivos se reinicia correctamente             ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -33,6 +32,7 @@
             --tradutema-blue: #3498db;
             --tradutema-blue-dark: #2980b9;
             --tradutema-gray: #5d6d7e;
+            --accent-gold: #d4a853;
             --accent-green: #2ecc71;
             --accent-red: #e74c3c;
             --accent-orange: #f39c12;
@@ -474,19 +474,6 @@
                 </div>
             </div>
             
-            <!-- Campos de contacto del cliente -->
-            <div class="form-group" style="margin-top: 16px;" id="clientContactFields">
-                <label>Contacto del cliente (opcional)</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
-                    <div>
-                        <input type="email" id="clientEmail" placeholder="Email del cliente" oninput="onContactChange()">
-                    </div>
-                    <div>
-                        <input type="tel" id="clientWhatsApp" placeholder="WhatsApp (+34...)" oninput="onContactChange()">
-                    </div>
-                </div>
-            </div>
-            
             <button class="btn btn-primary action-btn" id="step1Btn" onclick="completeStep1()" disabled>
                 Continuar a Archivos →
             </button>
@@ -707,6 +694,11 @@
                 <input type="email" id="clientEmail" placeholder="cliente@email.com">
             </div>
             
+            <div class="form-group">
+                <label>WhatsApp del cliente (opcional)</label>
+                <input type="tel" id="clientWhatsApp" placeholder="+34 612 345 678">
+            </div>
+            
             <div class="message-preview" id="clientMessagePreview"></div>
             
             <div class="copy-buttons">
@@ -726,7 +718,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.4.0 (27/12 20:00) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.4.1 (27/12 20:30) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -754,11 +746,11 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.4.0
-         * Fecha: 27/12/2025 20:00
+         * HTML Version: 2.4.1
+         * Fecha: 27/12/2025 20:30
          */
 
-        const HTML_VERSION = '2.4.0 (27/12 20:00)';
+        const HTML_VERSION = '2.4.1 (27/12 20:30)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -881,20 +873,42 @@
             const clientEmail = document.getElementById('clientEmail');
             const clientWhatsApp = document.getElementById('clientWhatsApp');
             const fileList = document.getElementById('fileList');
-            const filesTotal = document.getElementById('filesTotal');
-            const folderCreated = document.getElementById('folderCreated');
+            const fileTotal = document.getElementById('fileTotal');
+            const fileInput = document.getElementById('fileInput');
+            const fileUploadArea = document.getElementById('fileUploadArea');
+            const folderLink = document.getElementById('folderLink');
             const wordCountResults = document.getElementById('wordCountResults');
+            const step1Btn = document.getElementById('step1Btn');
+            const step2Btn = document.getElementById('step2Btn');
             
+            // Reset form fields
             if (sourceLang) sourceLang.value = '';
             if (targetLang) targetLang.value = '';
             if (clientEmail) clientEmail.value = '';
             if (clientWhatsApp) clientWhatsApp.value = '';
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
+            
+            // Reset file upload area completely
             if (fileList) fileList.innerHTML = '';
-            if (filesTotal) filesTotal.style.display = 'none';
-            if (folderCreated) folderCreated.classList.add('hidden');
+            if (fileTotal) fileTotal.style.display = 'none';
+            if (fileInput) fileInput.value = ''; // Reset file input
+            if (fileUploadArea) fileUploadArea.classList.remove('has-files');
+            
+            // Reset folder link
+            if (folderLink) folderLink.classList.add('hidden');
+            
+            // Reset word count results
             if (wordCountResults) wordCountResults.classList.add('hidden');
             
+            // Reset buttons
+            if (step1Btn) step1Btn.disabled = true;
+            if (step2Btn) step2Btn.disabled = true;
+            
+            // Reset budget ID display
+            document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
+            document.getElementById('budgetIdDisplay').classList.remove('active');
+            
+            // Force update progress steps to remove all 'completed' classes
             updateProgressSteps();
         }
 
@@ -1267,12 +1281,19 @@
             document.querySelectorAll('.progress-step').forEach(el => {
                 const step = parseInt(el.dataset.step);
                 
+                // First, remove all state classes
+                el.classList.remove('completed', 'active', 'locked');
+                
+                // Then apply the correct state
                 if (completedSteps.has(step)) {
                     el.classList.add('completed');
-                    el.classList.remove('locked');
+                } else if (step === currentStep) {
+                    el.classList.add('active');
+                } else if (step > currentStep && !completedSteps.has(step - 1)) {
+                    el.classList.add('locked');
                 }
                 
-                // Unlock next step
+                // Unlock step if previous is completed or current
                 const maxCompleted = Math.max(...completedSteps, 0);
                 if (step <= maxCompleted + 1) {
                     el.classList.remove('locked');
