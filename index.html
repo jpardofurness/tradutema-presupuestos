@@ -3,11 +3,19 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.5.2                                                ║
-║   FECHA:   28/12/2025 - 01:05                                   ║
+║   VERSIÓN: 2.6.0                                                ║
+║   FECHA:   28/12/2025 - 01:30                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Fix: Filtro WhatsApp ahora funciona (conversión a string)   ║
+║   - Email/WhatsApp cliente ahora en Paso 1 (se guarda desde     ║
+║     el principio y se recupera al retomar)                      ║
+║   - Traductores contactados se guardan al enviar tasación       ║
+║   - Selección de traductor elegido con radio button en Paso 5   ║
+║   - Listado muestra traductores contactados y elegido destacado ║
+║   - Fix: Filtro WhatsApp (conversión a string)                  ║
+║                                                                  ║
+║   ESTRUCTURA HOJA: 17 columnas (nuevas: TraductoresContactados, ║
+║                    TraductorElegido)                            ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -181,6 +189,25 @@
         .select-all-btn:hover { background: rgba(52,152,219,0.08); }
         .selected-count { font-size: 0.85rem; color: var(--text-secondary); }
         .no-providers { text-align: center; padding: 30px; color: var(--text-secondary); }
+        
+        /* CONTACTED PROVIDERS */
+        .contacted-providers { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        .contacted-list { display: flex; flex-direction: column; gap: 8px; }
+        .contacted-item { display: flex; align-items: center; padding: 12px 14px; border: 2px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer; transition: all 0.2s; }
+        .contacted-item:hover { border-color: var(--tradutema-blue-dark); }
+        .contacted-item.chosen { border-color: var(--accent-green); background: rgba(46,204,113,0.08); }
+        .contacted-radio { width: 20px; height: 20px; border: 2px solid var(--border-color); border-radius: 50%; margin-right: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+        .contacted-item.chosen .contacted-radio { border-color: var(--accent-green); }
+        .contacted-item.chosen .contacted-radio::after { content: ''; width: 10px; height: 10px; background: var(--accent-green); border-radius: 50%; }
+        .contacted-info { flex: 1; }
+        .contacted-name { font-weight: 600; color: var(--text-primary); }
+        .contacted-email { font-size: 0.8rem; color: var(--text-secondary); }
+        .contacted-badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; background: var(--accent-green); color: white; font-weight: 500; margin-left: 8px; }
+        
+        /* PROVIDER TAGS IN BUDGET LIST */
+        .budget-item-providers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
+        .provider-tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; background: rgba(52,152,219,0.1); color: var(--tradutema-blue); font-weight: 500; }
+        .provider-tag.chosen { background: var(--accent-green); color: white; }
         
         /* DEADLINE */
         .deadline-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -530,6 +557,15 @@
                 </div>
             </div>
             
+            <!-- Contacto del cliente -->
+            <div class="form-group" style="margin-top: 16px;">
+                <label>Contacto del cliente (opcional)</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+                    <input type="email" id="clientEmailStep1" placeholder="Email del cliente" oninput="onStep1Change()">
+                    <input type="tel" id="clientWhatsAppStep1" placeholder="WhatsApp (+34...)" oninput="onStep1Change()">
+                </div>
+            </div>
+            
             <button class="btn btn-primary action-btn" id="step1Btn" onclick="completeStep1()" disabled>
                 Continuar a Archivos →
             </button>
@@ -710,6 +746,17 @@
                 ✉️ Previsualizar y Enviar Tasación
             </button>
             
+            <!-- Traductores contactados (aparece después de enviar) -->
+            <div class="contacted-providers hidden" id="contactedProvidersSection">
+                <div class="card-title" style="margin-top: 20px; margin-bottom: 12px;">
+                    📋 Traductores contactados
+                    <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">
+                        (Selecciona el elegido para el presupuesto)
+                    </span>
+                </div>
+                <div class="contacted-list" id="contactedProvidersList"></div>
+            </div>
+            
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="skipToStep(6)">Saltar a Cliente</button>
             </div>
@@ -774,7 +821,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.5.2 (28/12 01:05) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.6.0 (28/12 01:30) | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -802,11 +849,11 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.5.2
-         * Fecha: 28/12/2025 01:05
+         * HTML Version: 2.6.0
+         * Fecha: 28/12/2025 01:30
          */
 
-        const HTML_VERSION = '2.5.2 (28/12 01:05)';
+        const HTML_VERSION = '2.6.0 (28/12 01:30)';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -838,7 +885,9 @@
             fileAnalysis: [],
             tariffPerWord: 0,
             tariffPage1: 0,
-            tariffPage2: 0
+            tariffPage2: 0,
+            contactedProviders: [],  // Traductores a los que se envió tasación
+            chosenProvider: null     // Traductor elegido para el presupuesto
         };
         
         let deadlineType = 'open';
@@ -936,7 +985,8 @@
                 sourceLang: '', targetLang: '', channel: '',
                 clientEmail: '', clientWhatsApp: '',
                 wordCount: null, pageCount: null, fileAnalysis: [],
-                tariffPerWord: 0, tariffPage1: 0, tariffPage2: 0
+                tariffPerWord: 0, tariffPage1: 0, tariffPage2: 0,
+                contactedProviders: [], chosenProvider: null
             };
             uploadedFiles = [];
             selectedProviders.clear();
@@ -949,6 +999,8 @@
             const targetLang = document.getElementById('targetLang');
             const clientEmail = document.getElementById('clientEmail');
             const clientWhatsApp = document.getElementById('clientWhatsApp');
+            const clientEmailStep1 = document.getElementById('clientEmailStep1');
+            const clientWhatsAppStep1 = document.getElementById('clientWhatsAppStep1');
             const fileList = document.getElementById('fileList');
             const fileTotal = document.getElementById('fileTotal');
             const fileInput = document.getElementById('fileInput');
@@ -957,6 +1009,7 @@
             const wordCountResults = document.getElementById('wordCountResults');
             const step1Btn = document.getElementById('step1Btn');
             const step2Btn = document.getElementById('step2Btn');
+            const contactedSection = document.getElementById('contactedProvidersSection');
             
             // Reset paso 6 fields
             const quoteAmount = document.getElementById('quoteAmount');
@@ -969,6 +1022,12 @@
             if (targetLang) targetLang.value = '';
             if (clientEmail) clientEmail.value = '';
             if (clientWhatsApp) clientWhatsApp.value = '';
+            if (clientEmailStep1) clientEmailStep1.value = '';
+            if (clientWhatsAppStep1) clientWhatsAppStep1.value = '';
+            document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
+            
+            // Reset contacted providers section
+            if (contactedSection) contactedSection.classList.add('hidden');
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
             
             // Reset file upload area completely
@@ -1306,6 +1365,20 @@
                     contactoHtml += `<span class="budget-item-detail">📞 ${b.whatsappCliente}</span>`;
                 }
                 
+                // Mostrar traductores contactados y elegido
+                let traductoresHtml = '';
+                if (b.traductoresContactados) {
+                    const traductores = b.traductoresContactados.split(',').map(t => t.trim()).filter(t => t);
+                    if (traductores.length > 0) {
+                        traductoresHtml = '<div class="budget-item-providers">';
+                        traductores.forEach(t => {
+                            const isChosen = b.traductorElegido && t === b.traductorElegido;
+                            traductoresHtml += `<span class="provider-tag ${isChosen ? 'chosen' : ''}">${t}${isChosen ? ' ✓' : ''}</span>`;
+                        });
+                        traductoresHtml += '</div>';
+                    }
+                }
+                
                 html += `
                     <div class="budget-item" onclick="loadBudget('${b.id}')">
                         <div class="budget-item-header">
@@ -1319,6 +1392,7 @@
                             ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} palabras</span>` : ''}
                             ${contactoHtml}
                         </div>
+                        ${traductoresHtml}
                     </div>
                 `;
             });
@@ -1349,6 +1423,19 @@
                     budgetData.wordCount = b.palabras ? parseInt(b.palabras) : null;
                     budgetData.pageCount = b.paginas ? parseInt(b.paginas) : null;
                     budgetData.tariffPerWord = b.tarifa ? parseFloat(b.tarifa) : 0;
+                    budgetData.clientEmail = b.emailCliente || '';
+                    budgetData.clientWhatsApp = b.whatsappCliente || '';
+                    
+                    // Restaurar traductores contactados
+                    if (b.traductoresContactados) {
+                        budgetData.contactedProviders = b.traductoresContactados.split(',').map(t => ({
+                            nombre: t.trim(),
+                            email: ''
+                        })).filter(p => p.nombre);
+                    } else {
+                        budgetData.contactedProviders = [];
+                    }
+                    budgetData.chosenProvider = b.traductorElegido || null;
                     
                     isResuming = true;
                     
@@ -1368,6 +1455,18 @@
                         btn.classList.toggle('selected', btn.dataset.channel === budgetData.channel);
                     });
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
+                    
+                    // Restaurar campos contacto en paso 1
+                    const clientEmailStep1 = document.getElementById('clientEmailStep1');
+                    const clientWhatsAppStep1 = document.getElementById('clientWhatsAppStep1');
+                    if (clientEmailStep1) clientEmailStep1.value = budgetData.clientEmail;
+                    if (clientWhatsAppStep1) clientWhatsAppStep1.value = budgetData.clientWhatsApp;
+                    
+                    // Mostrar traductores contactados si existen
+                    if (budgetData.contactedProviders.length > 0) {
+                        renderContactedProviders();
+                        document.getElementById('contactedProvidersSection').classList.remove('hidden');
+                    }
                     
                     // Show folder link
                     if (budgetData.folderUrl) {
@@ -1477,6 +1576,14 @@
             filterProviders();
             checkStep1Complete();
         }
+        
+        function onStep1Change() {
+            // Capturar datos del cliente del paso 1
+            const emailEl = document.getElementById('clientEmailStep1');
+            const whatsappEl = document.getElementById('clientWhatsAppStep1');
+            if (emailEl) budgetData.clientEmail = emailEl.value.trim();
+            if (whatsappEl) budgetData.clientWhatsApp = whatsappEl.value.trim();
+        }
 
         function filterProviders() {
             const src = document.getElementById('sourceLang').value;
@@ -1570,6 +1677,23 @@
                 el.classList.remove('active');
                 if (s === step) el.classList.add('active');
             });
+            
+            // Si es paso 6, pre-llenar email/whatsapp con datos del paso 1
+            if (step === 6) {
+                const clientEmail = document.getElementById('clientEmail');
+                const clientWhatsApp = document.getElementById('clientWhatsApp');
+                
+                // Solo pre-llenar si están vacíos
+                if (clientEmail && !clientEmail.value && budgetData.clientEmail) {
+                    clientEmail.value = budgetData.clientEmail;
+                }
+                if (clientWhatsApp && !clientWhatsApp.value && budgetData.clientWhatsApp) {
+                    clientWhatsApp.value = budgetData.clientWhatsApp;
+                }
+                
+                // Actualizar mensaje de cliente
+                updateClientMessage();
+            }
             
             // Scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2049,6 +2173,17 @@
                 if (data.success) {
                     hideStatus();
                     const ok = data.results.filter(r => r.success).length;
+                    
+                    // Guardar traductores contactados
+                    budgetData.contactedProviders = providers.map(p => ({
+                        nombre: p.nombre,
+                        email: p.email
+                    }));
+                    
+                    // Mostrar sección de traductores contactados
+                    renderContactedProviders();
+                    document.getElementById('contactedProvidersSection').classList.remove('hidden');
+                    
                     showSuccess('Emails enviados', `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`);
                     
                     completedSteps.add(5);
@@ -2056,7 +2191,7 @@
                     
                     setTimeout(() => {
                         hideSuccess();
-                        showCard(6);
+                        // No ir automáticamente a paso 6, quedarse para elegir traductor
                     }, 2000);
                 } else {
                     throw new Error(data.error);
@@ -2064,6 +2199,55 @@
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
                 setTimeout(hideStatus, 3000);
+            }
+        }
+        
+        // Renderizar traductores contactados con radio buttons
+        function renderContactedProviders() {
+            const container = document.getElementById('contactedProvidersList');
+            if (!budgetData.contactedProviders || budgetData.contactedProviders.length === 0) {
+                container.innerHTML = '<div class="no-providers">No se han contactado traductores</div>';
+                return;
+            }
+            
+            let html = '';
+            budgetData.contactedProviders.forEach((p, idx) => {
+                const isChosen = budgetData.chosenProvider === p.nombre;
+                html += `
+                    <div class="contacted-item ${isChosen ? 'chosen' : ''}" onclick="chooseProvider(${idx})">
+                        <div class="contacted-radio"></div>
+                        <div class="contacted-info">
+                            <div class="contacted-name">${p.nombre}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}</div>
+                            <div class="contacted-email">${p.email}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+        
+        // Elegir traductor para el presupuesto
+        async function chooseProvider(idx) {
+            const provider = budgetData.contactedProviders[idx];
+            budgetData.chosenProvider = provider.nombre;
+            
+            // Actualizar UI
+            renderContactedProviders();
+            
+            // Guardar en backend
+            try {
+                await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'saveChosenProvider',
+                        budgetId: budgetData.id,
+                        chosenProvider: provider.nombre
+                    })
+                });
+                showStatus('✓ Traductor elegido: ' + provider.nombre, 'success');
+                setTimeout(hideStatus, 2000);
+            } catch (error) {
+                console.log('Error guardando traductor elegido:', error);
             }
         }
 
