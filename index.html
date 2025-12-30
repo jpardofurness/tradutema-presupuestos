@@ -3,12 +3,12 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.8.5                                                ║
-║   FECHA:   30/12/2025 - 20:20                                   ║
+║   VERSIÓN: 2.9.0                                                ║
+║   FECHA:   30/12/2025 - 21:32                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Compresión iLovePDF deshabilitada (CORS no permite)         ║
-║   - Los archivos se suben sin comprimir                         ║
+║   - Compresión PDF via backend (sin CORS)                       ║
+║   - Funciona en móvil y fuera de casa                           ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -893,7 +893,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.8.5 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.9.0 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -925,12 +925,12 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.8.5
-         * Fecha: 30/12/2025 20:20
+         * HTML Version: 2.9.0
+         * Fecha: 30/12/2025 21:32
          */
 
-        const HTML_VERSION = '2.8.5';
-        const HTML_DATE = '30/12/2025 20:20';
+        const HTML_VERSION = '2.9.0';
+        const HTML_DATE = '30/12/2025 21:32';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1994,20 +1994,77 @@
             return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
         }
 
-        // ====== iLovePDF COMPRESSION ======
-        // NOTA: iLovePDF no permite llamadas desde GitHub Pages (CORS)
-        // Esta funcionalidad está deshabilitada temporalmente
-        // TODO: Mover compresión al backend (Apps Script) para evitar CORS
-        async function compressFilesWithIlovepdf() {
-            if (filesToCompress.size === 0) return;
+        // ====== iLovePDF COMPRESSION (via Backend) ======
+        // La compresión se hace en el backend para evitar CORS
+        async function compressFilesViaBackend(folderId) {
+            if (filesToCompress.size === 0) return [];
             
-            // Mostrar aviso y continuar sin comprimir
-            console.warn('Compresión iLovePDF deshabilitada - los archivos se subirán sin comprimir');
-            showStatus('⚠️ Compresión no disponible - subiendo archivos originales...', 'warning');
-            await new Promise(r => setTimeout(r, 1500));
+            const results = [];
+            const indicesToCompress = Array.from(filesToCompress);
             
-            // Limpiar marcas de compresión para que los archivos se suban normalmente
+            for (let i = 0; i < indicesToCompress.length; i++) {
+                const idx = indicesToCompress[i];
+                const file = uploadedFiles[idx];
+                if (!file || !file.name.toLowerCase().endsWith('.pdf')) continue;
+                
+                showStatus(`Comprimiendo ${file.name}... (${i + 1}/${indicesToCompress.length})`, 'loading');
+                
+                try {
+                    // Buscar el fileId del archivo subido
+                    // Necesitamos obtenerlo de la carpeta
+                    const filesResponse = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'getFilesInFolder',
+                            folderId: folderId
+                        })
+                    });
+                    
+                    const filesData = await filesResponse.json();
+                    if (!filesData.success) throw new Error('No se pudo obtener archivos');
+                    
+                    // Buscar el archivo por nombre
+                    const driveFile = filesData.files.find(f => f.name === file.name);
+                    if (!driveFile) throw new Error('Archivo no encontrado en Drive');
+                    
+                    // Llamar al backend para comprimir
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'compressPdf',
+                            fileId: driveFile.id,
+                            folderId: folderId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const savings = data.savings || 0;
+                        console.log(`✓ ${file.name}: ${formatFileSize(data.originalSize)} → ${formatFileSize(data.compressedSize)} (-${savings}%)`);
+                        results.push({
+                            name: file.name,
+                            success: true,
+                            savings: savings,
+                            originalSize: data.originalSize,
+                            compressedSize: data.compressedSize
+                        });
+                    } else {
+                        throw new Error(data.error);
+                    }
+                    
+                } catch (err) {
+                    console.error('Error comprimiendo ' + file.name + ':', err);
+                    results.push({
+                        name: file.name,
+                        success: false,
+                        error: err.message
+                    });
+                }
+            }
+            
             filesToCompress.clear();
+            return results;
         }
 
         // ====== FOLDER CREATION ======
@@ -2024,12 +2081,11 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span> Creando...';
             
+            // Guardar si hay archivos para comprimir ANTES de subir
+            const hasFilesToCompress = filesToCompress.size > 0;
+            const compressCount = filesToCompress.size;
+            
             try {
-                // Comprimir archivos marcados primero
-                if (filesToCompress.size > 0) {
-                    await compressFilesWithIlovepdf();
-                }
-                
                 showStatus('Creando carpeta y subiendo archivos...', 'loading');
                 
                 const response = await fetch(apiUrl, {
@@ -2051,6 +2107,18 @@
                     budgetData.id = data.budgetId;
                     budgetData.folderId = data.folderId;
                     budgetData.folderUrl = data.folderUrl;
+                    
+                    // Comprimir archivos marcados DESPUÉS de subir
+                    if (hasFilesToCompress) {
+                        const compressResults = await compressFilesViaBackend(budgetData.folderId);
+                        
+                        // Mostrar resumen de compresión
+                        const successful = compressResults.filter(r => r.success);
+                        if (successful.length > 0) {
+                            const totalSavings = successful.reduce((sum, r) => sum + (r.originalSize - r.compressedSize), 0);
+                            console.log(`Compresión completada: ${successful.length}/${compressCount} archivos, ${formatFileSize(totalSavings)} ahorrados`);
+                        }
+                    }
                     
                     // Update UI
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
