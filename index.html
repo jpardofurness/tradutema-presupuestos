@@ -3,15 +3,13 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.8.0                                                ║
-║   FECHA:   30/12/2025 - 12:30                                   ║
+║   VERSIÓN: 2.8.1                                                ║
+║   FECHA:   30/12/2025 - 13:30                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Paso 4 rediseñado: "Solo Páginas" (rápido) vs "Palabras"    ║
-║   - Muestra tarifa por página de la combinación actual          ║
-║   - Fix: Mensaje de carga se oculta correctamente               ║
-║   - Compresión PDFs con iLovePDF antes de subir                 ║
-║   - Filtro por código en Retomar presupuesto                    ║
+║   - Fix: Tarifas por página y palabra ahora se calculan bien    ║
+║   - Fix: iLovePDF usa servidor correcto para cada operación     ║
+║   - OCR para imágenes (extrae texto con Google Drive OCR)       ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -896,7 +894,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.8.0 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.8.1 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -928,12 +926,12 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.8.0
-         * Fecha: 30/12/2025 12:30
+         * HTML Version: 2.8.1
+         * Fecha: 30/12/2025 13:30
          */
 
-        const HTML_VERSION = '2.8.0';
-        const HTML_DATE = '30/12/2025 12:30';
+        const HTML_VERSION = '2.8.1';
+        const HTML_DATE = '30/12/2025 13:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1849,12 +1847,12 @@
             if (tariff) {
                 langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
                 page1.textContent = (tariff.tarifaPagina1 || 0).toFixed(2).replace('.', ',');
-                page2.textContent = (tariff.tarifaPaginaResto || 0).toFixed(2).replace('.', ',');
+                page2.textContent = (tariff.tarifaPagina2 || 0).toFixed(2).replace('.', ',');
                 
                 // Guardar en budgetData para cálculos
                 budgetData.tariffPage1 = tariff.tarifaPagina1 || 0;
-                budgetData.tariffPage2 = tariff.tarifaPaginaResto || 0;
-                budgetData.tariffPerWord = tariff.tarifaPalabra || 0;
+                budgetData.tariffPage2 = tariff.tarifaPagina2 || 0;
+                budgetData.tariffPerWord = tariff.tarifaPorPalabra || 0;
             } else {
                 langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
                 page1.textContent = '--';
@@ -2014,18 +2012,22 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ public_key: ilovepdfPublicKey })
                     });
+                    if (!authResponse.ok) throw new Error('Error de autenticación: ' + authResponse.status);
                     const authData = await authResponse.json();
-                    if (!authData.token) throw new Error('Error de autenticación iLovePDF');
+                    if (!authData.token) throw new Error('Token no recibido');
                     
-                    // 2. Iniciar tarea de compresión
+                    // 2. Iniciar tarea de compresión (devuelve server y task)
                     const startResponse = await fetch('https://api.ilovepdf.com/v1/start/compress', {
                         method: 'GET',
                         headers: { 'Authorization': 'Bearer ' + authData.token }
                     });
+                    if (!startResponse.ok) throw new Error('Error al iniciar: ' + startResponse.status);
                     const startData = await startResponse.json();
-                    if (!startData.task) throw new Error('Error al iniciar tarea');
+                    if (!startData.task || !startData.server) throw new Error('Datos de tarea incompletos');
                     
-                    // 3. Subir archivo
+                    const serverUrl = 'https://' + startData.server;
+                    
+                    // 3. Subir archivo al servidor asignado
                     const formData = new FormData();
                     
                     // Convertir base64 a blob
@@ -2045,16 +2047,17 @@
                     formData.append('task', startData.task);
                     formData.append('file', blob, file.name);
                     
-                    const uploadResponse = await fetch('https://api.ilovepdf.com/v1/upload', {
+                    const uploadResponse = await fetch(serverUrl + '/v1/upload', {
                         method: 'POST',
                         headers: { 'Authorization': 'Bearer ' + authData.token },
                         body: formData
                     });
+                    if (!uploadResponse.ok) throw new Error('Error al subir: ' + uploadResponse.status);
                     const uploadData = await uploadResponse.json();
-                    if (!uploadData.server_filename) throw new Error('Error al subir archivo');
+                    if (!uploadData.server_filename) throw new Error('Archivo no procesado');
                     
                     // 4. Procesar compresión
-                    const processResponse = await fetch('https://api.ilovepdf.com/v1/process', {
+                    const processResponse = await fetch(serverUrl + '/v1/process', {
                         method: 'POST',
                         headers: { 
                             'Authorization': 'Bearer ' + authData.token,
@@ -2070,14 +2073,15 @@
                             compression_level: 'recommended'
                         })
                     });
+                    if (!processResponse.ok) throw new Error('Error al comprimir: ' + processResponse.status);
                     const processData = await processResponse.json();
-                    if (!processData.download_filename) throw new Error('Error al procesar');
                     
                     // 5. Descargar archivo comprimido
-                    const downloadResponse = await fetch(`https://api.ilovepdf.com/v1/download/${startData.task}`, {
+                    const downloadResponse = await fetch(serverUrl + '/v1/download/' + startData.task, {
                         method: 'GET',
                         headers: { 'Authorization': 'Bearer ' + authData.token }
                     });
+                    if (!downloadResponse.ok) throw new Error('Error al descargar: ' + downloadResponse.status);
                     const compressedBlob = await downloadResponse.blob();
                     
                     // 6. Convertir a base64 y reemplazar en uploadedFiles
