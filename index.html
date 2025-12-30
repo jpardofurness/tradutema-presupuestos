@@ -3,13 +3,12 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.8.1                                                ║
-║   FECHA:   30/12/2025 - 13:30                                   ║
+║   VERSIÓN: 2.8.3                                                ║
+║   FECHA:   30/12/2025 - 14:15                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Fix: Tarifas por página y palabra ahora se calculan bien    ║
-║   - Fix: iLovePDF usa servidor correcto para cada operación     ║
-║   - OCR para imágenes (extrae texto con Google Drive OCR)       ║
+║   - Fix: Tarifas se convierten a número correctamente           ║
+║   - Fix: Error toFixed en tariffPerWord                         ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -894,7 +893,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.8.1 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.8.3 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -926,12 +925,12 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.8.1
-         * Fecha: 30/12/2025 13:30
+         * HTML Version: 2.8.3
+         * Fecha: 30/12/2025 14:15
          */
 
-        const HTML_VERSION = '2.8.1';
-        const HTML_DATE = '30/12/2025 13:30';
+        const HTML_VERSION = '2.8.3';
+        const HTML_DATE = '30/12/2025 14:15';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1846,13 +1845,17 @@
             
             if (tariff) {
                 langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
-                page1.textContent = (tariff.tarifaPagina1 || 0).toFixed(2).replace('.', ',');
-                page2.textContent = (tariff.tarifaPagina2 || 0).toFixed(2).replace('.', ',');
+                const p1 = parseFloat(String(tariff.tarifaPagina1).replace(',', '.')) || 0;
+                const p2 = parseFloat(String(tariff.tarifaPagina2).replace(',', '.')) || 0;
+                const pw = parseFloat(String(tariff.tarifaPorPalabra).replace(',', '.')) || 0;
+                
+                page1.textContent = p1.toFixed(2).replace('.', ',');
+                page2.textContent = p2.toFixed(2).replace('.', ',');
                 
                 // Guardar en budgetData para cálculos
-                budgetData.tariffPage1 = tariff.tarifaPagina1 || 0;
-                budgetData.tariffPage2 = tariff.tarifaPagina2 || 0;
-                budgetData.tariffPerWord = tariff.tarifaPorPalabra || 0;
+                budgetData.tariffPage1 = p1;
+                budgetData.tariffPage2 = p2;
+                budgetData.tariffPerWord = pw;
             } else {
                 langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
                 page1.textContent = '--';
@@ -2030,9 +2033,25 @@
                     // 3. Subir archivo al servidor asignado
                     const formData = new FormData();
                     
-                    // Convertir base64 a blob
-                    const base64Data = file.content.split(',')[1];
-                    const byteCharacters = atob(base64Data);
+                    // Convertir base64 a blob - manejar diferentes formatos
+                    let base64Data = file.content;
+                    if (base64Data.includes(',')) {
+                        base64Data = base64Data.split(',')[1];
+                    }
+                    if (!base64Data) {
+                        throw new Error('Contenido del archivo vacío');
+                    }
+                    
+                    // Limpiar posibles caracteres no válidos
+                    base64Data = base64Data.replace(/[^A-Za-z0-9+/=]/g, '');
+                    
+                    let byteCharacters;
+                    try {
+                        byteCharacters = atob(base64Data);
+                    } catch (e) {
+                        throw new Error('Formato base64 inválido');
+                    }
+                    
                     const byteArrays = [];
                     for (let offset = 0; offset < byteCharacters.length; offset += 512) {
                         const slice = byteCharacters.slice(offset, offset + 512);
@@ -2308,7 +2327,7 @@
                     hideStatus();
                     
                     // Set custom tariff from config
-                    document.getElementById('customTariff').value = budgetData.tariffPerWord.toFixed(2);
+                    document.getElementById('customTariff').value = (parseFloat(budgetData.tariffPerWord) || 0).toFixed(2);
                     updateTotalPrice();
                 } else {
                     throw new Error(data.error);
