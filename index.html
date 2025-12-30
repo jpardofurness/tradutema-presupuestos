@@ -3,19 +3,13 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.6.0                                                ║
-║   FECHA:   28/12/2025 - 01:30                                   ║
+║   VERSIÓN: 2.7.2                                                ║
+║   FECHA:   30/12/2025 - 11:30                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Email/WhatsApp cliente ahora en Paso 1 (se guarda desde     ║
-║     el principio y se recupera al retomar)                      ║
-║   - Traductores contactados se guardan al enviar tasación       ║
-║   - Selección de traductor elegido con radio button en Paso 5   ║
-║   - Listado muestra traductores contactados y elegido destacado ║
-║   - Fix: Filtro WhatsApp (conversión a string)                  ║
-║                                                                  ║
-║   ESTRUCTURA HOJA: 17 columnas (nuevas: TraductoresContactados, ║
-║                    TraductorElegido)                            ║
+║   - Filtro por código de presupuesto en Retomar                 ║
+║   - Enlace a Google Sheet en pantalla de inicio                 ║
+║   - Mensajes editables antes de enviar (proveedor y cliente)    ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -251,6 +245,12 @@
         .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; flex-shrink: 0; background: var(--bg-primary); }
         .modal-footer .btn { flex: 1; }
         
+        /* EDITABLE MESSAGE */
+        .editable-message { width: 100%; min-height: 200px; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit; font-size: 0.9rem; line-height: 1.5; resize: vertical; }
+        .editable-message:focus { outline: none; border-color: var(--tradutema-blue); }
+        .preview-recipients { background: var(--bg-primary); padding: 12px; border-radius: var(--radius-md); margin-bottom: 12px; font-size: 0.85rem; }
+        .preview-recipients strong { color: var(--tradutema-blue); }
+        
         /* SUCCESS OVERLAY */
         .success-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(46,204,113,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; color: white; }
         .success-overlay.visible { display: flex; }
@@ -282,6 +282,16 @@
         .home-btn-text { flex: 1; }
         .home-btn-title { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
         .home-btn-desc { font-size: 0.85rem; color: var(--text-secondary); }
+        
+        /* VERSION INDICATOR */
+        .version-indicator { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; margin-top: 8px; }
+        .version-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.8rem; font-family: 'Space Mono', monospace; }
+        .version-label { color: var(--text-secondary); min-width: 40px; }
+        .version-value { color: var(--tradutema-blue); font-weight: 500; }
+        .version-value.error { color: var(--accent-red); }
+        .version-value.ok { color: var(--accent-green); }
+        .config-link { color: var(--tradutema-blue); text-decoration: none; font-size: 0.85rem; font-family: inherit; display: flex; align-items: center; gap: 4px; }
+        .config-link:hover { text-decoration: underline; }
         
         /* BUDGET LIST */
         .budget-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; padding: 16px; background: var(--bg-primary); border-radius: var(--radius-md); }
@@ -412,6 +422,23 @@
                     </div>
                 </button>
             </div>
+            
+            <!-- Indicador de versiones y acceso rápido -->
+            <div class="version-indicator" id="homeVersionInfo">
+                <div class="version-row">
+                    <span class="version-label">HTML:</span>
+                    <span class="version-value" id="htmlVersionDisplay">--</span>
+                </div>
+                <div class="version-row">
+                    <span class="version-label">API:</span>
+                    <span class="version-value" id="apiVersionDisplay">--</span>
+                </div>
+                <div class="version-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color);">
+                    <a href="https://docs.google.com/spreadsheets/d/1E75kTMGy4WSQbs04U4rkGKmPoR-B26hqX9S1Po1kX5w/edit" target="_blank" class="config-link">
+                        📊 Abrir Google Sheet
+                    </a>
+                </div>
+            </div>
         </div>
 
         <!-- QUICK WORD COUNT SCREEN -->
@@ -468,6 +495,10 @@
             <div class="card-title">Presupuestos</div>
             
             <div class="budget-filters">
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>🔍 Código presupuesto</label>
+                    <input type="text" id="filterCode" placeholder="Ej: 2412-00001" oninput="filterBudgets()" style="font-family: 'Space Mono', monospace;">
+                </div>
                 <div class="form-group">
                     <label>Estado</label>
                     <select id="filterStatus" onchange="filterBudgets()">
@@ -802,7 +833,10 @@
                 <input type="tel" id="clientWhatsApp" placeholder="+34 612 345 678">
             </div>
             
-            <div class="message-preview" id="clientMessagePreview"></div>
+            <div class="form-group">
+                <label style="font-weight: 600;">Mensaje al cliente (editable):</label>
+                <textarea class="editable-message" id="clientMessageEdit" rows="10" oninput="onClientMessageEdit()"></textarea>
+            </div>
             
             <div class="copy-buttons">
                 <button class="btn copy-btn whatsapp" onclick="copyForWhatsApp()">
@@ -821,7 +855,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.6.0 (28/12 01:30) | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.7.2 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -831,7 +865,11 @@
                 <span class="modal-title">Vista previa - Tasación</span>
                 <button class="modal-close" onclick="closeProviderModal()">✕</button>
             </div>
-            <div class="modal-body" id="providerPreviewBody"></div>
+            <div class="modal-body">
+                <div class="preview-recipients" id="previewRecipients"></div>
+                <label style="font-weight: 600; margin-bottom: 8px; display: block;">Mensaje (editable):</label>
+                <textarea class="editable-message" id="providerMessageEdit" rows="12"></textarea>
+            </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeProviderModal()">Cancelar</button>
                 <button class="btn btn-primary btn-success" onclick="sendProviderEmails()">Enviar</button>
@@ -849,16 +887,18 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.6.0
-         * Fecha: 28/12/2025 01:30
+         * HTML Version: 2.7.2
+         * Fecha: 30/12/2025 11:30
          */
 
-        const HTML_VERSION = '2.6.0 (28/12 01:30)';
+        const HTML_VERSION = '2.7.2';
+        const HTML_DATE = '30/12/2025 11:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
         let apiUrl = localStorage.getItem('tradutema_api_url') || '';
         let apiVersion = '?';
+        let apiDate = '';
         let allProviders = [];
         let allTariffs = [];
         let allBudgets = [];
@@ -892,6 +932,7 @@
         
         let deadlineType = 'open';
         let messageLang = 'es';
+        let clientMessageEdited = false;  // Para rastrear si el usuario editó el mensaje
 
         // ====== INIT ======
         document.addEventListener('DOMContentLoaded', () => {
@@ -993,6 +1034,7 @@
             completedSteps.clear();
             currentStep = 1;
             isResuming = false;
+            clientMessageEdited = false;  // Reset flag de mensaje editado
             
             // Reset UI - con verificación de existencia
             const sourceLang = document.getElementById('sourceLang');
@@ -1315,6 +1357,7 @@
         }
 
         function filterBudgets() {
+            const code = document.getElementById('filterCode').value.toLowerCase().trim();
             const status = document.getElementById('filterStatus').value;
             const channel = document.getElementById('filterChannel').value;
             const source = document.getElementById('filterSource').value;
@@ -1324,6 +1367,7 @@
             const dateFrom = document.getElementById('filterDateFrom').value;
             
             filteredBudgets = allBudgets.filter(b => {
+                if (code && (!b.id || !b.id.toLowerCase().includes(code))) return false;
                 if (status && b.estado !== status) return false;
                 if (channel && b.canal !== channel) return false;
                 if (source && b.origen !== source) return false;
@@ -1518,7 +1562,13 @@
                     allProviders = data.providers || [];
                     allTariffs = data.tariffs || [];
                     apiVersion = data.version || '?';
+                    apiDate = data.versionDate || '';
+                    
+                    // Actualizar footer
                     document.getElementById('versionInfo').textContent = `HTML v${HTML_VERSION} | API: ${apiVersion}`;
+                    
+                    // Actualizar indicador en home
+                    updateVersionIndicator();
                     
                     populateLanguages();
                     hideStatus();
@@ -1527,6 +1577,29 @@
                 }
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
+                updateVersionIndicator(true);
+            }
+        }
+        
+        function updateVersionIndicator(error = false) {
+            const htmlDisplay = document.getElementById('htmlVersionDisplay');
+            const apiDisplay = document.getElementById('apiVersionDisplay');
+            
+            if (htmlDisplay) {
+                htmlDisplay.textContent = `v${HTML_VERSION} (${HTML_DATE})`;
+                htmlDisplay.classList.add('ok');
+            }
+            
+            if (apiDisplay) {
+                if (error) {
+                    apiDisplay.textContent = 'Error de conexión';
+                    apiDisplay.classList.add('error');
+                } else if (apiVersion && apiVersion !== '?') {
+                    apiDisplay.textContent = `v${apiVersion}${apiDate ? ' (' + apiDate + ')' : ''}`;
+                    apiDisplay.classList.add('ok');
+                } else {
+                    apiDisplay.textContent = 'Cargando...';
+                }
             }
         }
 
@@ -2051,34 +2124,27 @@
             const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
             const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
             
-            let html = `
-                <div style="background: rgba(52,152,219,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
-                    <strong>Asunto:</strong> Nueva Tasación Traducción Jurada ${budgetData.sourceLang} > ${budgetData.targetLang} [${budgetData.id}]
-                </div>
-                <div style="background: rgba(52,152,219,0.08); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;">
-                    <strong>Destinatarios (${providers.length}):</strong><br>
-                    ${providers.map(p => p.nombre + ' &lt;' + p.email + '&gt;').join('<br>')}
-                </div>
+            // Generar info de destinatarios
+            let recipientsHtml = `
+                <div><strong>Asunto:</strong> Nueva Tasación Traducción Jurada ${budgetData.sourceLang} > ${budgetData.targetLang} [${budgetData.id}]</div>
+                <div style="margin-top: 8px;"><strong>Destinatarios (${providers.length}):</strong> ${providers.map(p => p.nombre).join(', ')}</div>
             `;
             
             if (uploadedFiles.length > 0) {
-                html += `
-                    <div style="background: rgba(46,204,113,0.1); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem; color: #1e8449;">
-                        <strong>Archivos adjuntos:</strong> ${uploadedFiles.map(f => f.name).join(', ')}
-                    </div>
-                `;
+                recipientsHtml += `<div style="margin-top: 8px; color: #1e8449;"><strong>📎 Adjuntos:</strong> ${uploadedFiles.length} archivo(s)</div>`;
             }
             
-            html += `<div style="background: var(--bg-primary); padding: 16px; border-radius: 8px; font-family: 'Space Mono', monospace; font-size: 0.8rem; white-space: pre-wrap; line-height: 1.5;">`;
-            html += generateProviderEmailPreview(providers[0], includeWords, includeProposedRate);
-            html += `</div>`;
+            document.getElementById('previewRecipients').innerHTML = recipientsHtml;
             
-            document.getElementById('providerPreviewBody').innerHTML = html;
+            // Generar mensaje editable
+            const messageBody = generateProviderEmailBody(providers[0], includeWords, includeProposedRate);
+            document.getElementById('providerMessageEdit').value = messageBody;
+            
             document.getElementById('providerPreviewModal').classList.add('visible');
         }
 
-        function generateProviderEmailPreview(provider, includeWords, includeProposedRate) {
-            let body = `Hola ${provider.nombre},\n\n`;
+        function generateProviderEmailBody(provider, includeWords, includeProposedRate) {
+            let body = `Hola [NOMBRE],\n\n`;
             body += `Te escribo para solicitar tarifa y disponibilidad para una traducción.\n\n`;
             body += `DETALLES DEL ENCARGO\n`;
             body += `--------------------\n`;
@@ -2141,8 +2207,7 @@
             closeProviderModal();
             
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
-            const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
-            const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
+            const customMessage = document.getElementById('providerMessageEdit').value;
             
             showStatus('Enviando emails a proveedores...', 'loading');
             
@@ -2156,15 +2221,7 @@
                         folderId: budgetData.folderId,
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
-                        deadline: deadlineType,
-                        deadlineDate: document.getElementById('deadlineDate').value,
-                        deadlineTime: document.getElementById('deadlineTime').value,
-                        wordCount: includeWords ? budgetData.wordCount : null,
-                        pageCount: includeWords ? budgetData.pageCount : null,
-                        includeProposedRate: includeProposedRate,
-                        proposedTariff: parseFloat(document.getElementById('proposedTariff').value) || 0,
-                        proposedTotal: parseFloat(document.getElementById('proposedTotal').value) || 0,
-                        comments: document.getElementById('providerComments').value
+                        customMessage: customMessage  // Mensaje editado por el usuario
                     })
                 });
                 
@@ -2260,7 +2317,14 @@
             updateClientMessage();
         }
 
+        function onClientMessageEdit() {
+            clientMessageEdited = true;
+        }
+        
         function updateClientMessage() {
+            // Si el usuario ya editó el mensaje, no sobrescribir
+            if (clientMessageEdited) return;
+            
             const amount = document.getElementById('quoteAmount').value || 'XXX';
             const days = document.getElementById('quoteDays').value || 'X';
             const urgency = document.getElementById('quoteUrgency').value || '';
@@ -2333,7 +2397,12 @@ info@tradutema.com
 Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             }
             
-            document.getElementById('clientMessagePreview').textContent = message;
+            document.getElementById('clientMessageEdit').value = message;
+        }
+        
+        function regenerateClientMessage() {
+            clientMessageEdited = false;
+            updateClientMessage();
         }
 
         function validateClientFields() {
@@ -2380,7 +2449,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         async function copyForWhatsApp() {
             if (!validateClientFields()) return;
             
-            const message = document.getElementById('clientMessagePreview').textContent;
+            const message = document.getElementById('clientMessageEdit').value;
             navigator.clipboard.writeText(message).then(async () => {
                 showStatus('Copiado para WhatsApp ✓', 'success');
                 // Guardar datos del cliente
@@ -2394,7 +2463,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         async function copyForEmail() {
             if (!validateClientFields()) return;
             
-            const message = document.getElementById('clientMessagePreview').textContent;
+            const message = document.getElementById('clientMessageEdit').value;
             navigator.clipboard.writeText(message).then(async () => {
                 showStatus('Copiado para Email ✓', 'success');
                 // Guardar datos del cliente
@@ -2424,6 +2493,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             try {
                 showStatus('Enviando presupuesto al cliente...', 'loading');
                 
+                const customMessage = document.getElementById('clientMessageEdit').value;
+                
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -2432,12 +2503,9 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         clientWhatsApp: whatsapp,
                         budgetId: budgetData.id,
                         amount: document.getElementById('quoteAmount').value,
-                        days: document.getElementById('quoteDays').value,
-                        urgency: document.getElementById('quoteUrgency').value,
-                        language: messageLang,
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
-                        numDocs: uploadedFiles.length
+                        customMessage: customMessage  // Mensaje editado por el usuario
                     })
                 });
                 
