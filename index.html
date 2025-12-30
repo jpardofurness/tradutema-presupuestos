@@ -3,13 +3,15 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.7.2                                                ║
-║   FECHA:   30/12/2025 - 11:30                                   ║
+║   VERSIÓN: 2.8.0                                                ║
+║   FECHA:   30/12/2025 - 12:30                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Filtro por código de presupuesto en Retomar                 ║
-║   - Enlace a Google Sheet en pantalla de inicio                 ║
-║   - Mensajes editables antes de enviar (proveedor y cliente)    ║
+║   - Paso 4 rediseñado: "Solo Páginas" (rápido) vs "Palabras"    ║
+║   - Muestra tarifa por página de la combinación actual          ║
+║   - Fix: Mensaje de carga se oculta correctamente               ║
+║   - Compresión PDFs con iLovePDF antes de subir                 ║
+║   - Filtro por código en Retomar presupuesto                    ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -118,8 +120,18 @@
         .file-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
         .file-item-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-item-size { font-size: 0.75rem; color: var(--text-secondary); }
+        .file-item-size.file-size-large { color: var(--accent-orange); font-weight: 600; }
+        .file-item-actions { display: flex; align-items: center; gap: 8px; }
         .file-item-remove { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.2rem; padding: 4px 8px; }
         .file-total { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; padding: 8px 12px; background: rgba(52,152,219,0.05); border-radius: var(--radius-sm); }
+        
+        /* COMPRESS CHECKBOX */
+        .compress-checkbox { display: flex; align-items: center; cursor: pointer; }
+        .compress-checkbox input { display: none; }
+        .compress-checkbox .compress-label { font-size: 1.1rem; opacity: 0.4; transition: all 0.2s; padding: 4px; }
+        .compress-checkbox input:checked + .compress-label { opacity: 1; }
+        .compress-checkbox:hover .compress-label { opacity: 0.7; }
+        .compress-count { color: var(--accent-orange); font-weight: 600; }
         
         /* BUTTONS */
         .btn { padding: 16px 24px; font-size: 1rem; font-weight: 600; font-family: inherit; border: none; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
@@ -163,6 +175,18 @@
         .tariff-editor label { margin-bottom: 0; flex-shrink: 0; font-size: 0.85rem; }
         .tariff-editor input { width: 100px; padding: 8px 12px; text-align: right; font-family: 'Space Mono', monospace; }
         .tariff-editor .tariff-unit { color: var(--text-secondary); font-size: 0.85rem; }
+        
+        /* PAGE TARIFF INFO */
+        .page-tariff-info { background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; }
+        .page-tariff-label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .page-tariff-values { display: flex; gap: 16px; font-size: 0.95rem; }
+        .page-tariff-values strong { color: var(--accent-green); font-family: 'Space Mono', monospace; }
+        
+        /* COUNT OPTIONS */
+        .count-options { display: flex; flex-direction: column; gap: 12px; }
+        .count-options .action-btn { margin-top: 0; }
+        .btn-hint { font-size: 0.75rem; font-weight: 400; opacity: 0.8; margin-left: 4px; }
+        
         .proposed-rate-fields { margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.05); border-radius: var(--radius-md); border: 1px solid rgba(212,168,83,0.3); }
         .proposed-rate-fields.hidden { display: none; }
         
@@ -394,6 +418,11 @@
         <div class="config-section" id="configSection">
             <div class="config-label">Configuración API (una sola vez)</div>
             <input type="text" id="apiUrl" class="config-input" placeholder="Pega la URL del Apps Script (termina en /exec)">
+            
+            <div class="config-label" style="margin-top: 16px;">iLovePDF (opcional - para comprimir PDFs)</div>
+            <input type="text" id="ilovepdfPublicKey" class="config-input" placeholder="Public Key de iLovePDF" style="margin-bottom: 8px;">
+            <input type="text" id="ilovepdfSecretKey" class="config-input" placeholder="Secret Key de iLovePDF">
+            
             <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">Guardar y Conectar</button>
         </div>
 
@@ -657,16 +686,28 @@
         <!-- STEP 4: CONTAR PALABRAS -->
         <div class="card hidden" id="step4Card">
             <div class="card-title">
-                Recuento de palabras
+                Análisis de documentos
                 <span class="step-badge">PASO 4 - Opcional</span>
             </div>
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
-                Analiza los documentos para contar palabras y páginas. El informe se guarda en la carpeta del presupuesto.
-            </p>
             
-            <button class="btn btn-primary btn-orange action-btn" id="countWordsBtn" onclick="countWords()">
-                🔢 Contar Palabras
-            </button>
+            <!-- Tarifa por página de esta combinación -->
+            <div class="page-tariff-info" id="pageTariffInfo">
+                <div class="page-tariff-label">Tarifa por página (<span id="langPairDisplay">--</span>):</div>
+                <div class="page-tariff-values">
+                    <span><strong id="tariffPage1Display">--</strong> € (1ª pág)</span>
+                    <span><strong id="tariffPage2Display">--</strong> € (resto)</span>
+                </div>
+            </div>
+            
+            <div class="count-options">
+                <button class="btn btn-primary btn-success action-btn" id="countPagesBtn" onclick="countPagesOnly()">
+                    📄 Solo Páginas <span class="btn-hint">(instantáneo)</span>
+                </button>
+                
+                <button class="btn btn-primary btn-orange action-btn" id="countWordsBtn" onclick="countWords()">
+                    🔢 Palabras + Páginas <span class="btn-hint">(más lento)</span>
+                </button>
+            </div>
             
             <div class="results-box hidden" id="wordCountResults">
                 <div class="results-title">Resultado del análisis</div>
@@ -681,14 +722,14 @@
                     <tbody id="wordCountBody"></tbody>
                 </table>
                 
-                <div class="tariff-editor">
+                <div class="tariff-editor" id="tariffEditorWords">
                     <label>Tarifa:</label>
                     <input type="number" id="customTariff" step="0.01" min="0" onchange="updateTotalPrice()">
                     <span class="tariff-unit">€/palabra</span>
                 </div>
                 
                 <div class="results-grid" style="margin-top: 12px;">
-                    <div class="result-item">
+                    <div class="result-item" id="resultByWords">
                         <div class="result-label">Por palabras</div>
                         <div class="result-value" id="priceByWords">0,00 €</div>
                     </div>
@@ -855,7 +896,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.7.2 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.8.0 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -887,12 +928,12 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.7.2
-         * Fecha: 30/12/2025 11:30
+         * HTML Version: 2.8.0
+         * Fecha: 30/12/2025 12:30
          */
 
-        const HTML_VERSION = '2.7.2';
-        const HTML_DATE = '30/12/2025 11:30';
+        const HTML_VERSION = '2.8.0';
+        const HTML_DATE = '30/12/2025 12:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -909,6 +950,11 @@
         let currentStep = 1;
         let completedSteps = new Set();
         let isResuming = false;
+        
+        // iLovePDF
+        let ilovepdfPublicKey = localStorage.getItem('tradutema_ilovepdf_public') || '';
+        let ilovepdfSecretKey = localStorage.getItem('tradutema_ilovepdf_secret') || '';
+        let filesToCompress = new Set();  // Índices de archivos marcados para comprimir
         
         // Budget data
         let budgetData = {
@@ -997,6 +1043,15 @@
             }
             apiUrl = url;
             localStorage.setItem('tradutema_api_url', url);
+            
+            // Guardar keys de iLovePDF (opcionales)
+            const publicKey = document.getElementById('ilovepdfPublicKey').value.trim();
+            const secretKey = document.getElementById('ilovepdfSecretKey').value.trim();
+            if (publicKey) localStorage.setItem('tradutema_ilovepdf_public', publicKey);
+            if (secretKey) localStorage.setItem('tradutema_ilovepdf_secret', secretKey);
+            ilovepdfPublicKey = publicKey;
+            ilovepdfSecretKey = secretKey;
+            
             document.getElementById('configSection').style.display = 'none';
             loadData();
         }
@@ -1004,6 +1059,8 @@
         function showConfig() {
             document.getElementById('configSection').style.display = 'block';
             document.getElementById('apiUrl').value = apiUrl;
+            document.getElementById('ilovepdfPublicKey').value = ilovepdfPublicKey || '';
+            document.getElementById('ilovepdfSecretKey').value = ilovepdfSecretKey || '';
         }
 
         // ====== HOME SCREEN ======
@@ -1032,6 +1089,7 @@
             uploadedFiles = [];
             selectedProviders.clear();
             completedSteps.clear();
+            filesToCompress.clear();  // Limpiar marcas de compresión
             currentStep = 1;
             isResuming = false;
             clientMessageEdited = false;  // Reset flag de mensaje editado
@@ -1751,6 +1809,11 @@
                 if (s === step) el.classList.add('active');
             });
             
+            // Si es paso 4, mostrar tarifas por página
+            if (step === 4) {
+                updatePageTariffDisplay();
+            }
+            
             // Si es paso 6, pre-llenar email/whatsapp con datos del paso 1
             if (step === 6) {
                 const clientEmail = document.getElementById('clientEmail');
@@ -1770,6 +1833,33 @@
             
             // Scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        function updatePageTariffDisplay() {
+            // Buscar tarifa por página para la combinación actual
+            const tariff = allTariffs.find(t => 
+                t.idiomaOrigen === budgetData.sourceLang && 
+                t.idiomaDestino === budgetData.targetLang
+            );
+            
+            const langPair = document.getElementById('langPairDisplay');
+            const page1 = document.getElementById('tariffPage1Display');
+            const page2 = document.getElementById('tariffPage2Display');
+            
+            if (tariff) {
+                langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
+                page1.textContent = (tariff.tarifaPagina1 || 0).toFixed(2).replace('.', ',');
+                page2.textContent = (tariff.tarifaPaginaResto || 0).toFixed(2).replace('.', ',');
+                
+                // Guardar en budgetData para cálculos
+                budgetData.tariffPage1 = tariff.tarifaPagina1 || 0;
+                budgetData.tariffPage2 = tariff.tarifaPaginaResto || 0;
+                budgetData.tariffPerWord = tariff.tarifaPalabra || 0;
+            } else {
+                langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
+                page1.textContent = '--';
+                page2.textContent = '--';
+            }
         }
 
         function updateProgressSteps() {
@@ -1827,6 +1917,7 @@
                 total.style.display = 'none';
                 area.classList.remove('has-files');
                 btn.disabled = true;
+                filesToCompress.clear();
                 return;
             }
             
@@ -1835,27 +1926,64 @@
             
             let html = '';
             let totalSize = 0;
+            const hasIlovepdf = ilovepdfPublicKey && ilovepdfSecretKey;
             
             uploadedFiles.forEach((f, i) => {
                 totalSize += f.size;
+                const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+                const isChecked = filesToCompress.has(i);
+                const sizeClass = f.size > 2 * 1024 * 1024 ? 'file-size-large' : ''; // >2MB
+                
                 html += `
                     <div class="file-item">
                         <div class="file-item-info">
                             <span class="file-item-name">${f.name}</span>
-                            <span class="file-item-size">${formatFileSize(f.size)}</span>
+                            <span class="file-item-size ${sizeClass}">${formatFileSize(f.size)}</span>
                         </div>
-                        <button class="file-item-remove" onclick="removeFile(${i})">✕</button>
+                        <div class="file-item-actions">
+                            ${isPdf && hasIlovepdf ? `
+                                <label class="compress-checkbox" title="Comprimir con iLovePDF">
+                                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleCompress(${i})">
+                                    <span class="compress-label">📦</span>
+                                </label>
+                            ` : ''}
+                            <button class="file-item-remove" onclick="removeFile(${i})">✕</button>
+                        </div>
                     </div>
                 `;
             });
             
             list.innerHTML = html;
-            total.innerHTML = `<strong>${uploadedFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total`;
+            
+            // Mostrar contador de archivos a comprimir
+            const compressCount = filesToCompress.size;
+            let totalHtml = `<strong>${uploadedFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total`;
+            if (compressCount > 0) {
+                totalHtml += ` | <span class="compress-count">📦 ${compressCount} a comprimir</span>`;
+            }
+            total.innerHTML = totalHtml;
             total.style.display = 'block';
+        }
+        
+        function toggleCompress(index) {
+            if (filesToCompress.has(index)) {
+                filesToCompress.delete(index);
+            } else {
+                filesToCompress.add(index);
+            }
+            renderFiles();
         }
 
         function removeFile(index) {
             uploadedFiles.splice(index, 1);
+            filesToCompress.delete(index);
+            // Reajustar índices en filesToCompress
+            const newSet = new Set();
+            filesToCompress.forEach(i => {
+                if (i > index) newSet.add(i - 1);
+                else if (i < index) newSet.add(i);
+            });
+            filesToCompress = newSet;
             renderFiles();
         }
 
@@ -1863,6 +1991,132 @@
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        // ====== iLovePDF COMPRESSION ======
+        async function compressFilesWithIlovepdf() {
+            if (filesToCompress.size === 0) return;
+            if (!ilovepdfPublicKey || !ilovepdfSecretKey) return;
+            
+            const indicesToCompress = Array.from(filesToCompress);
+            let compressed = 0;
+            
+            for (const idx of indicesToCompress) {
+                const file = uploadedFiles[idx];
+                if (!file || !file.name.toLowerCase().endsWith('.pdf')) continue;
+                
+                try {
+                    showStatus(`Comprimiendo ${file.name}... (${compressed + 1}/${indicesToCompress.length})`, 'loading');
+                    
+                    // 1. Autenticación
+                    const authResponse = await fetch('https://api.ilovepdf.com/v1/auth', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ public_key: ilovepdfPublicKey })
+                    });
+                    const authData = await authResponse.json();
+                    if (!authData.token) throw new Error('Error de autenticación iLovePDF');
+                    
+                    // 2. Iniciar tarea de compresión
+                    const startResponse = await fetch('https://api.ilovepdf.com/v1/start/compress', {
+                        method: 'GET',
+                        headers: { 'Authorization': 'Bearer ' + authData.token }
+                    });
+                    const startData = await startResponse.json();
+                    if (!startData.task) throw new Error('Error al iniciar tarea');
+                    
+                    // 3. Subir archivo
+                    const formData = new FormData();
+                    
+                    // Convertir base64 a blob
+                    const base64Data = file.content.split(',')[1];
+                    const byteCharacters = atob(base64Data);
+                    const byteArrays = [];
+                    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                        const slice = byteCharacters.slice(offset, offset + 512);
+                        const byteNumbers = new Array(slice.length);
+                        for (let i = 0; i < slice.length; i++) {
+                            byteNumbers[i] = slice.charCodeAt(i);
+                        }
+                        byteArrays.push(new Uint8Array(byteNumbers));
+                    }
+                    const blob = new Blob(byteArrays, { type: 'application/pdf' });
+                    
+                    formData.append('task', startData.task);
+                    formData.append('file', blob, file.name);
+                    
+                    const uploadResponse = await fetch('https://api.ilovepdf.com/v1/upload', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + authData.token },
+                        body: formData
+                    });
+                    const uploadData = await uploadResponse.json();
+                    if (!uploadData.server_filename) throw new Error('Error al subir archivo');
+                    
+                    // 4. Procesar compresión
+                    const processResponse = await fetch('https://api.ilovepdf.com/v1/process', {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': 'Bearer ' + authData.token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            task: startData.task,
+                            tool: 'compress',
+                            files: [{
+                                server_filename: uploadData.server_filename,
+                                filename: file.name
+                            }],
+                            compression_level: 'recommended'
+                        })
+                    });
+                    const processData = await processResponse.json();
+                    if (!processData.download_filename) throw new Error('Error al procesar');
+                    
+                    // 5. Descargar archivo comprimido
+                    const downloadResponse = await fetch(`https://api.ilovepdf.com/v1/download/${startData.task}`, {
+                        method: 'GET',
+                        headers: { 'Authorization': 'Bearer ' + authData.token }
+                    });
+                    const compressedBlob = await downloadResponse.blob();
+                    
+                    // 6. Convertir a base64 y reemplazar en uploadedFiles
+                    const reader = new FileReader();
+                    const compressedBase64 = await new Promise((resolve) => {
+                        reader.onload = () => resolve(reader.result);
+                        reader.readAsDataURL(compressedBlob);
+                    });
+                    
+                    const originalSize = file.size;
+                    const newSize = compressedBlob.size;
+                    const savings = Math.round((1 - newSize / originalSize) * 100);
+                    
+                    // Actualizar archivo en la lista
+                    uploadedFiles[idx] = {
+                        name: file.name,
+                        type: 'application/pdf',
+                        size: newSize,
+                        content: compressedBase64
+                    };
+                    
+                    console.log(`Comprimido ${file.name}: ${formatFileSize(originalSize)} → ${formatFileSize(newSize)} (-${savings}%)`);
+                    compressed++;
+                    
+                } catch (err) {
+                    console.error('Error comprimiendo ' + file.name + ':', err);
+                    showStatus(`Error comprimiendo ${file.name}: ${err.message}`, 'error');
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            }
+            
+            // Limpiar marcas de compresión
+            filesToCompress.clear();
+            renderFiles();
+            
+            if (compressed > 0) {
+                showStatus(`${compressed} archivo(s) comprimido(s) ✓`, 'success');
+                await new Promise(r => setTimeout(r, 1500));
+            }
         }
 
         // ====== FOLDER CREATION ======
@@ -1880,6 +2134,11 @@
             btn.innerHTML = '<span class="spinner"></span> Creando...';
             
             try {
+                // Comprimir archivos marcados primero
+                if (filesToCompress.size > 0) {
+                    await compressFilesWithIlovepdf();
+                }
+                
                 showStatus('Creando carpeta y subiendo archivos...', 'loading');
                 
                 const response = await fetch(apiUrl, {
@@ -1915,6 +2174,7 @@
                     completedSteps.add(3);
                     updateProgressSteps();
                     
+                    hideStatus();  // Ocultar mensaje de carga
                     showSuccess('Carpeta creada', budgetData.id);
                     
                     setTimeout(() => {
@@ -1933,6 +2193,83 @@
         }
 
         // ====== WORD COUNT ======
+        async function countPagesOnly() {
+            if (!budgetData.folderId) {
+                showStatus('Primero crea la carpeta del presupuesto', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('countPagesBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Contando...';
+            
+            try {
+                showStatus('Contando páginas...', 'loading');
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'countPagesOnly',
+                        folderId: budgetData.folderId,
+                        budgetId: budgetData.id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    budgetData.fileAnalysis = data.analysis || [];
+                    budgetData.wordCount = null;  // No contamos palabras
+                    budgetData.pageCount = data.totalPages || 0;
+                    
+                    // Display results (sin palabras)
+                    displayPageCountResults(data);
+                    hideStatus();
+                    
+                    updateTotalPrice();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '📄 Solo Páginas <span class="btn-hint">(instantáneo)</span>';
+        }
+        
+        function displayPageCountResults(data) {
+            const tbody = document.getElementById('wordCountBody');
+            let html = '';
+            
+            data.analysis.forEach(file => {
+                html += `
+                    <tr>
+                        <td>${file.fileName}</td>
+                        <td style="text-align:right; color: var(--text-secondary);">--</td>
+                        <td style="text-align:right; font-weight: 600;">${file.pages}</td>
+                    </tr>
+                `;
+            });
+            
+            // Totals
+            html += `
+                <tr class="total-row">
+                    <td><strong>TOTAL</strong></td>
+                    <td style="text-align:right; color: var(--text-secondary);">--</td>
+                    <td style="text-align:right;"><strong>${data.totalPages}</strong></td>
+                </tr>
+            `;
+            
+            tbody.innerHTML = html;
+            
+            // Ocultar sección de palabras, mostrar solo páginas
+            document.getElementById('tariffEditorWords').style.display = 'none';
+            document.getElementById('resultByWords').style.display = 'none';
+            
+            document.getElementById('wordCountResults').classList.remove('hidden');
+        }
+        
         async function countWords() {
             if (!budgetData.folderId) {
                 showStatus('Primero crea la carpeta del presupuesto', 'warning');
@@ -2004,6 +2341,11 @@
             `;
             
             tbody.innerHTML = html;
+            
+            // Restaurar elementos que podrían estar ocultos
+            document.getElementById('tariffEditorWords').style.display = '';
+            document.getElementById('resultByWords').style.display = '';
+            
             resultsBox.classList.remove('hidden');
         }
 
