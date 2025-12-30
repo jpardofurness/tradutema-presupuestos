@@ -3,12 +3,12 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.8.3                                                ║
-║   FECHA:   30/12/2025 - 19:32                                   ║
+║   VERSIÓN: 2.8.5                                                ║
+║   FECHA:   30/12/2025 - 20:20                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Fix: Tarifas se convierten a número correctamente           ║
-║   - Fix: Error toFixed en tariffPerWord                         ║
+║   - Compresión iLovePDF deshabilitada (CORS no permite)         ║
+║   - Los archivos se suben sin comprimir                         ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -893,7 +893,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.8.3 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.8.5 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -925,12 +925,12 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.8.3
-         * Fecha: 30/12/2025 19:32
+         * HTML Version: 2.8.5
+         * Fecha: 30/12/2025 20:20
          */
 
-        const HTML_VERSION = '2.8.3';
-        const HTML_DATE = '30/12/2025 19:32';
+        const HTML_VERSION = '2.8.5';
+        const HTML_DATE = '30/12/2025 20:20';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1995,151 +1995,19 @@
         }
 
         // ====== iLovePDF COMPRESSION ======
+        // NOTA: iLovePDF no permite llamadas desde GitHub Pages (CORS)
+        // Esta funcionalidad está deshabilitada temporalmente
+        // TODO: Mover compresión al backend (Apps Script) para evitar CORS
         async function compressFilesWithIlovepdf() {
             if (filesToCompress.size === 0) return;
-            if (!ilovepdfPublicKey || !ilovepdfSecretKey) return;
             
-            const indicesToCompress = Array.from(filesToCompress);
-            let compressed = 0;
+            // Mostrar aviso y continuar sin comprimir
+            console.warn('Compresión iLovePDF deshabilitada - los archivos se subirán sin comprimir');
+            showStatus('⚠️ Compresión no disponible - subiendo archivos originales...', 'warning');
+            await new Promise(r => setTimeout(r, 1500));
             
-            for (const idx of indicesToCompress) {
-                const file = uploadedFiles[idx];
-                if (!file || !file.name.toLowerCase().endsWith('.pdf')) continue;
-                
-                try {
-                    showStatus(`Comprimiendo ${file.name}... (${compressed + 1}/${indicesToCompress.length})`, 'loading');
-                    
-                    // 1. Autenticación
-                    const authResponse = await fetch('https://api.ilovepdf.com/v1/auth', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ public_key: ilovepdfPublicKey })
-                    });
-                    if (!authResponse.ok) throw new Error('Error de autenticación: ' + authResponse.status);
-                    const authData = await authResponse.json();
-                    if (!authData.token) throw new Error('Token no recibido');
-                    
-                    // 2. Iniciar tarea de compresión (devuelve server y task)
-                    const startResponse = await fetch('https://api.ilovepdf.com/v1/start/compress', {
-                        method: 'GET',
-                        headers: { 'Authorization': 'Bearer ' + authData.token }
-                    });
-                    if (!startResponse.ok) throw new Error('Error al iniciar: ' + startResponse.status);
-                    const startData = await startResponse.json();
-                    if (!startData.task || !startData.server) throw new Error('Datos de tarea incompletos');
-                    
-                    const serverUrl = 'https://' + startData.server;
-                    
-                    // 3. Subir archivo al servidor asignado
-                    const formData = new FormData();
-                    
-                    // Convertir base64 a blob - manejar diferentes formatos
-                    let base64Data = file.content;
-                    if (base64Data.includes(',')) {
-                        base64Data = base64Data.split(',')[1];
-                    }
-                    if (!base64Data) {
-                        throw new Error('Contenido del archivo vacío');
-                    }
-                    
-                    // Limpiar posibles caracteres no válidos
-                    base64Data = base64Data.replace(/[^A-Za-z0-9+/=]/g, '');
-                    
-                    let byteCharacters;
-                    try {
-                        byteCharacters = atob(base64Data);
-                    } catch (e) {
-                        throw new Error('Formato base64 inválido');
-                    }
-                    
-                    const byteArrays = [];
-                    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-                        const slice = byteCharacters.slice(offset, offset + 512);
-                        const byteNumbers = new Array(slice.length);
-                        for (let i = 0; i < slice.length; i++) {
-                            byteNumbers[i] = slice.charCodeAt(i);
-                        }
-                        byteArrays.push(new Uint8Array(byteNumbers));
-                    }
-                    const blob = new Blob(byteArrays, { type: 'application/pdf' });
-                    
-                    formData.append('task', startData.task);
-                    formData.append('file', blob, file.name);
-                    
-                    const uploadResponse = await fetch(serverUrl + '/v1/upload', {
-                        method: 'POST',
-                        headers: { 'Authorization': 'Bearer ' + authData.token },
-                        body: formData
-                    });
-                    if (!uploadResponse.ok) throw new Error('Error al subir: ' + uploadResponse.status);
-                    const uploadData = await uploadResponse.json();
-                    if (!uploadData.server_filename) throw new Error('Archivo no procesado');
-                    
-                    // 4. Procesar compresión
-                    const processResponse = await fetch(serverUrl + '/v1/process', {
-                        method: 'POST',
-                        headers: { 
-                            'Authorization': 'Bearer ' + authData.token,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            task: startData.task,
-                            tool: 'compress',
-                            files: [{
-                                server_filename: uploadData.server_filename,
-                                filename: file.name
-                            }],
-                            compression_level: 'recommended'
-                        })
-                    });
-                    if (!processResponse.ok) throw new Error('Error al comprimir: ' + processResponse.status);
-                    const processData = await processResponse.json();
-                    
-                    // 5. Descargar archivo comprimido
-                    const downloadResponse = await fetch(serverUrl + '/v1/download/' + startData.task, {
-                        method: 'GET',
-                        headers: { 'Authorization': 'Bearer ' + authData.token }
-                    });
-                    if (!downloadResponse.ok) throw new Error('Error al descargar: ' + downloadResponse.status);
-                    const compressedBlob = await downloadResponse.blob();
-                    
-                    // 6. Convertir a base64 y reemplazar en uploadedFiles
-                    const reader = new FileReader();
-                    const compressedBase64 = await new Promise((resolve) => {
-                        reader.onload = () => resolve(reader.result);
-                        reader.readAsDataURL(compressedBlob);
-                    });
-                    
-                    const originalSize = file.size;
-                    const newSize = compressedBlob.size;
-                    const savings = Math.round((1 - newSize / originalSize) * 100);
-                    
-                    // Actualizar archivo en la lista
-                    uploadedFiles[idx] = {
-                        name: file.name,
-                        type: 'application/pdf',
-                        size: newSize,
-                        content: compressedBase64
-                    };
-                    
-                    console.log(`Comprimido ${file.name}: ${formatFileSize(originalSize)} → ${formatFileSize(newSize)} (-${savings}%)`);
-                    compressed++;
-                    
-                } catch (err) {
-                    console.error('Error comprimiendo ' + file.name + ':', err);
-                    showStatus(`Error comprimiendo ${file.name}: ${err.message}`, 'error');
-                    await new Promise(r => setTimeout(r, 2000));
-                }
-            }
-            
-            // Limpiar marcas de compresión
+            // Limpiar marcas de compresión para que los archivos se suban normalmente
             filesToCompress.clear();
-            renderFiles();
-            
-            if (compressed > 0) {
-                showStatus(`${compressed} archivo(s) comprimido(s) ✓`, 'success');
-                await new Promise(r => setTimeout(r, 1500));
-            }
         }
 
         // ====== FOLDER CREATION ======
@@ -2311,7 +2179,8 @@
                     body: JSON.stringify({
                         action: 'countWords',
                         folderId: budgetData.folderId,
-                        budgetId: budgetData.id
+                        budgetId: budgetData.id,
+                        sourceLang: budgetData.sourceLang  // Para OCR de imágenes
                     })
                 });
                 
