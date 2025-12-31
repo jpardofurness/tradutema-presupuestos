@@ -3,12 +3,13 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.9.2                                                ║
+║   VERSIÓN: 2.9.3                                                ║
 ║   FECHA:   31/12/2025                                           ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Logo Tradutema + título "Tradutema QUOTES" en header        ║
-║   - Eliminado código de compresión (simplificación)             ║
+║   - Conteo rápido: muestra páginas al cargar archivos           ║
+║   - Conteo rápido: OCR habilitado para imágenes (JPG, PNG...)   ║
+║   - Nuevo título: "Contar Palabras y Páginas"                   ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -456,10 +457,10 @@
         <div class="card hidden" id="quickCountScreen">
             <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
             
-            <div class="card-title">Contar Palabras Rápido</div>
+            <div class="card-title">Contar Palabras y Páginas</div>
             
             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
-                Arrastra archivos para contar palabras sin crear carpeta ni presupuesto.
+                Sin crear tasación ni presupuesto.
             </p>
             
             <div class="file-upload-area" id="quickUploadArea" onclick="document.getElementById('quickFileInput').click()">
@@ -914,7 +915,7 @@
          * Fecha: 30/12/2025 21:45
          */
 
-        const HTML_VERSION = '2.9.2';
+        const HTML_VERSION = '2.9.3';
         const HTML_DATE = '31/12/2025';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1167,8 +1168,14 @@
         }
         
         function handleQuickFiles(files) {
+            let loadedCount = 0;
+            const totalFiles = files.length;
+            
             for (const file of files) {
-                if (quickFiles.some(f => f.name === file.name)) continue;
+                if (quickFiles.some(f => f.name === file.name)) {
+                    loadedCount++;
+                    continue;
+                }
                 
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -1177,12 +1184,54 @@
                         name: file.name,
                         size: file.size,
                         type: file.type || 'application/octet-stream',
-                        content: base64
+                        content: base64,
+                        pages: null // Se obtendrá del backend
                     });
-                    renderQuickFiles();
+                    loadedCount++;
+                    
+                    // Cuando todos los archivos estén cargados, obtener páginas
+                    if (loadedCount === totalFiles) {
+                        renderQuickFiles();
+                        fetchQuickFilesPages();
+                    }
                 };
                 reader.readAsDataURL(file);
             }
+        }
+        
+        async function fetchQuickFilesPages() {
+            if (quickFiles.length === 0) return;
+            
+            const btn = document.getElementById('quickCountBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Contando páginas...';
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'getFilesPages',
+                        files: quickFiles
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Actualizar páginas en quickFiles
+                    data.files.forEach((f, idx) => {
+                        if (quickFiles[idx]) {
+                            quickFiles[idx].pages = f.pages;
+                        }
+                    });
+                    renderQuickFiles();
+                }
+            } catch (error) {
+                console.error('Error obteniendo páginas:', error);
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '🔢 Contar Palabras';
         }
         
         function renderQuickFiles() {
@@ -1204,16 +1253,20 @@
             
             let html = '';
             let totalSize = 0;
+            let totalPages = 0;
             quickFiles.forEach((file, idx) => {
                 totalSize += file.size;
+                const pages = file.pages || 1;
+                totalPages += pages;
                 const sizeStr = file.size > 1024*1024 
                     ? (file.size / (1024*1024)).toFixed(1) + ' MB'
                     : (file.size / 1024).toFixed(0) + ' KB';
+                const pagesStr = file.pages !== null ? `<span style="color: var(--primary-color); font-weight: 500;">${pages} pág.</span>` : '<span style="color: #999;">...</span>';
                 html += `
                     <div class="file-item">
                         <div class="file-item-info">
                             <span class="file-item-name">${file.name}</span>
-                            <span class="file-item-size">${sizeStr}</span>
+                            <span class="file-item-size">${sizeStr} · ${pagesStr}</span>
                         </div>
                         <button class="file-remove" onclick="removeQuickFile(${idx})">✕</button>
                     </div>
@@ -1224,7 +1277,10 @@
             const totalStr = totalSize > 1024*1024 
                 ? (totalSize / (1024*1024)).toFixed(1) + ' MB'
                 : (totalSize / 1024).toFixed(0) + ' KB';
-            total.innerHTML = `${quickFiles.length} archivo(s) - <strong>${totalStr}</strong> total`;
+            const pagesInfo = quickFiles.some(f => f.pages !== null) 
+                ? ` · <strong style="color: var(--primary-color);">${totalPages} páginas</strong>`
+                : '';
+            total.innerHTML = `${quickFiles.length} archivo(s) - <strong>${totalStr}</strong>${pagesInfo}`;
             total.style.display = 'block';
         }
         
