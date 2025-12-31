@@ -3,12 +3,12 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.9.0                                                ║
-║   FECHA:   30/12/2025 - 21:32                                   ║
+║   VERSIÓN: 2.9.1                                                ║
+║   FECHA:   30/12/2025 - 21:50                                   ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Compresión PDF via backend (sin CORS)                       ║
-║   - Funciona en móvil y fuera de casa                           ║
+║   - Eliminado código de compresión (simplificación)             ║
+║   - Código limpio y mantenible                                  ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -121,14 +121,6 @@
         .file-item-actions { display: flex; align-items: center; gap: 8px; }
         .file-item-remove { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.2rem; padding: 4px 8px; }
         .file-total { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; padding: 8px 12px; background: rgba(52,152,219,0.05); border-radius: var(--radius-sm); }
-        
-        /* COMPRESS CHECKBOX */
-        .compress-checkbox { display: flex; align-items: center; cursor: pointer; }
-        .compress-checkbox input { display: none; }
-        .compress-checkbox .compress-label { font-size: 1.1rem; opacity: 0.4; transition: all 0.2s; padding: 4px; }
-        .compress-checkbox input:checked + .compress-label { opacity: 1; }
-        .compress-checkbox:hover .compress-label { opacity: 0.7; }
-        .compress-count { color: var(--accent-orange); font-weight: 600; }
         
         /* BUTTONS */
         .btn { padding: 16px 24px; font-size: 1rem; font-weight: 600; font-family: inherit; border: none; border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
@@ -415,10 +407,6 @@
         <div class="config-section" id="configSection">
             <div class="config-label">Configuración API (una sola vez)</div>
             <input type="text" id="apiUrl" class="config-input" placeholder="Pega la URL del Apps Script (termina en /exec)">
-            
-            <div class="config-label" style="margin-top: 16px;">iLovePDF (opcional - para comprimir PDFs)</div>
-            <input type="text" id="ilovepdfPublicKey" class="config-input" placeholder="Public Key de iLovePDF" style="margin-bottom: 8px;">
-            <input type="text" id="ilovepdfSecretKey" class="config-input" placeholder="Secret Key de iLovePDF">
             
             <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">Guardar y Conectar</button>
         </div>
@@ -893,7 +881,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.9.0 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v2.9.1 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -925,12 +913,12 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.9.0
-         * Fecha: 30/12/2025 21:32
+         * HTML Version: 2.9.1
+         * Fecha: 30/12/2025 21:45
          */
 
-        const HTML_VERSION = '2.9.0';
-        const HTML_DATE = '30/12/2025 21:32';
+        const HTML_VERSION = '2.9.1';
+        const HTML_DATE = '30/12/2025 21:50';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -947,11 +935,6 @@
         let currentStep = 1;
         let completedSteps = new Set();
         let isResuming = false;
-        
-        // iLovePDF
-        let ilovepdfPublicKey = localStorage.getItem('tradutema_ilovepdf_public') || '';
-        let ilovepdfSecretKey = localStorage.getItem('tradutema_ilovepdf_secret') || '';
-        let filesToCompress = new Set();  // Índices de archivos marcados para comprimir
         
         // Budget data
         let budgetData = {
@@ -1041,14 +1024,6 @@
             apiUrl = url;
             localStorage.setItem('tradutema_api_url', url);
             
-            // Guardar keys de iLovePDF (opcionales)
-            const publicKey = document.getElementById('ilovepdfPublicKey').value.trim();
-            const secretKey = document.getElementById('ilovepdfSecretKey').value.trim();
-            if (publicKey) localStorage.setItem('tradutema_ilovepdf_public', publicKey);
-            if (secretKey) localStorage.setItem('tradutema_ilovepdf_secret', secretKey);
-            ilovepdfPublicKey = publicKey;
-            ilovepdfSecretKey = secretKey;
-            
             document.getElementById('configSection').style.display = 'none';
             loadData();
         }
@@ -1056,8 +1031,6 @@
         function showConfig() {
             document.getElementById('configSection').style.display = 'block';
             document.getElementById('apiUrl').value = apiUrl;
-            document.getElementById('ilovepdfPublicKey').value = ilovepdfPublicKey || '';
-            document.getElementById('ilovepdfSecretKey').value = ilovepdfSecretKey || '';
         }
 
         // ====== HOME SCREEN ======
@@ -1086,7 +1059,6 @@
             uploadedFiles = [];
             selectedProviders.clear();
             completedSteps.clear();
-            filesToCompress.clear();  // Limpiar marcas de compresión
             currentStep = 1;
             isResuming = false;
             clientMessageEdited = false;  // Reset flag de mensaje editado
@@ -1918,7 +1890,6 @@
                 total.style.display = 'none';
                 area.classList.remove('has-files');
                 btn.disabled = true;
-                filesToCompress.clear();
                 return;
             }
             
@@ -1927,12 +1898,9 @@
             
             let html = '';
             let totalSize = 0;
-            const hasIlovepdf = ilovepdfPublicKey && ilovepdfSecretKey;
             
             uploadedFiles.forEach((f, i) => {
                 totalSize += f.size;
-                const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
-                const isChecked = filesToCompress.has(i);
                 const sizeClass = f.size > 2 * 1024 * 1024 ? 'file-size-large' : ''; // >2MB
                 
                 html += `
@@ -1942,12 +1910,6 @@
                             <span class="file-item-size ${sizeClass}">${formatFileSize(f.size)}</span>
                         </div>
                         <div class="file-item-actions">
-                            ${isPdf && hasIlovepdf ? `
-                                <label class="compress-checkbox" title="Comprimir con iLovePDF">
-                                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleCompress(${i})">
-                                    <span class="compress-label">📦</span>
-                                </label>
-                            ` : ''}
                             <button class="file-item-remove" onclick="removeFile(${i})">✕</button>
                         </div>
                     </div>
@@ -1956,35 +1918,12 @@
             
             list.innerHTML = html;
             
-            // Mostrar contador de archivos a comprimir
-            const compressCount = filesToCompress.size;
-            let totalHtml = `<strong>${uploadedFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total`;
-            if (compressCount > 0) {
-                totalHtml += ` | <span class="compress-count">📦 ${compressCount} a comprimir</span>`;
-            }
-            total.innerHTML = totalHtml;
+            total.innerHTML = `<strong>${uploadedFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total`;
             total.style.display = 'block';
-        }
-        
-        function toggleCompress(index) {
-            if (filesToCompress.has(index)) {
-                filesToCompress.delete(index);
-            } else {
-                filesToCompress.add(index);
-            }
-            renderFiles();
         }
 
         function removeFile(index) {
             uploadedFiles.splice(index, 1);
-            filesToCompress.delete(index);
-            // Reajustar índices en filesToCompress
-            const newSet = new Set();
-            filesToCompress.forEach(i => {
-                if (i > index) newSet.add(i - 1);
-                else if (i < index) newSet.add(i);
-            });
-            filesToCompress = newSet;
             renderFiles();
         }
 
@@ -1992,79 +1931,6 @@
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-        }
-
-        // ====== iLovePDF COMPRESSION (via Backend) ======
-        // La compresión se hace en el backend para evitar CORS
-        async function compressFilesViaBackend(folderId) {
-            if (filesToCompress.size === 0) return [];
-            
-            const results = [];
-            const indicesToCompress = Array.from(filesToCompress);
-            
-            for (let i = 0; i < indicesToCompress.length; i++) {
-                const idx = indicesToCompress[i];
-                const file = uploadedFiles[idx];
-                if (!file || !file.name.toLowerCase().endsWith('.pdf')) continue;
-                
-                showStatus(`Comprimiendo ${file.name}... (${i + 1}/${indicesToCompress.length})`, 'loading');
-                
-                try {
-                    // Buscar el fileId del archivo subido
-                    // Necesitamos obtenerlo de la carpeta
-                    const filesResponse = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'getFilesInFolder',
-                            folderId: folderId
-                        })
-                    });
-                    
-                    const filesData = await filesResponse.json();
-                    if (!filesData.success) throw new Error('No se pudo obtener archivos');
-                    
-                    // Buscar el archivo por nombre
-                    const driveFile = filesData.files.find(f => f.name === file.name);
-                    if (!driveFile) throw new Error('Archivo no encontrado en Drive');
-                    
-                    // Llamar al backend para comprimir
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'compressPdf',
-                            fileId: driveFile.id,
-                            folderId: folderId
-                        })
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        const savings = data.savings || 0;
-                        console.log(`✓ ${file.name}: ${formatFileSize(data.originalSize)} → ${formatFileSize(data.compressedSize)} (-${savings}%)`);
-                        results.push({
-                            name: file.name,
-                            success: true,
-                            savings: savings,
-                            originalSize: data.originalSize,
-                            compressedSize: data.compressedSize
-                        });
-                    } else {
-                        throw new Error(data.error);
-                    }
-                    
-                } catch (err) {
-                    console.error('Error comprimiendo ' + file.name + ':', err);
-                    results.push({
-                        name: file.name,
-                        success: false,
-                        error: err.message
-                    });
-                }
-            }
-            
-            filesToCompress.clear();
-            return results;
         }
 
         // ====== FOLDER CREATION ======
@@ -2080,10 +1946,6 @@
             const btn = document.getElementById('step3Btn');
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span> Creando...';
-            
-            // Guardar si hay archivos para comprimir ANTES de subir
-            const hasFilesToCompress = filesToCompress.size > 0;
-            const compressCount = filesToCompress.size;
             
             try {
                 showStatus('Creando carpeta y subiendo archivos...', 'loading');
@@ -2107,18 +1969,6 @@
                     budgetData.id = data.budgetId;
                     budgetData.folderId = data.folderId;
                     budgetData.folderUrl = data.folderUrl;
-                    
-                    // Comprimir archivos marcados DESPUÉS de subir
-                    if (hasFilesToCompress) {
-                        const compressResults = await compressFilesViaBackend(budgetData.folderId);
-                        
-                        // Mostrar resumen de compresión
-                        const successful = compressResults.filter(r => r.success);
-                        if (successful.length > 0) {
-                            const totalSavings = successful.reduce((sum, r) => sum + (r.originalSize - r.compressedSize), 0);
-                            console.log(`Compresión completada: ${successful.length}/${compressCount} archivos, ${formatFileSize(totalSavings)} ahorrados`);
-                        }
-                    }
                     
                     // Update UI
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
