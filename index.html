@@ -62,9 +62,11 @@
         /* PROGRESS STEPS */
         .progress-container { background: white; border-bottom: 1px solid var(--border-color); padding: 12px 20px; position: sticky; top: 64px; z-index: 99; }
         .progress-steps { max-width: 700px; margin: 0 auto; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
-        .progress-step { flex: 1; min-width: 80px; text-align: center; padding: 8px 4px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); background: var(--bg-primary); transition: all 0.3s; cursor: pointer; }
-        .progress-step.active { background: var(--tradutema-blue); color: white; }
+        .progress-step { flex: 1; min-width: 80px; text-align: center; padding: 8px 4px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); background: var(--bg-primary); transition: all 0.3s; cursor: pointer; border: 2px solid transparent; }
+        .progress-step:hover { background: rgba(52,152,219,0.1); }
+        .progress-step.active { background: var(--tradutema-blue); color: white; border-color: #1a5276; box-shadow: 0 4px 12px rgba(52,152,219,0.4); transform: scale(1.05); }
         .progress-step.completed { background: var(--accent-green); color: white; }
+        .progress-step.completed:hover { background: #27ae60; }
         .progress-step.locked { opacity: 0.5; cursor: not-allowed; }
         .step-num { display: block; font-size: 1rem; font-weight: 700; }
         
@@ -864,15 +866,15 @@
             
             <div class="copy-buttons">
                 <button class="btn copy-btn whatsapp" onclick="copyForWhatsApp()">
-                    📱 Copiar WhatsApp
+                    💾 Guardar y Copiar WhatsApp
                 </button>
                 <button class="btn copy-btn email" onclick="copyForEmail()">
-                    📧 Copiar Email
+                    💾 Guardar y Copiar Email
                 </button>
             </div>
             
             <button class="btn btn-primary btn-success action-btn" id="sendClientBtn" onclick="sendClientEmail()" style="margin-top: 12px;">
-                ✉️ Enviar Email al Cliente
+                💾 Guardar y Enviar Email
             </button>
         </div>
     </main>
@@ -911,12 +913,18 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.9.1
-         * Fecha: 30/12/2025 21:45
+         * HTML Version: 2.9.4
+         * Fecha: 02/01/2026
+         * 
+         * CAMBIOS v2.9.4:
+         * - Botones "Guardar y Copiar/Enviar" guardan mensaje en Google Sheet
+         * - Nueva columna MensajeCliente en Google Sheet
+         * - Colores de pasos mejorados: paso actual siempre azul destacado
+         * - Paso actual con sombra y escala para mejor visibilidad
          */
 
-        const HTML_VERSION = '2.9.3';
-        const HTML_DATE = '31/12/2025';
+        const HTML_VERSION = '2.9.4';
+        const HTML_DATE = '02/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1549,6 +1557,8 @@
                     budgetData.tariffPerWord = b.tarifa ? parseFloat(b.tarifa) : 0;
                     budgetData.clientEmail = b.emailCliente || '';
                     budgetData.clientWhatsApp = b.whatsappCliente || '';
+                    budgetData.savedClientMessage = b.mensajeCliente || '';  // Mensaje guardado
+                    budgetData.savedAmount = b.importe || '';  // Importe guardado
                     
                     // Restaurar traductores contactados
                     if (b.traductoresContactados) {
@@ -1586,6 +1596,12 @@
                     if (clientEmailStep1) clientEmailStep1.value = budgetData.clientEmail;
                     if (clientWhatsAppStep1) clientWhatsAppStep1.value = budgetData.clientWhatsApp;
                     
+                    // Restaurar importe si existe
+                    if (budgetData.savedAmount) {
+                        const quoteAmount = document.getElementById('quoteAmount');
+                        if (quoteAmount) quoteAmount.value = budgetData.savedAmount;
+                    }
+                    
                     // Mostrar traductores contactados si existen
                     if (budgetData.contactedProviders.length > 0) {
                         renderContactedProviders();
@@ -1621,7 +1637,15 @@
                     if (b.estado === 'Enviado') targetStep = 6;
                     
                     showCard(targetStep);
-                    updateClientMessage();
+                    
+                    // Cargar mensaje guardado o generar nuevo
+                    if (budgetData.savedClientMessage) {
+                        // Si hay mensaje guardado, usarlo
+                        document.getElementById('clientMessageEdit').value = budgetData.savedClientMessage;
+                    } else {
+                        // Si no hay mensaje guardado, generar uno nuevo
+                        updateClientMessage();
+                    }
                     
                 } else {
                     throw new Error(data.error);
@@ -1824,12 +1848,8 @@
             const currentCard = document.getElementById(`step${step}Card`);
             if (currentCard) currentCard.classList.remove('hidden');
             
-            // Update progress steps visual
-            document.querySelectorAll('.progress-step').forEach(el => {
-                const s = parseInt(el.dataset.step);
-                el.classList.remove('active');
-                if (s === step) el.classList.add('active');
-            });
+            // Update progress steps visual - usar función centralizada
+            updateProgressSteps();
             
             // Si es paso 4, mostrar tarifas por página
             if (step === 4) {
@@ -1895,11 +1915,12 @@
                 // First, remove all state classes
                 el.classList.remove('completed', 'active', 'locked');
                 
-                // Then apply the correct state
-                if (completedSteps.has(step)) {
-                    el.classList.add('completed');
-                } else if (step === currentStep) {
+                // PRIORIDAD: El paso actual siempre tiene clase "active"
+                if (step === currentStep) {
                     el.classList.add('active');
+                } else if (completedSteps.has(step)) {
+                    // Pasos completados que NO son el actual
+                    el.classList.add('completed');
                 } else if (step > currentStep && !completedSteps.has(step - 1)) {
                     el.classList.add('locked');
                 }
@@ -2632,6 +2653,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const email = document.getElementById('clientEmail').value.trim();
             const whatsapp = document.getElementById('clientWhatsApp').value.trim();
             const amount = document.getElementById('quoteAmount').value;
+            const clientMessage = document.getElementById('clientMessageEdit').value;
             
             if (!budgetData.id) return;
             
@@ -2643,9 +2665,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         budgetId: budgetData.id,
                         clientEmail: email,
                         clientWhatsApp: whatsapp,
-                        amount: amount
+                        amount: amount,
+                        clientMessage: clientMessage
                     })
                 });
+                console.log('Datos guardados: mensaje (' + clientMessage.length + ' chars)');
             } catch (error) {
                 console.log('Error guardando datos cliente:', error);
             }
@@ -2730,7 +2754,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             }
             
             btn.disabled = false;
-            btn.innerHTML = '✉️ Enviar Email al Cliente';
+            btn.innerHTML = '💾 Guardar y Enviar Email';
         }
 
         // ====== STATUS & SUCCESS ======
