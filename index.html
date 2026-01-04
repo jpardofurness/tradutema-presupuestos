@@ -845,18 +845,18 @@
             <div class="quote-row">
                 <div class="form-group">
                     <label>Recargo urgencia (€, opcional)</label>
-                    <input type="number" id="quoteUrgency" step="0.01" min="0" placeholder="Ej: 15.00" onchange="updateClientMessage()">
+                    <input type="number" id="quoteUrgency" step="0.01" min="0" placeholder="" onchange="updateClientMessage()">
                 </div>
             </div>
             
             <div class="form-group">
                 <label>Email del cliente (opcional, para envío directo)</label>
-                <input type="email" id="clientEmail" placeholder="cliente@email.com">
+                <input type="email" id="clientEmail" placeholder="">
             </div>
             
             <div class="form-group">
                 <label>WhatsApp del cliente (opcional)</label>
-                <input type="tel" id="clientWhatsApp" placeholder="+34 612 345 678">
+                <input type="tel" id="clientWhatsApp" placeholder="">
             </div>
             
             <div class="form-group">
@@ -913,18 +913,25 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.9.4
-         * Fecha: 02/01/2026
+         * HTML Version: 2.9.6
+         * Fecha: 04/01/2026
          * 
-         * CAMBIOS v2.9.4:
-         * - Botones "Guardar y Copiar/Enviar" guardan mensaje en Google Sheet
-         * - Nueva columna MensajeCliente en Google Sheet
-         * - Colores de pasos mejorados: paso actual siempre azul destacado
-         * - Paso actual con sombra y escala para mejor visibilidad
+         * CAMBIOS v2.9.6:
+         * - Corregido singular/plural: "1 día laborable" vs "2 días laborables"
+         * - Corregido singular/plural: "1 working day" vs "2 working days"  
+         * - Corregido singular/plural: "1 palabra" vs "X palabras"
+         * - Corregido singular/plural: "1 página" vs "X páginas"
+         * - Mejorada plantilla de traductores: "Volumen" y "Extensión" en lugar de "Palabras" y "Páginas"
+         * 
+         * CAMBIOS v2.9.5:
+         * - sendClientEmail ahora guarda el mensaje en Google Sheet
+         * - Añadida columna "Plazo" para guardar días laborables
+         * - Quitados placeholders confusos (email, whatsapp, urgencia)
+         * - Al retomar: se cargan correctamente email, whatsapp, importe y plazo
          */
 
-        const HTML_VERSION = '2.9.4';
-        const HTML_DATE = '02/01/2026';
+        const HTML_VERSION = '2.9.6';
+        const HTML_DATE = '04/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1521,7 +1528,7 @@
                             <span class="budget-item-detail">📅 ${fecha}</span>
                             <span class="budget-item-detail">${canal}</span>
                             <span class="budget-item-detail">🌐 ${b.origen} → ${b.destino}</span>
-                            ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} palabras</span>` : ''}
+                            ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} ${parseInt(b.palabras) === 1 ? 'palabra' : 'palabras'}</span>` : ''}
                             ${contactoHtml}
                         </div>
                         ${traductoresHtml}
@@ -1559,6 +1566,7 @@
                     budgetData.clientWhatsApp = b.whatsappCliente || '';
                     budgetData.savedClientMessage = b.mensajeCliente || '';  // Mensaje guardado
                     budgetData.savedAmount = b.importe || '';  // Importe guardado
+                    budgetData.savedQuoteDays = b.plazo || '';  // Plazo guardado
                     
                     // Restaurar traductores contactados
                     if (b.traductoresContactados) {
@@ -1582,7 +1590,7 @@
                     if (b.estado === 'Tasación enviada' || b.estado === 'Enviado') completedSteps.add(5);
                     if (b.estado === 'Enviado') completedSteps.add(6);
                     
-                    // Update UI
+                    // Update UI - Paso 1
                     document.getElementById('sourceLang').value = budgetData.sourceLang;
                     document.getElementById('targetLang').value = budgetData.targetLang;
                     document.querySelectorAll('.channel-btn').forEach(btn => {
@@ -1590,16 +1598,33 @@
                     });
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
                     
-                    // Restaurar campos contacto en paso 1
+                    // Restaurar campos contacto en paso 1 (solo si tienen valor)
                     const clientEmailStep1 = document.getElementById('clientEmailStep1');
                     const clientWhatsAppStep1 = document.getElementById('clientWhatsAppStep1');
-                    if (clientEmailStep1) clientEmailStep1.value = budgetData.clientEmail;
-                    if (clientWhatsAppStep1) clientWhatsAppStep1.value = budgetData.clientWhatsApp;
+                    if (clientEmailStep1 && budgetData.clientEmail) {
+                        clientEmailStep1.value = budgetData.clientEmail;
+                    }
+                    if (clientWhatsAppStep1 && budgetData.clientWhatsApp) {
+                        clientWhatsAppStep1.value = budgetData.clientWhatsApp;
+                    }
                     
-                    // Restaurar importe si existe
-                    if (budgetData.savedAmount) {
-                        const quoteAmount = document.getElementById('quoteAmount');
-                        if (quoteAmount) quoteAmount.value = budgetData.savedAmount;
+                    // Restaurar campos del paso 6 (solo si tienen valor)
+                    const clientEmail = document.getElementById('clientEmail');
+                    const clientWhatsApp = document.getElementById('clientWhatsApp');
+                    const quoteAmount = document.getElementById('quoteAmount');
+                    const quoteDays = document.getElementById('quoteDays');
+                    
+                    if (clientEmail && budgetData.clientEmail) {
+                        clientEmail.value = budgetData.clientEmail;
+                    }
+                    if (clientWhatsApp && budgetData.clientWhatsApp) {
+                        clientWhatsApp.value = budgetData.clientWhatsApp;
+                    }
+                    if (quoteAmount && budgetData.savedAmount) {
+                        quoteAmount.value = budgetData.savedAmount;
+                    }
+                    if (quoteDays && budgetData.savedQuoteDays) {
+                        quoteDays.value = budgetData.savedQuoteDays;
                     }
                     
                     // Mostrar traductores contactados si existen
@@ -2377,8 +2402,19 @@
             body += `* Combinación: ${budgetData.sourceLang} > ${budgetData.targetLang}\n`;
             
             if (includeWords && budgetData.wordCount) {
-                body += `* Palabras: ${budgetData.wordCount.toLocaleString('es-ES')}\n`;
-                body += `* Páginas: ${budgetData.pageCount}\n`;
+                // Singular/plural para palabras
+                const wordsText = budgetData.wordCount === 1 
+                    ? '1 palabra' 
+                    : `${budgetData.wordCount.toLocaleString('es-ES')} palabras`;
+                body += `* Volumen: ${wordsText}\n`;
+                
+                // Singular/plural para páginas
+                if (budgetData.pageCount) {
+                    const pagesText = budgetData.pageCount === 1 
+                        ? '1 página' 
+                        : `${budgetData.pageCount} páginas`;
+                    body += `* Extensión: ${pagesText}\n`;
+                }
             }
             
             if (deadlineType === 'open') {
@@ -2547,6 +2583,21 @@
             clientMessageEdited = true;
         }
         
+        // ====== FUNCIONES HELPER PARA SINGULAR/PLURAL ======
+        function pluralize(count, singular, plural) {
+            const n = parseInt(count);
+            if (isNaN(n) || n === 0) return `${count} ${plural}`;
+            return n === 1 ? `${n} ${singular}` : `${n} ${plural}`;
+        }
+        
+        function pluralizeEs(count, singular, plural) {
+            return pluralize(count, singular, plural);
+        }
+        
+        function pluralizeEn(count, singular, plural) {
+            return pluralize(count, singular, plural);
+        }
+        
         function updateClientMessage() {
             // Si el usuario ya editó el mensaje, no sobrescribir
             if (clientMessageEdited) return;
@@ -2557,14 +2608,19 @@
             const refId = budgetData.id || 'REFERENCIA';
             const srcLang = budgetData.sourceLang || 'origen';
             const tgtLang = budgetData.targetLang || 'destino';
-            const numDocs = uploadedFiles.length || 1;
+            const numDocs = uploadedFiles.length || budgetData.numArchivos || 1;
             
-            // Document text
-            const docText = numDocs > 1 ? `de los ${numDocs} documentos enviados` : 'del documento enviado';
+            // Textos con singular/plural correctos
+            const daysTextEs = days === 'X' ? 'X días laborables' : pluralizeEs(days, 'día laborable', 'días laborables');
+            const daysTextEn = days === 'X' ? 'X working days' : pluralizeEn(days, 'working day', 'working days');
+            
+            // Document text (singular/plural)
+            const docTextEs = numDocs === 1 ? 'del documento enviado' : `de los ${numDocs} documentos enviados`;
+            const docTextEn = numDocs === 1 ? 'of the document sent' : `of the ${numDocs} documents sent`;
             
             // Calculate delivery date
-            let deliveryDate = 'X días laborables desde hoy';
-            if (days && !isNaN(parseInt(days))) {
+            let deliveryDate = '';
+            if (days && days !== 'X' && !isNaN(parseInt(days))) {
                 const d = new Date();
                 let added = 0;
                 while (added < parseInt(days)) {
@@ -2572,16 +2628,21 @@
                     if (d.getDay() !== 0 && d.getDay() !== 6) added++;
                 }
                 deliveryDate = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+            } else {
+                deliveryDate = 'la fecha indicada';
             }
             
             let message;
             
             if (messageLang === 'es') {
+                // Texto de urgencia
+                const urgencyText = urgency ? ` (si lo necesitas antes, es posible, con un recargo por urgencia de ${urgency} EUR)` : '';
+                
                 message = `Hola,
 
-La tarifa para la traducción jurada de ${srcLang} a ${tgtLang} ${docText} es de ${amount} EUR (IVA incluido).
+La tarifa para la traducción jurada de ${srcLang} a ${tgtLang} ${docTextEs} es de ${amount} EUR (IVA incluido).
 
-Plazo aproximado: ${days} días laborables${urgency ? ` (si lo necesitas antes, es posible, con un recargo por urgencia de ${urgency} EUR)` : ''}.
+Plazo aproximado: ${daysTextEs}${urgencyText}.
 
 Para realizar el pedido:
 1. Haz clic en https://tradutema.com/cotizacion-personalizada/
@@ -2599,12 +2660,14 @@ info@tradutema.com
 
 Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI`;
             } else {
-                const docTextEn = numDocs > 1 ? `of the ${numDocs} documents sent` : 'of the document sent';
+                // Texto de urgencia en inglés
+                const urgencyTextEn = urgency ? ` (if you need it sooner, it's possible with an urgency surcharge of ${urgency} EUR)` : '';
+                
                 message = `Hello,
 
 The fee for the sworn translation from ${srcLang} to ${tgtLang} ${docTextEn} is ${amount} EUR (VAT included).
 
-Estimated delivery: ${days} working days${urgency ? ` (if you need it sooner, it's possible with an urgency surcharge of ${urgency} EUR)` : ''}.
+Estimated delivery: ${daysTextEn}${urgencyTextEn}.
 
 To place your order:
 1. Click on https://tradutema.com/cotizacion-personalizada/
@@ -2654,6 +2717,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const whatsapp = document.getElementById('clientWhatsApp').value.trim();
             const amount = document.getElementById('quoteAmount').value;
             const clientMessage = document.getElementById('clientMessageEdit').value;
+            const quoteDays = document.getElementById('quoteDays').value;
             
             if (!budgetData.id) return;
             
@@ -2666,10 +2730,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         clientEmail: email,
                         clientWhatsApp: whatsapp,
                         amount: amount,
-                        clientMessage: clientMessage
+                        clientMessage: clientMessage,
+                        quoteDays: quoteDays
                     })
                 });
-                console.log('Datos guardados: mensaje (' + clientMessage.length + ' chars)');
+                console.log('Datos guardados: mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDays);
             } catch (error) {
                 console.log('Error guardando datos cliente:', error);
             }
@@ -2723,6 +2788,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 showStatus('Enviando presupuesto al cliente...', 'loading');
                 
                 const customMessage = document.getElementById('clientMessageEdit').value;
+                const quoteDays = document.getElementById('quoteDays').value;
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -2734,7 +2800,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         amount: document.getElementById('quoteAmount').value,
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
-                        customMessage: customMessage  // Mensaje editado por el usuario
+                        customMessage: customMessage,  // Mensaje editado por el usuario
+                        quoteDays: quoteDays  // Plazo en días
                     })
                 });
                 
