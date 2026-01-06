@@ -283,6 +283,8 @@
         .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
         .spinner.dark { border-color: rgba(52,152,219,0.2); border-top-color: var(--tradutema-blue); }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-message { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px; color: var(--text-secondary); font-size: 0.9rem; }
+        .loading-message .spinner { border-color: rgba(52,152,219,0.2); border-top-color: var(--tradutema-blue); }
         
         /* FOOTER */
         .footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.75rem; }
@@ -383,18 +385,14 @@
             </div>
             <div class="progress-step locked" data-step="3" onclick="goToStep(3)">
                 <span class="step-num">3</span>
-                Carpeta
+                Palabras
             </div>
             <div class="progress-step locked" data-step="4" onclick="goToStep(4)">
                 <span class="step-num">4</span>
-                Palabras
+                Tasación
             </div>
             <div class="progress-step locked" data-step="5" onclick="goToStep(5)">
                 <span class="step-num">5</span>
-                Tasación
-            </div>
-            <div class="progress-step locked" data-step="6" onclick="goToStep(6)">
-                <span class="step-num">6</span>
                 Cliente
             </div>
         </div>
@@ -633,33 +631,8 @@
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
             
-            <button class="btn btn-primary action-btn" id="step2Btn" onclick="completeStep2()" disabled>
-                Continuar a Crear Carpeta →
-            </button>
-        </div>
-
-        <!-- STEP 3: CREAR CARPETA -->
-        <div class="card hidden" id="step3Card">
-            <div class="card-title">
-                Crear carpeta de presupuesto
-                <span class="step-badge">PASO 3</span>
-            </div>
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
-                Se creará una carpeta en Google Drive con el ID del presupuesto y se subirán los archivos.
-            </p>
-            
-            <div class="results-box" id="folderPreview">
-                <div class="results-title">Vista previa</div>
-                <div class="results-grid">
-                    <div class="result-item full-width">
-                        <div class="result-label">ID Presupuesto</div>
-                        <div class="result-value" id="previewBudgetId">--</div>
-                    </div>
-                </div>
-            </div>
-            
-            <button class="btn btn-primary btn-gold action-btn" id="step3Btn" onclick="createFolder()">
-                📁 Crear Carpeta en Drive
+            <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue()" disabled>
+                📁 Crear Carpeta y Continuar →
             </button>
             
             <a href="#" class="folder-link hidden" id="folderLink" target="_blank">
@@ -668,11 +641,11 @@
             </a>
         </div>
 
-        <!-- STEP 4: CONTAR PALABRAS -->
-        <div class="card hidden" id="step4Card">
+        <!-- STEP 3: CONTAR PALABRAS (automático) -->
+        <div class="card hidden" id="step3Card">
             <div class="card-title">
                 Análisis de documentos
-                <span class="step-badge">PASO 4 - Opcional</span>
+                <span class="step-badge">PASO 3 - Opcional</span>
             </div>
             
             <!-- Tarifa por página de esta combinación -->
@@ -684,19 +657,13 @@
                 </div>
             </div>
             
-            <div class="count-options">
-                <button class="btn btn-primary btn-success action-btn" id="countPagesBtn" onclick="countPagesOnly()">
-                    📄 Solo Páginas <span class="btn-hint">(instantáneo)</span>
-                </button>
-                
-                <button class="btn btn-primary btn-orange action-btn" id="countWordsBtn" onclick="countWords()">
-                    🔢 Palabras + Páginas <span class="btn-hint">(más lento)</span>
-                </button>
-            </div>
-            
-            <div class="results-box hidden" id="wordCountResults">
+            <!-- Resultados del análisis (se muestran automáticamente) -->
+            <div class="results-box" id="wordCountResults">
                 <div class="results-title">Resultado del análisis</div>
-                <table class="word-count-table" id="wordCountTable">
+                <div id="wordCountLoading" class="loading-message">
+                    <span class="spinner"></span> Analizando documentos...
+                </div>
+                <table class="word-count-table hidden" id="wordCountTable">
                     <thead>
                         <tr>
                             <th>Archivo</th>
@@ -707,13 +674,13 @@
                     <tbody id="wordCountBody"></tbody>
                 </table>
                 
-                <div class="tariff-editor" id="tariffEditorWords">
+                <div class="tariff-editor hidden" id="tariffEditorWords">
                     <label>Tarifa:</label>
                     <input type="number" id="customTariff" step="0.01" min="0" onchange="updateTotalPrice()">
                     <span class="tariff-unit">€/palabra</span>
                 </div>
                 
-                <div class="results-grid" style="margin-top: 12px;">
+                <div class="results-grid hidden" id="priceResultsGrid" style="margin-top: 12px;">
                     <div class="result-item" id="resultByWords">
                         <div class="result-label">Por palabras</div>
                         <div class="result-value" id="priceByWords">0,00 €</div>
@@ -725,17 +692,21 @@
                 </div>
             </div>
             
+            <button class="btn btn-primary btn-orange action-btn hidden" id="countWordsBtn" onclick="countWords()">
+                🔢 Analizar Palabras <span class="btn-hint">(más lento)</span>
+            </button>
+            
             <div class="btn-row" style="margin-top: 16px;">
-                <button class="btn btn-secondary" onclick="skipToStep(5)">Saltar</button>
-                <button class="btn btn-primary" onclick="completeStep4()">Continuar →</button>
+                <button class="btn btn-secondary" onclick="skipToStep(4)">Saltar</button>
+                <button class="btn btn-primary" onclick="completeStep3()">Continuar →</button>
             </div>
         </div>
 
-        <!-- STEP 5: TASACIÓN PROVEEDORES -->
-        <div class="card hidden" id="step5Card">
+        <!-- STEP 4: TASACIÓN PROVEEDORES -->
+        <div class="card hidden" id="step4Card">
             <div class="card-title">
                 Solicitar tasación a proveedores
-                <span class="step-badge">PASO 5 - Opcional</span>
+                <span class="step-badge">PASO 4 - Opcional</span>
             </div>
             
             <!-- Opciones de la tasación -->
@@ -815,15 +786,15 @@
             </div>
             
             <div class="btn-row">
-                <button class="btn btn-secondary" onclick="skipToStep(6)">Saltar a Cliente</button>
+                <button class="btn btn-secondary" onclick="skipToStep(5)">Saltar a Cliente</button>
             </div>
         </div>
 
-        <!-- STEP 6: PRESUPUESTO CLIENTE -->
-        <div class="card hidden" id="step6Card">
+        <!-- STEP 5: PRESUPUESTO CLIENTE -->
+        <div class="card hidden" id="step5Card">
             <div class="card-title">
                 Enviar presupuesto al cliente
-                <span class="step-badge">PASO 6</span>
+                <span class="step-badge">PASO 5</span>
             </div>
             
             <div class="lang-toggle">
@@ -913,25 +884,27 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 2.9.6
-         * Fecha: 04/01/2026
+         * HTML Version: 3.0.0
+         * Fecha: 06/01/2026
+         * 
+         * CAMBIOS v3.0.0:
+         * - RESTRUCTURACIÓN: De 6 pasos a 5 pasos
+         *   1. Idiomas
+         *   2. Archivos (incluye crear carpeta automáticamente)
+         *   3. Palabras (análisis automático de páginas al entrar)
+         *   4. Tasación
+         *   5. Cliente
+         * - Eliminado paso "Carpeta" (se fusiona con "Archivos")
+         * - Análisis de páginas automático al entrar al paso 3
+         * - Corregido: numArchivos se carga correctamente al retomar presupuesto
+         * - Corregido: "de los X documentos enviados" usa numArchivos de la DB
          * 
          * CAMBIOS v2.9.6:
-         * - Corregido singular/plural: "1 día laborable" vs "2 días laborables"
-         * - Corregido singular/plural: "1 working day" vs "2 working days"  
-         * - Corregido singular/plural: "1 palabra" vs "X palabras"
-         * - Corregido singular/plural: "1 página" vs "X páginas"
-         * - Mejorada plantilla de traductores: "Volumen" y "Extensión" en lugar de "Palabras" y "Páginas"
-         * 
-         * CAMBIOS v2.9.5:
-         * - sendClientEmail ahora guarda el mensaje en Google Sheet
-         * - Añadida columna "Plazo" para guardar días laborables
-         * - Quitados placeholders confusos (email, whatsapp, urgencia)
-         * - Al retomar: se cargan correctamente email, whatsapp, importe y plazo
+         * - Corregido singular/plural en mensajes
          */
 
-        const HTML_VERSION = '2.9.6';
-        const HTML_DATE = '04/01/2026';
+        const HTML_VERSION = '3.0.0';
+        const HTML_DATE = '06/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1093,7 +1066,7 @@
             const step2Btn = document.getElementById('step2Btn');
             const contactedSection = document.getElementById('contactedProvidersSection');
             
-            // Reset paso 6 fields
+            // Reset paso 5 fields
             const quoteAmount = document.getElementById('quoteAmount');
             const quoteDays = document.getElementById('quoteDays');
             const quoteUrgency = document.getElementById('quoteUrgency');
@@ -1124,7 +1097,7 @@
             // Reset word count results
             if (wordCountResults) wordCountResults.classList.add('hidden');
             
-            // Reset paso 6 fields
+            // Reset paso 5 fields
             if (quoteAmount) quoteAmount.value = '';
             if (quoteDays) quoteDays.value = '';
             if (quoteUrgency) quoteUrgency.value = '';
@@ -1564,9 +1537,10 @@
                     budgetData.tariffPerWord = b.tarifa ? parseFloat(b.tarifa) : 0;
                     budgetData.clientEmail = b.emailCliente || '';
                     budgetData.clientWhatsApp = b.whatsappCliente || '';
-                    budgetData.savedClientMessage = b.mensajeCliente || '';  // Mensaje guardado
-                    budgetData.savedAmount = b.importe || '';  // Importe guardado
-                    budgetData.savedQuoteDays = b.plazo || '';  // Plazo guardado
+                    budgetData.savedClientMessage = b.mensajeCliente || '';
+                    budgetData.savedAmount = b.importe || '';
+                    budgetData.savedQuoteDays = b.plazo || '';
+                    budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
                     
                     // Restaurar traductores contactados
                     if (b.traductoresContactados) {
@@ -1581,14 +1555,13 @@
                     
                     isResuming = true;
                     
-                    // Set completed steps based on what data exists
+                    // Set completed steps based on what data exists (ahora 5 pasos)
                     completedSteps.clear();
                     completedSteps.add(1); // Languages always done
-                    completedSteps.add(2); // Files always uploaded
-                    completedSteps.add(3); // Folder always created
-                    if (budgetData.wordCount) completedSteps.add(4);
-                    if (b.estado === 'Tasación enviada' || b.estado === 'Enviado') completedSteps.add(5);
-                    if (b.estado === 'Enviado') completedSteps.add(6);
+                    completedSteps.add(2); // Files + Folder always done when resuming
+                    if (budgetData.wordCount || budgetData.pageCount) completedSteps.add(3);
+                    if (b.estado === 'Tasación enviada' || b.estado === 'Enviado') completedSteps.add(4);
+                    if (b.estado === 'Enviado') completedSteps.add(5);
                     
                     // Update UI - Paso 1
                     document.getElementById('sourceLang').value = budgetData.sourceLang;
@@ -1608,7 +1581,7 @@
                         clientWhatsAppStep1.value = budgetData.clientWhatsApp;
                     }
                     
-                    // Restaurar campos del paso 6 (solo si tienen valor)
+                    // Restaurar campos del paso 5 (Cliente) - solo si tienen valor
                     const clientEmail = document.getElementById('clientEmail');
                     const clientWhatsApp = document.getElementById('clientWhatsApp');
                     const quoteAmount = document.getElementById('quoteAmount');
@@ -1640,8 +1613,6 @@
                             folderLink.href = budgetData.folderUrl;
                             folderLink.classList.remove('hidden');
                         }
-                        const previewId = document.getElementById('previewBudgetId');
-                        if (previewId) previewId.textContent = budgetData.id;
                     }
                     
                     // Update tariff
@@ -1656,19 +1627,17 @@
                     updateProgressSteps();
                     hideStatus();
                     
-                    // Go to the appropriate step
-                    let targetStep = 6; // Default to client step
-                    if (!budgetData.wordCount) targetStep = 4;
-                    if (b.estado === 'Enviado') targetStep = 6;
+                    // Go to the appropriate step (ahora 5 pasos)
+                    let targetStep = 5; // Default to client step (paso 5)
+                    if (!budgetData.wordCount && !budgetData.pageCount) targetStep = 3;
+                    if (b.estado === 'Enviado') targetStep = 5;
                     
                     showCard(targetStep);
                     
                     // Cargar mensaje guardado o generar nuevo
                     if (budgetData.savedClientMessage) {
-                        // Si hay mensaje guardado, usarlo
                         document.getElementById('clientMessageEdit').value = budgetData.savedClientMessage;
                     } else {
-                        // Si no hay mensaje guardado, generar uno nuevo
                         updateClientMessage();
                     }
                     
@@ -1835,14 +1804,13 @@
             }
             completedSteps.add(2);
             updateProgressSteps();
-            showCard(3);
-            updateFolderPreview();
+            // Ya no se usa - ahora se usa createFolderAndContinue()
         }
 
-        function completeStep4() {
-            completedSteps.add(4);
+        function completeStep3() {
+            completedSteps.add(3);
             updateProgressSteps();
-            showCard(5);
+            showCard(4);
             
             // Auto-check include word count if we have data
             if (budgetData.wordCount) {
@@ -1863,8 +1831,8 @@
         function showCard(step) {
             currentStep = step;
             
-            // Hide all cards
-            for (let i = 1; i <= 6; i++) {
+            // Hide all cards (ahora 5 pasos)
+            for (let i = 1; i <= 5; i++) {
                 const card = document.getElementById(`step${i}Card`);
                 if (card) card.classList.add('hidden');
             }
@@ -1876,13 +1844,20 @@
             // Update progress steps visual - usar función centralizada
             updateProgressSteps();
             
-            // Si es paso 4, mostrar tarifas por página
-            if (step === 4) {
+            // Si es paso 3 (Palabras), mostrar tarifas y ejecutar análisis automático de páginas
+            if (step === 3) {
                 updatePageTariffDisplay();
+                // Ejecutar análisis automático de páginas si no hay datos previos
+                if (!budgetData.pageCount && !isResuming) {
+                    autoCountPages();
+                } else if (budgetData.pageCount) {
+                    // Si ya hay datos, mostrarlos
+                    showExistingWordCountResults();
+                }
             }
             
-            // Si es paso 6, pre-llenar email/whatsapp con datos del paso 1
-            if (step === 6) {
+            // Si es paso 5 (Cliente), pre-llenar email/whatsapp con datos del paso 1
+            if (step === 5) {
                 const clientEmail = document.getElementById('clientEmail');
                 const clientWhatsApp = document.getElementById('clientWhatsApp');
                 
@@ -1900,6 +1875,141 @@
             
             // Scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // Función para ejecutar análisis automático de páginas
+        async function autoCountPages() {
+            const loading = document.getElementById('wordCountLoading');
+            const table = document.getElementById('wordCountTable');
+            const editor = document.getElementById('tariffEditorWords');
+            const priceGrid = document.getElementById('priceResultsGrid');
+            const countWordsBtn = document.getElementById('countWordsBtn');
+            
+            // Mostrar loading
+            if (loading) loading.classList.remove('hidden');
+            if (table) table.classList.add('hidden');
+            if (editor) editor.classList.add('hidden');
+            if (priceGrid) priceGrid.classList.add('hidden');
+            if (countWordsBtn) countWordsBtn.classList.add('hidden');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'countPagesOnly',
+                        folderId: budgetData.folderId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Ocultar loading
+                    if (loading) loading.classList.add('hidden');
+                    
+                    budgetData.wordCount = null;  // No contamos palabras aún
+                    budgetData.pageCount = data.totalPages;
+                    budgetData.numArchivos = data.files ? data.files.length : uploadedFiles.length;
+                    
+                    // Display results
+                    displayPageResults(data.files, data.totalPages);
+                    
+                    // Mostrar botón de contar palabras
+                    if (countWordsBtn) countWordsBtn.classList.remove('hidden');
+                    
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                if (loading) loading.classList.add('hidden');
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
+        }
+        
+        // Mostrar resultados de páginas
+        function displayPageResults(files, totalPages) {
+            const table = document.getElementById('wordCountTable');
+            const tbody = document.getElementById('wordCountBody');
+            const priceGrid = document.getElementById('priceResultsGrid');
+            
+            if (!files || files.length === 0) return;
+            
+            // Build table
+            tbody.innerHTML = files.map(file => `
+                <tr>
+                    <td>${file.name}</td>
+                    <td style="text-align:right; color: var(--text-secondary);">-</td>
+                    <td style="text-align:right; font-weight: 600;">${file.pages}</td>
+                </tr>
+            `).join('');
+            
+            // Add totals row
+            tbody.innerHTML += `
+                <tr class="totals-row">
+                    <td><strong>TOTAL</strong></td>
+                    <td style="text-align:right; color: var(--text-secondary);">-</td>
+                    <td style="text-align:right;"><strong>${totalPages}</strong></td>
+                </tr>
+            `;
+            
+            // Calculate price by pages
+            const page1 = budgetData.tariffPage1 || 0;
+            const page2 = budgetData.tariffPage2 || 0;
+            const pages = totalPages || 0;
+            
+            let priceByPages = 0;
+            if (pages > 0) {
+                priceByPages = page1 + Math.max(0, pages - 1) * page2;
+            }
+            
+            document.getElementById('priceByWords').textContent = '-';
+            document.getElementById('priceByPages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
+            
+            // Show elements
+            if (table) table.classList.remove('hidden');
+            if (priceGrid) priceGrid.classList.remove('hidden');
+        }
+        
+        // Mostrar resultados existentes al retomar
+        function showExistingWordCountResults() {
+            const loading = document.getElementById('wordCountLoading');
+            const table = document.getElementById('wordCountTable');
+            const tbody = document.getElementById('wordCountBody');
+            const editor = document.getElementById('tariffEditorWords');
+            const priceGrid = document.getElementById('priceResultsGrid');
+            const countWordsBtn = document.getElementById('countWordsBtn');
+            
+            if (loading) loading.classList.add('hidden');
+            
+            // Mostrar tabla con datos guardados
+            tbody.innerHTML = `
+                <tr class="totals-row">
+                    <td><strong>TOTAL (guardado)</strong></td>
+                    <td style="text-align:right;"><strong>${budgetData.wordCount ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</strong></td>
+                    <td style="text-align:right;"><strong>${budgetData.pageCount || '-'}</strong></td>
+                </tr>
+            `;
+            
+            // Calculate prices
+            const page1 = budgetData.tariffPage1 || 0;
+            const page2 = budgetData.tariffPage2 || 0;
+            const pages = budgetData.pageCount || 0;
+            const words = budgetData.wordCount || 0;
+            const tariff = budgetData.tariffPerWord || 0;
+            
+            let priceByPages = 0;
+            if (pages > 0) {
+                priceByPages = page1 + Math.max(0, pages - 1) * page2;
+            }
+            
+            document.getElementById('priceByWords').textContent = words > 0 ? (words * tariff).toFixed(2).replace('.', ',') + ' €' : '-';
+            document.getElementById('priceByPages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
+            
+            if (table) table.classList.remove('hidden');
+            if (priceGrid) priceGrid.classList.remove('hidden');
+            if (countWordsBtn) countWordsBtn.classList.remove('hidden');
+            if (words > 0 && editor) editor.classList.remove('hidden');
         }
         
         function updatePageTariffDisplay() {
@@ -2038,13 +2148,18 @@
             const mm = String(today.getMonth() + 1).padStart(2, '0');
             const dd = String(today.getDate()).padStart(2, '0');
             const preview = `${mm}${dd}-XX-${budgetData.channel}`;
-            document.getElementById('previewBudgetId').textContent = preview;
+            // No hay previewBudgetId en el nuevo flujo
         }
 
-        async function createFolder() {
-            const btn = document.getElementById('step3Btn');
+        async function createFolderAndContinue() {
+            if (uploadedFiles.length === 0) {
+                showStatus('Adjunta al menos un archivo', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('step2Btn');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Creando...';
+            btn.innerHTML = '<span class="spinner"></span> Creando carpeta...';
             
             try {
                 showStatus('Creando carpeta y subiendo archivos...', 'loading');
@@ -2068,26 +2183,26 @@
                     budgetData.id = data.budgetId;
                     budgetData.folderId = data.folderId;
                     budgetData.folderUrl = data.folderUrl;
+                    budgetData.numArchivos = uploadedFiles.length;
                     
                     // Update UI
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
                     document.getElementById('budgetIdDisplay').classList.add('active');
-                    document.getElementById('previewBudgetId').textContent = budgetData.id;
                     
                     // Show folder link
                     const folderLink = document.getElementById('folderLink');
                     folderLink.href = budgetData.folderUrl;
                     folderLink.classList.remove('hidden');
                     
-                    completedSteps.add(3);
+                    completedSteps.add(2);
                     updateProgressSteps();
                     
-                    hideStatus();  // Ocultar mensaje de carga
+                    hideStatus();
                     showSuccess('Carpeta creada', budgetData.id);
                     
                     setTimeout(() => {
                         hideSuccess();
-                        showCard(4);
+                        showCard(3);  // Ir al paso 3 (Palabras)
                     }, 1500);
                 } else {
                     throw new Error(data.error);
@@ -2097,7 +2212,12 @@
             }
             
             btn.disabled = false;
-            btn.innerHTML = '📁 Crear Carpeta en Drive';
+            btn.innerHTML = '📁 Crear Carpeta y Continuar →';
+        }
+
+        // Mantener createFolder como alias para compatibilidad
+        async function createFolder() {
+            return createFolderAndContinue();
         }
 
         // ====== WORD COUNT ======
@@ -2510,7 +2630,7 @@
                     
                     setTimeout(() => {
                         hideSuccess();
-                        // No ir automáticamente a paso 6, quedarse para elegir traductor
+                        // No ir automáticamente a paso 5, quedarse para elegir traductor
                     }, 2000);
                 } else {
                     throw new Error(data.error);
@@ -2748,7 +2868,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 showStatus('Copiado para WhatsApp ✓', 'success');
                 // Guardar datos del cliente
                 await saveClientData();
-                completedSteps.add(6);
+                completedSteps.add(5);
                 updateProgressSteps();
                 setTimeout(hideStatus, 2000);
             });
@@ -2762,7 +2882,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 showStatus('Copiado para Email ✓', 'success');
                 // Guardar datos del cliente
                 await saveClientData();
-                completedSteps.add(6);
+                completedSteps.add(5);
                 updateProgressSteps();
                 setTimeout(hideStatus, 2000);
             });
@@ -2809,7 +2929,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 
                 if (data.success) {
                     hideStatus();
-                    completedSteps.add(6);
+                    completedSteps.add(5);
                     updateProgressSteps();
                     showSuccess('¡Presupuesto enviado!', `Email enviado a ${email}`, true);
                 } else {
