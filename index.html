@@ -285,6 +285,19 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-message { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px; color: var(--text-secondary); font-size: 0.9rem; }
         .loading-message .spinner { border-color: rgba(52,152,219,0.2); border-top-color: var(--tradutema-blue); }
+        .loading-box { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 30px; text-align: center; }
+        
+        /* ANALYSIS SUMMARY */
+        .analysis-summary { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 16px; margin-top: 16px; }
+        .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+        .summary-row:last-child { border-bottom: none; }
+        .summary-row.highlight { background: rgba(52,152,219,0.1); margin: 8px -16px -12px; padding: 12px 16px; border-radius: 0 0 var(--radius-sm) var(--radius-sm); border-bottom: none; }
+        .summary-label { color: var(--text-secondary); }
+        .summary-value { font-weight: 600; color: var(--text-primary); }
+        .summary-row.highlight .summary-value { color: var(--tradutema-blue); font-size: 1.1rem; }
+        .tariff-detail { margin-top: 12px; padding: 8px 12px; background: rgba(52,152,219,0.05); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 0.85rem; }
+        .tariff-detail strong { color: var(--tradutema-blue); }
+        .tariff-result { margin-left: 12px; color: var(--accent-green); font-weight: 600; }
         
         /* FOOTER */
         .footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.75rem; }
@@ -641,29 +654,26 @@
             </a>
         </div>
 
-        <!-- STEP 3: CONTAR PALABRAS (automático) -->
+        <!-- STEP 3: ANÁLISIS DE DOCUMENTOS (automático) -->
         <div class="card hidden" id="step3Card">
             <div class="card-title">
                 Análisis de documentos
                 <span class="step-badge">PASO 3 - Opcional</span>
             </div>
             
-            <!-- Tarifa por página de esta combinación -->
-            <div class="page-tariff-info" id="pageTariffInfo">
-                <div class="page-tariff-label">Tarifa por página (<span id="langPairDisplay">--</span>):</div>
-                <div class="page-tariff-values">
-                    <span><strong id="tariffPage1Display">--</strong> € (1ª pág)</span>
-                    <span><strong id="tariffPage2Display">--</strong> € (resto)</span>
+            <!-- Loading mientras se analiza -->
+            <div id="step3Loading" class="loading-box">
+                <div class="loading-message">
+                    <span class="spinner"></span> Analizando documentos...
                 </div>
             </div>
             
-            <!-- Resultados del análisis (se muestran automáticamente) -->
-            <div class="results-box" id="wordCountResults">
-                <div class="results-title">Resultado del análisis</div>
-                <div id="wordCountLoading" class="loading-message">
-                    <span class="spinner"></span> Analizando documentos...
-                </div>
-                <table class="word-count-table hidden" id="wordCountTable">
+            <!-- Resultados del análisis (se muestran cuando termina) -->
+            <div class="results-box hidden" id="step3Results">
+                <div class="results-title">📊 Resumen del análisis</div>
+                
+                <!-- Tabla de archivos -->
+                <table class="word-count-table" id="wordCountTable">
                     <thead>
                         <tr>
                             <th>Archivo</th>
@@ -674,26 +684,39 @@
                     <tbody id="wordCountBody"></tbody>
                 </table>
                 
+                <!-- Resumen de totales y tarifa -->
+                <div class="analysis-summary" id="analysisSummary">
+                    <div class="summary-row">
+                        <span class="summary-label">Total archivos:</span>
+                        <span class="summary-value" id="summaryFiles">-</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Total páginas:</span>
+                        <span class="summary-value" id="summaryPages">-</span>
+                    </div>
+                    <div class="summary-row highlight">
+                        <span class="summary-label">Tarifa por páginas (<span id="langPairDisplay">--</span>):</span>
+                        <span class="summary-value" id="summaryPricePages">-</span>
+                    </div>
+                </div>
+                
+                <!-- Info de tarifa por página -->
+                <div class="tariff-detail" id="tariffDetail">
+                    <small>Cálculo: <span id="tariffPage1Display">--</span> € (1ª pág) + <span id="tariffPage2Display">--</span> € × (<span id="calcPagesRest">0</span> págs resto) = <strong id="calcTotal">0,00</strong> €</small>
+                </div>
+                
+                <!-- Editor de tarifa por palabra (solo si hay palabras) -->
                 <div class="tariff-editor hidden" id="tariffEditorWords">
                     <label>Tarifa:</label>
                     <input type="number" id="customTariff" step="0.01" min="0" onchange="updateTotalPrice()">
                     <span class="tariff-unit">€/palabra</span>
-                </div>
-                
-                <div class="results-grid hidden" id="priceResultsGrid" style="margin-top: 12px;">
-                    <div class="result-item" id="resultByWords">
-                        <div class="result-label">Por palabras</div>
-                        <div class="result-value" id="priceByWords">0,00 €</div>
-                    </div>
-                    <div class="result-item">
-                        <div class="result-label">Por páginas</div>
-                        <div class="result-value" id="priceByPages">0,00 €</div>
-                    </div>
+                    <span class="tariff-result">= <strong id="priceByWords">0,00</strong> €</span>
                 </div>
             </div>
             
+            <!-- Botón para análisis profundo de palabras -->
             <button class="btn btn-primary btn-orange action-btn hidden" id="countWordsBtn" onclick="countWords()">
-                🔢 Analizar Palabras <span class="btn-hint">(más lento)</span>
+                🔢 Analizar Palabras <span class="btn-hint">(más lento, para presupuesto por palabra)</span>
             </button>
             
             <div class="btn-row" style="margin-top: 16px;">
@@ -884,26 +907,24 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.0.0
+         * HTML Version: 3.0.1
          * Fecha: 06/01/2026
+         * 
+         * CAMBIOS v3.0.1:
+         * - Paso 3: Análisis automático de páginas al entrar
+         * - Nuevo diseño del paso 3 con resumen claro:
+         *   - Número de archivos
+         *   - Páginas por archivo
+         *   - Total de páginas
+         *   - Tarifa calculada automáticamente
+         *   - Desglose del cálculo (1ª pág + resto × tarifa)
+         * - Botón opcional "Analizar Palabras" para presupuestos por palabra
          * 
          * CAMBIOS v3.0.0:
          * - RESTRUCTURACIÓN: De 6 pasos a 5 pasos
-         *   1. Idiomas
-         *   2. Archivos (incluye crear carpeta automáticamente)
-         *   3. Palabras (análisis automático de páginas al entrar)
-         *   4. Tasación
-         *   5. Cliente
-         * - Eliminado paso "Carpeta" (se fusiona con "Archivos")
-         * - Análisis de páginas automático al entrar al paso 3
-         * - Corregido: numArchivos se carga correctamente al retomar presupuesto
-         * - Corregido: "de los X documentos enviados" usa numArchivos de la DB
-         * 
-         * CAMBIOS v2.9.6:
-         * - Corregido singular/plural en mensajes
          */
 
-        const HTML_VERSION = '3.0.0';
+        const HTML_VERSION = '3.0.1';
         const HTML_DATE = '06/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1879,17 +1900,13 @@
         
         // Función para ejecutar análisis automático de páginas
         async function autoCountPages() {
-            const loading = document.getElementById('wordCountLoading');
-            const table = document.getElementById('wordCountTable');
-            const editor = document.getElementById('tariffEditorWords');
-            const priceGrid = document.getElementById('priceResultsGrid');
+            const loading = document.getElementById('step3Loading');
+            const results = document.getElementById('step3Results');
             const countWordsBtn = document.getElementById('countWordsBtn');
             
-            // Mostrar loading
+            // Mostrar loading, ocultar resultados
             if (loading) loading.classList.remove('hidden');
-            if (table) table.classList.add('hidden');
-            if (editor) editor.classList.add('hidden');
-            if (priceGrid) priceGrid.classList.add('hidden');
+            if (results) results.classList.add('hidden');
             if (countWordsBtn) countWordsBtn.classList.add('hidden');
             
             try {
@@ -1904,8 +1921,9 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Ocultar loading
+                    // Ocultar loading, mostrar resultados
                     if (loading) loading.classList.add('hidden');
+                    if (results) results.classList.remove('hidden');
                     
                     budgetData.wordCount = null;  // No contamos palabras aún
                     budgetData.pageCount = data.totalPages;
@@ -1929,9 +1947,8 @@
         
         // Mostrar resultados de páginas
         function displayPageResults(files, totalPages) {
-            const table = document.getElementById('wordCountTable');
             const tbody = document.getElementById('wordCountBody');
-            const priceGrid = document.getElementById('priceResultsGrid');
+            const results = document.getElementById('step3Results');
             
             if (!files || files.length === 0) return;
             
@@ -1953,63 +1970,87 @@
                 </tr>
             `;
             
+            // Update summary
+            document.getElementById('summaryFiles').textContent = files.length;
+            document.getElementById('summaryPages').textContent = totalPages;
+            document.getElementById('langPairDisplay').textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
+            
             // Calculate price by pages
             const page1 = budgetData.tariffPage1 || 0;
             const page2 = budgetData.tariffPage2 || 0;
             const pages = totalPages || 0;
+            const pagesRest = Math.max(0, pages - 1);
             
             let priceByPages = 0;
             if (pages > 0) {
-                priceByPages = page1 + Math.max(0, pages - 1) * page2;
+                priceByPages = page1 + pagesRest * page2;
             }
             
-            document.getElementById('priceByWords').textContent = '-';
-            document.getElementById('priceByPages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
+            // Update tariff display
+            document.getElementById('tariffPage1Display').textContent = page1.toFixed(2).replace('.', ',');
+            document.getElementById('tariffPage2Display').textContent = page2.toFixed(2).replace('.', ',');
+            document.getElementById('calcPagesRest').textContent = pagesRest;
+            document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
+            document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
             
-            // Show elements
-            if (table) table.classList.remove('hidden');
-            if (priceGrid) priceGrid.classList.remove('hidden');
+            // Show results
+            if (results) results.classList.remove('hidden');
         }
         
         // Mostrar resultados existentes al retomar
         function showExistingWordCountResults() {
-            const loading = document.getElementById('wordCountLoading');
-            const table = document.getElementById('wordCountTable');
+            const loading = document.getElementById('step3Loading');
+            const results = document.getElementById('step3Results');
             const tbody = document.getElementById('wordCountBody');
             const editor = document.getElementById('tariffEditorWords');
-            const priceGrid = document.getElementById('priceResultsGrid');
             const countWordsBtn = document.getElementById('countWordsBtn');
             
             if (loading) loading.classList.add('hidden');
+            if (results) results.classList.remove('hidden');
             
             // Mostrar tabla con datos guardados
+            const hasWords = budgetData.wordCount && budgetData.wordCount > 0;
             tbody.innerHTML = `
                 <tr class="totals-row">
                     <td><strong>TOTAL (guardado)</strong></td>
-                    <td style="text-align:right;"><strong>${budgetData.wordCount ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</strong></td>
+                    <td style="text-align:right;"><strong>${hasWords ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</strong></td>
                     <td style="text-align:right;"><strong>${budgetData.pageCount || '-'}</strong></td>
                 </tr>
             `;
+            
+            // Update summary
+            document.getElementById('summaryFiles').textContent = budgetData.numArchivos || '-';
+            document.getElementById('summaryPages').textContent = budgetData.pageCount || '-';
+            document.getElementById('langPairDisplay').textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
             
             // Calculate prices
             const page1 = budgetData.tariffPage1 || 0;
             const page2 = budgetData.tariffPage2 || 0;
             const pages = budgetData.pageCount || 0;
+            const pagesRest = Math.max(0, pages - 1);
             const words = budgetData.wordCount || 0;
             const tariff = budgetData.tariffPerWord || 0;
             
             let priceByPages = 0;
             if (pages > 0) {
-                priceByPages = page1 + Math.max(0, pages - 1) * page2;
+                priceByPages = page1 + pagesRest * page2;
             }
             
-            document.getElementById('priceByWords').textContent = words > 0 ? (words * tariff).toFixed(2).replace('.', ',') + ' €' : '-';
-            document.getElementById('priceByPages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
+            // Update displays
+            document.getElementById('tariffPage1Display').textContent = page1.toFixed(2).replace('.', ',');
+            document.getElementById('tariffPage2Display').textContent = page2.toFixed(2).replace('.', ',');
+            document.getElementById('calcPagesRest').textContent = pagesRest;
+            document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
+            document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
             
-            if (table) table.classList.remove('hidden');
-            if (priceGrid) priceGrid.classList.remove('hidden');
+            // Si hay palabras, mostrar editor de tarifa
+            if (hasWords) {
+                document.getElementById('customTariff').value = tariff;
+                document.getElementById('priceByWords').textContent = (words * tariff).toFixed(2).replace('.', ',');
+                if (editor) editor.classList.remove('hidden');
+            }
+            
             if (countWordsBtn) countWordsBtn.classList.remove('hidden');
-            if (words > 0 && editor) editor.classList.remove('hidden');
         }
         
         function updatePageTariffDisplay() {
@@ -2343,12 +2384,13 @@
             }
             
             btn.disabled = false;
-            btn.innerHTML = '🔢 Contar Palabras';
+            btn.innerHTML = '🔢 Analizar Palabras <span class="btn-hint">(completado)</span>';
         }
 
         function displayWordCountResults(data) {
-            const resultsBox = document.getElementById('wordCountResults');
+            const results = document.getElementById('step3Results');
             const tbody = document.getElementById('wordCountBody');
+            const editor = document.getElementById('tariffEditorWords');
             
             let html = '';
             data.analysis.forEach(file => {
@@ -2371,11 +2413,13 @@
             
             tbody.innerHTML = html;
             
-            // Restaurar elementos que podrían estar ocultos
-            document.getElementById('tariffEditorWords').style.display = '';
-            document.getElementById('resultByWords').style.display = '';
+            // Update summary
+            document.getElementById('summaryFiles').textContent = data.analysis.length;
+            document.getElementById('summaryPages').textContent = data.totalPages;
             
-            resultsBox.classList.remove('hidden');
+            // Mostrar editor de tarifa por palabra
+            if (editor) editor.classList.remove('hidden');
+            if (results) results.classList.remove('hidden');
         }
 
         function updateTotalPrice() {
@@ -2385,16 +2429,21 @@
             
             // Price by words
             const priceByWords = (words * tariff).toFixed(2).replace('.', ',');
-            document.getElementById('priceByWords').textContent = priceByWords + ' €';
+            document.getElementById('priceByWords').textContent = priceByWords;
             
             // Price by pages
             const page1 = budgetData.tariffPage1 || 0;
             const page2 = budgetData.tariffPage2 || 0;
+            const pagesRest = Math.max(0, pages - 1);
             let priceByPages = 0;
             if (pages > 0) {
-                priceByPages = page1 + Math.max(0, pages - 1) * page2;
+                priceByPages = page1 + pagesRest * page2;
             }
-            document.getElementById('priceByPages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
+            
+            // Update displays
+            document.getElementById('calcPagesRest').textContent = pagesRest;
+            document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
+            document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
         }
 
         // ====== PROVIDERS ======
