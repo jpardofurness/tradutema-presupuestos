@@ -917,21 +917,20 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.0.7
+         * HTML Version: 3.0.8
          * Fecha: 07/01/2026
          * 
-         * CAMBIOS v3.0.7:
-         * - Sección "Traductores contactados" movida del Paso 4 al Paso 5
-         * - Campos de tarifa/plazo para cada proveedor contactado
-         * - Se muestra automáticamente al entrar al Paso 5 si hay proveedores
-         * - Después de enviar tasación, va automáticamente al Paso 5
-         * - Solo muestra proveedores que fueron contactados (no todos)
+         * CAMBIOS v3.0.8:
+         * - FIX: Al enviar tasación a nuevos proveedores, se AÑADEN a la lista
+         *   en lugar de sobrescribir los anteriores
+         * - Ahora puedes enviar tasación a Vanessa, luego a José Carlos,
+         *   y ambos aparecerán en Paso 5
          * 
-         * CAMBIOS v3.0.6:
-         * - Guardar datos básicos al cambiar de paso
+         * CAMBIOS v3.0.7:
+         * - Sección "Traductores contactados" movida al Paso 5
          */
 
-        const HTML_VERSION = '3.0.7';
+        const HTML_VERSION = '3.0.8';
         const HTML_DATE = '07/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2805,11 +2804,26 @@
                     hideStatus();
                     const ok = data.results.filter(r => r.success).length;
                     
-                    // Guardar traductores contactados
-                    budgetData.contactedProviders = providers.map(p => ({
+                    // AÑADIR nuevos traductores a los ya contactados (sin duplicar)
+                    const newProviders = providers.map(p => ({
                         nombre: p.nombre,
                         email: p.email
                     }));
+                    
+                    // Inicializar si no existe
+                    if (!budgetData.contactedProviders) {
+                        budgetData.contactedProviders = [];
+                    }
+                    
+                    // Añadir solo los que no están ya en la lista
+                    newProviders.forEach(newP => {
+                        const exists = budgetData.contactedProviders.some(
+                            existing => existing.nombre === newP.nombre
+                        );
+                        if (!exists) {
+                            budgetData.contactedProviders.push(newP);
+                        }
+                    });
                     
                     showSuccess('Emails enviados', `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`);
                     
