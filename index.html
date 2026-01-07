@@ -58,6 +58,8 @@
         .budget-id.active { background: white; color: var(--tradutema-blue); }
         .home-link { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; }
         .home-link:hover { background: rgba(255,255,255,0.3); }
+        .delete-btn { background: rgba(220,53,69,0.8); border: none; color: white; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
+        .delete-btn:hover { background: rgba(220,53,69,1); transform: scale(1.1); }
         
         /* PROGRESS STEPS */
         .progress-container { background: white; border-bottom: 1px solid var(--border-color); padding: 12px 20px; position: sticky; top: 64px; z-index: 99; }
@@ -394,6 +396,7 @@
             <div style="display: flex; align-items: center; gap: 12px;">
                 <button class="home-link" onclick="showHomeScreen()" id="homeBtn" style="display: none;">🏠 Inicio</button>
                 <div class="budget-id" id="budgetIdDisplay">Sin crear</div>
+                <button class="delete-btn" id="deleteBudgetBtn" onclick="confirmDeleteBudget()" title="Eliminar presupuesto y carpeta" style="display: none;">🗑️</button>
             </div>
         </div>
     </header>
@@ -917,20 +920,20 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.0.8
+         * HTML Version: 3.0.9
          * Fecha: 07/01/2026
          * 
-         * CAMBIOS v3.0.8:
-         * - FIX: Al enviar tasación a nuevos proveedores, se AÑADEN a la lista
-         *   en lugar de sobrescribir los anteriores
-         * - Ahora puedes enviar tasación a Vanessa, luego a José Carlos,
-         *   y ambos aparecerán en Paso 5
+         * CAMBIOS v3.0.9:
+         * - NUEVO: Botón para eliminar presupuesto y carpeta (🗑️)
+         * - Aparece junto al ID del presupuesto cuando hay uno activo
+         * - Pide confirmación antes de eliminar
+         * - Elimina tanto el registro como la carpeta de Drive
          * 
-         * CAMBIOS v3.0.7:
-         * - Sección "Traductores contactados" movida al Paso 5
+         * CAMBIOS v3.0.8:
+         * - Al enviar tasación a nuevos proveedores, se añaden a la lista
          */
 
-        const HTML_VERSION = '3.0.8';
+        const HTML_VERSION = '3.0.9';
         const HTML_DATE = '07/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1055,9 +1058,64 @@
             document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
             document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
             document.getElementById('homeBtn').style.display = 'none';
+            document.getElementById('deleteBudgetBtn').style.display = 'none';
             
             // Reset state
             resetBudgetState();
+        }
+        
+        // Confirmar eliminación de presupuesto
+        function confirmDeleteBudget() {
+            if (!budgetData.id) {
+                showStatus('No hay presupuesto para eliminar', 'warning');
+                setTimeout(hideStatus, 2000);
+                return;
+            }
+            
+            const confirmed = confirm(
+                `¿Estás seguro de que quieres eliminar el presupuesto ${budgetData.id}?\n\n` +
+                `Esto eliminará:\n` +
+                `• El registro de la base de datos\n` +
+                `• La carpeta de Drive con todos los archivos\n\n` +
+                `Esta acción NO se puede deshacer.`
+            );
+            
+            if (confirmed) {
+                deleteBudget();
+            }
+        }
+        
+        // Eliminar presupuesto y carpeta
+        async function deleteBudget() {
+            if (!budgetData.id) return;
+            
+            showStatus('Eliminando presupuesto...', 'loading');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'deleteBudget',
+                        budgetId: budgetData.id,
+                        folderId: budgetData.folderId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('✓ Presupuesto eliminado correctamente', 'success');
+                    setTimeout(() => {
+                        hideStatus();
+                        showHomeScreen();
+                    }, 1500);
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
         }
 
         function resetBudgetState() {
@@ -1137,6 +1195,7 @@
             // Reset budget ID display
             document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
             document.getElementById('budgetIdDisplay').classList.remove('active');
+            document.getElementById('deleteBudgetBtn').style.display = 'none';
             
             // Force update progress steps to remove all 'completed' classes
             updateProgressSteps();
@@ -1609,6 +1668,7 @@
                         btn.classList.toggle('selected', btn.dataset.channel === budgetData.channel);
                     });
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
+                    document.getElementById('deleteBudgetBtn').style.display = 'inline-block';
                     
                     // Restaurar campos contacto en paso 1 (solo si tienen valor)
                     const clientEmailStep1 = document.getElementById('clientEmailStep1');
@@ -2371,6 +2431,7 @@
                     // Update UI
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
                     document.getElementById('budgetIdDisplay').classList.add('active');
+                    document.getElementById('deleteBudgetBtn').style.display = 'inline-block';
                     
                     // Show folder link
                     const folderLink = document.getElementById('folderLink');
