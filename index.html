@@ -203,9 +203,10 @@
         /* CONTACTED PROVIDERS */
         .contacted-providers { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color); }
         .contacted-list { display: flex; flex-direction: column; gap: 8px; }
-        .contacted-item { display: flex; align-items: center; padding: 12px 14px; border: 2px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); cursor: pointer; transition: all 0.2s; }
+        .contacted-item { display: flex; flex-direction: column; padding: 12px 14px; border: 2px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); transition: all 0.2s; }
         .contacted-item:hover { border-color: var(--tradutema-blue-dark); }
         .contacted-item.chosen { border-color: var(--accent-green); background: rgba(46,204,113,0.08); }
+        .contacted-header { display: flex; align-items: center; cursor: pointer; }
         .contacted-radio { width: 20px; height: 20px; border: 2px solid var(--border-color); border-radius: 50%; margin-right: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
         .contacted-item.chosen .contacted-radio { border-color: var(--accent-green); }
         .contacted-item.chosen .contacted-radio::after { content: ''; width: 10px; height: 10px; background: var(--accent-green); border-radius: 50%; }
@@ -213,6 +214,12 @@
         .contacted-name { font-weight: 600; color: var(--text-primary); }
         .contacted-email { font-size: 0.8rem; color: var(--text-secondary); }
         .contacted-badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; background: var(--accent-green); color: white; font-weight: 500; margin-left: 8px; }
+        .contacted-quote-fields { display: flex; gap: 12px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
+        .quote-field { display: flex; align-items: center; gap: 6px; flex: 1; }
+        .quote-field label { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
+        .quote-field input { flex: 1; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem; background: var(--bg-primary); min-width: 0; }
+        .quote-field input:focus { border-color: var(--tradutema-blue); outline: none; }
+        .quote-field input::placeholder { color: #aaa; font-size: 0.8rem; }
         
         /* PROVIDER TAGS IN BUDGET LIST */
         .budget-item-providers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
@@ -907,18 +914,19 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.0.4
+         * HTML Version: 3.0.5
          * Fecha: 06/01/2026
          * 
-         * CAMBIOS v3.0.4:
-         * - Paso 5: Importe se pre-rellena automáticamente con tarifa por páginas
-         * - Calcula: precio_1ª_pág + (núm_páginas - 1) × precio_resto
+         * CAMBIOS v3.0.5:
+         * - NUEVO: Campos de cotización (tarifa/plazo) para cada proveedor contactado
+         * - Las cotizaciones se guardan automáticamente en Google Sheet (columna T)
+         * - Se cargan al retomar un presupuesto
          * 
-         * CAMBIOS v3.0.3:
-         * - FIX: Backend devuelve 'analysis' y 'fileName'
+         * CAMBIOS v3.0.4:
+         * - Paso 5: Importe se pre-rellena con tarifa por páginas
          */
 
-        const HTML_VERSION = '3.0.4';
+        const HTML_VERSION = '3.0.5';
         const HTML_DATE = '06/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1567,6 +1575,18 @@
                         budgetData.contactedProviders = [];
                     }
                     budgetData.chosenProvider = b.traductorElegido || null;
+                    
+                    // Restaurar cotizaciones de proveedores (JSON)
+                    if (b.cotizacionesProveedores) {
+                        try {
+                            budgetData.providerQuotes = JSON.parse(b.cotizacionesProveedores);
+                        } catch (e) {
+                            console.log('Error parseando cotizaciones:', e);
+                            budgetData.providerQuotes = {};
+                        }
+                    } else {
+                        budgetData.providerQuotes = {};
+                    }
                     
                     isResuming = true;
                     
@@ -2758,20 +2778,80 @@
                 return;
             }
             
+            // Inicializar objeto de cotizaciones si no existe
+            if (!budgetData.providerQuotes) {
+                budgetData.providerQuotes = {};
+            }
+            
             let html = '';
             budgetData.contactedProviders.forEach((p, idx) => {
                 const isChosen = budgetData.chosenProvider === p.nombre;
+                const quote = budgetData.providerQuotes[p.nombre] || {};
                 html += `
-                    <div class="contacted-item ${isChosen ? 'chosen' : ''}" onclick="chooseProvider(${idx})">
-                        <div class="contacted-radio"></div>
-                        <div class="contacted-info">
-                            <div class="contacted-name">${p.nombre}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}</div>
-                            <div class="contacted-email">${p.email}</div>
+                    <div class="contacted-item ${isChosen ? 'chosen' : ''}">
+                        <div class="contacted-header" onclick="chooseProvider(${idx})">
+                            <div class="contacted-radio"></div>
+                            <div class="contacted-info">
+                                <div class="contacted-name">${p.nombre}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}</div>
+                                <div class="contacted-email">${p.email}</div>
+                            </div>
+                        </div>
+                        <div class="contacted-quote-fields">
+                            <div class="quote-field">
+                                <label>Tarifa:</label>
+                                <input type="text" 
+                                       placeholder="ej: 0.08 €/pal" 
+                                       value="${quote.tarifa || ''}"
+                                       onchange="updateProviderQuote('${p.nombre}', 'tarifa', this.value)"
+                                       onclick="event.stopPropagation()">
+                            </div>
+                            <div class="quote-field">
+                                <label>Plazo:</label>
+                                <input type="text" 
+                                       placeholder="ej: 3 días" 
+                                       value="${quote.plazo || ''}"
+                                       onchange="updateProviderQuote('${p.nombre}', 'plazo', this.value)"
+                                       onclick="event.stopPropagation()">
+                            </div>
                         </div>
                     </div>
                 `;
             });
             container.innerHTML = html;
+        }
+        
+        // Actualizar cotización de un proveedor
+        function updateProviderQuote(providerName, field, value) {
+            if (!budgetData.providerQuotes) {
+                budgetData.providerQuotes = {};
+            }
+            if (!budgetData.providerQuotes[providerName]) {
+                budgetData.providerQuotes[providerName] = {};
+            }
+            budgetData.providerQuotes[providerName][field] = value;
+            console.log('Cotización actualizada:', providerName, field, value);
+            
+            // Guardar automáticamente (con debounce implícito por el onchange)
+            saveProviderQuotes();
+        }
+        
+        // Guardar cotizaciones en el backend
+        async function saveProviderQuotes() {
+            if (!budgetData.id || !budgetData.providerQuotes) return;
+            
+            try {
+                await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'saveProviderQuotes',
+                        budgetId: budgetData.id,
+                        quotes: budgetData.providerQuotes
+                    })
+                });
+                console.log('Cotizaciones guardadas');
+            } catch (error) {
+                console.log('Error guardando cotizaciones:', error);
+            }
         }
         
         // Elegir traductor para el presupuesto
