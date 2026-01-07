@@ -914,20 +914,22 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.0.5
-         * Fecha: 06/01/2026
+         * HTML Version: 3.0.6
+         * Fecha: 07/01/2026
+         * 
+         * CAMBIOS v3.0.6:
+         * - FIX: Guardar datos básicos (idiomas, canal, contacto) al cambiar de paso
+         * - FIX: Guardar páginas y archivos automáticamente después del análisis
+         * - FIX: Si no hay páginas guardadas al retomar, ejecutar análisis automático
+         * - NUEVO: updateBudgetBasicData en backend para actualizar datos sin crear nuevo registro
+         * - completeStep1() ahora actualiza budgetData con valores actuales del formulario
          * 
          * CAMBIOS v3.0.5:
-         * - NUEVO: Campos de cotización (tarifa/plazo) para cada proveedor contactado
-         * - Las cotizaciones se guardan automáticamente en Google Sheet (columna T)
-         * - Se cargan al retomar un presupuesto
-         * 
-         * CAMBIOS v3.0.4:
-         * - Paso 5: Importe se pre-rellena con tarifa por páginas
+         * - Campos de cotización para proveedores
          */
 
-        const HTML_VERSION = '3.0.5';
-        const HTML_DATE = '06/01/2026';
+        const HTML_VERSION = '3.0.6';
+        const HTML_DATE = '07/01/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1827,8 +1829,30 @@
         }
 
         function completeStep1() {
+            // Actualizar budgetData con los valores actuales del formulario
+            budgetData.sourceLang = document.getElementById('sourceLang').value;
+            budgetData.targetLang = document.getElementById('targetLang').value;
+            
+            // Actualizar canal desde el botón seleccionado
+            const selectedChannel = document.querySelector('.channel-btn.selected');
+            if (selectedChannel) {
+                budgetData.channel = selectedChannel.dataset.channel;
+            }
+            
+            // Actualizar datos de contacto del cliente
+            const emailStep1 = document.getElementById('clientEmailStep1');
+            const whatsAppStep1 = document.getElementById('clientWhatsAppStep1');
+            if (emailStep1) budgetData.clientEmail = emailStep1.value;
+            if (whatsAppStep1) budgetData.clientWhatsApp = whatsAppStep1.value;
+            
             completedSteps.add(1);
             updateProgressSteps();
+            
+            // Si ya existe el presupuesto, guardar cambios de idioma/canal/contacto
+            if (budgetData.id) {
+                saveBudgetDataIfNeeded();
+            }
+            
             showCard(2);
         }
 
@@ -1845,6 +1869,7 @@
         function completeStep3() {
             completedSteps.add(3);
             updateProgressSteps();
+            saveBudgetDataIfNeeded();  // Guardar páginas y otros datos
             showCard(4);
             
             // Auto-check include word count if we have data
@@ -1854,13 +1879,40 @@
         }
 
         function skipToStep(step) {
+            saveBudgetDataIfNeeded();
             showCard(step);
         }
 
         function goToStep(step) {
             const stepEl = document.querySelector(`.progress-step[data-step="${step}"]`);
             if (stepEl.classList.contains('locked')) return;
+            saveBudgetDataIfNeeded();
             showCard(step);
+        }
+        
+        // Guardar datos básicos del presupuesto si ha sido creado
+        async function saveBudgetDataIfNeeded() {
+            if (!budgetData.id) return;  // Solo si existe el presupuesto
+            
+            try {
+                await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'updateBudgetBasicData',
+                        budgetId: budgetData.id,
+                        sourceLang: budgetData.sourceLang,
+                        targetLang: budgetData.targetLang,
+                        canal: budgetData.channel,
+                        numArchivos: budgetData.numArchivos,
+                        paginas: budgetData.pageCount,
+                        emailCliente: budgetData.clientEmail,
+                        whatsappCliente: budgetData.clientWhatsApp
+                    })
+                });
+                console.log('Datos básicos guardados');
+            } catch (error) {
+                console.log('Error guardando datos básicos:', error);
+            }
         }
 
         function showCard(step) {
@@ -1884,19 +1936,21 @@
                 // Resetear estado visual del paso 3
                 resetStep3UI();
                 
-                // Actualizar tarifas
+                // Actualizar tarifas según combinación de idiomas actual
                 updatePageTariffDisplay();
                 
-                // Ejecutar análisis automático de páginas si no hay datos previos
-                if (!budgetData.pageCount && !isResuming) {
-                    console.log('showCard: Ejecutando autoCountPages (nuevo presupuesto)');
-                    autoCountPages();
-                } else if (budgetData.pageCount) {
-                    console.log('showCard: Mostrando resultados existentes');
+                // Decidir qué mostrar
+                if (budgetData.pageCount && budgetData.pageCount > 0) {
+                    // Ya hay datos de páginas guardados - mostrarlos
+                    console.log('showCard: Mostrando resultados existentes (páginas:', budgetData.pageCount, ')');
                     showExistingWordCountResults();
+                } else if (budgetData.folderId) {
+                    // No hay páginas pero sí carpeta - ejecutar análisis
+                    console.log('showCard: Ejecutando autoCountPages (folderId existe, sin páginas guardadas)');
+                    autoCountPages();
                 } else {
-                    console.log('showCard: Sin datos, mostrando botón manual');
-                    // Si es resuming pero no hay pageCount, mostrar botón para análisis manual
+                    // Sin carpeta ni datos - mostrar botón manual
+                    console.log('showCard: Sin carpeta, mostrando botón manual');
                     document.getElementById('step3Loading').classList.add('hidden');
                     document.getElementById('countWordsBtn').classList.remove('hidden');
                 }
@@ -1999,6 +2053,9 @@
                         pages: f.pages
                     }));
                     displayPageResults(filesForDisplay, data.totalPages);
+                    
+                    // Guardar automáticamente los resultados del análisis
+                    saveBudgetDataIfNeeded();
                     
                     // Ocultar loading, mostrar resultados DESPUÉS de tener datos
                     if (loading) loading.classList.add('hidden');
