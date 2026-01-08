@@ -230,6 +230,7 @@
         
         /* PROVIDER TAGS IN BUDGET LIST */
         .budget-item-providers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
+        .budget-item-notes { margin-top: 10px; padding: 8px 10px; background: rgba(230, 126, 34, 0.08); border-left: 3px solid #e67e22; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.8rem; color: #a04000; font-style: italic; }
         .provider-tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; background: rgba(52,152,219,0.1); color: var(--tradutema-blue); font-weight: 500; }
         .provider-tag.chosen { background: var(--accent-green); color: white; }
         
@@ -713,6 +714,11 @@
                         <span class="summary-label">Tarifa por páginas (<span id="langPairDisplay">--</span>):</span>
                         <span class="summary-value" id="summaryPricePages">-</span>
                     </div>
+                    <!-- Notas internas (si existen) -->
+                    <div class="summary-row internal-notes hidden" id="internalNotesRow" style="margin-top: 12px; border-top: 1px dashed #ddd; padding-top: 12px;">
+                        <span class="summary-label" style="color: #e67e22;">📝 Notas:</span>
+                        <span class="summary-value" id="internalNotesDisplay" style="color: #555; font-style: italic; white-space: pre-wrap;">-</span>
+                    </div>
                 </div>
                 
                 <!-- Info de tarifa por página -->
@@ -790,8 +796,15 @@
             </div>
             
             <div class="form-group">
-                <label>Comentarios adicionales</label>
+                <label>📝 Notas internas (no se envían)</label>
+                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2, Documento bilingüe, Revisar formato..." oninput="updateInternalNotesDisplay()"></textarea>
+                <small style="color: #666; font-size: 11px;">Solo para ti. Aparecerán en el resumen.</small>
+            </div>
+            
+            <div class="form-group">
+                <label>💬 Comentarios para proveedores</label>
                 <textarea id="providerComments" placeholder="Detalles sobre el documento, formato de entrega, etc."></textarea>
+                <small style="color: #666; font-size: 11px;">Se incluirán en el mensaje a los traductores.</small>
             </div>
             
             <!-- Proveedores -->
@@ -1188,6 +1201,18 @@
             if (quoteUrgency) quoteUrgency.value = '';
             if (clientMessagePreview) clientMessagePreview.innerHTML = '';
             
+            // Reset comentarios de proveedor (paso 4)
+            const providerComments = document.getElementById('providerComments');
+            if (providerComments) providerComments.value = '';
+            
+            // Reset comentarios internos (paso 4)
+            const internalComments = document.getElementById('internalComments');
+            if (internalComments) internalComments.value = '';
+            
+            // Ocultar notas internas en resumen
+            const internalNotesRow = document.getElementById('internalNotesRow');
+            if (internalNotesRow) internalNotesRow.classList.add('hidden');
+            
             // Reset buttons
             if (step1Btn) step1Btn.disabled = true;
             if (step2Btn) step2Btn.disabled = true;
@@ -1577,6 +1602,12 @@
                     }
                 }
                 
+                // Mostrar comentarios internos si existen
+                let notasHtml = '';
+                if (b.comentariosInternos) {
+                    notasHtml = `<div class="budget-item-notes">📝 ${b.comentariosInternos}</div>`;
+                }
+                
                 html += `
                     <div class="budget-item" onclick="loadBudget('${b.id}')">
                         <div class="budget-item-header">
@@ -1590,6 +1621,7 @@
                             ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} ${parseInt(b.palabras) === 1 ? 'palabra' : 'palabras'}</span>` : ''}
                             ${contactoHtml}
                         </div>
+                        ${notasHtml}
                         ${traductoresHtml}
                     </div>
                 `;
@@ -1650,6 +1682,22 @@
                     } else {
                         budgetData.providerQuotes = {};
                     }
+                    
+                    // Restaurar comentarios de proveedor
+                    budgetData.providerComments = b.comentariosProveedor || '';
+                    const providerCommentsField = document.getElementById('providerComments');
+                    if (providerCommentsField) {
+                        providerCommentsField.value = budgetData.providerComments;
+                    }
+                    
+                    // Restaurar comentarios internos
+                    budgetData.internalComments = b.comentariosInternos || '';
+                    const internalCommentsField = document.getElementById('internalComments');
+                    if (internalCommentsField) {
+                        internalCommentsField.value = budgetData.internalComments;
+                    }
+                    // Mostrar en resumen si hay notas
+                    updateInternalNotesDisplay();
                     
                     isResuming = true;
                     
@@ -2648,6 +2696,24 @@
             document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
             document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
         }
+        
+        // Actualizar visualización de notas internas en el resumen
+        function updateInternalNotesDisplay() {
+            const internalCommentsField = document.getElementById('internalComments');
+            const internalNotesRow = document.getElementById('internalNotesRow');
+            const internalNotesDisplay = document.getElementById('internalNotesDisplay');
+            
+            if (!internalNotesRow || !internalNotesDisplay) return;
+            
+            const notes = internalCommentsField ? internalCommentsField.value.trim() : (budgetData.internalComments || '');
+            
+            if (notes) {
+                internalNotesDisplay.textContent = notes;
+                internalNotesRow.classList.remove('hidden');
+            } else {
+                internalNotesRow.classList.add('hidden');
+            }
+        }
 
         // ====== PROVIDERS ======
         function renderProviders() {
@@ -2842,6 +2908,8 @@
             
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             const customMessage = document.getElementById('providerMessageEdit').value;
+            const additionalComments = document.getElementById('providerComments').value.trim();
+            const internalComments = document.getElementById('internalComments').value.trim();
             
             showStatus('Enviando emails a proveedores...', 'loading');
             
@@ -2855,7 +2923,9 @@
                         folderId: budgetData.folderId,
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
-                        customMessage: customMessage  // Mensaje editado por el usuario
+                        customMessage: customMessage,  // Mensaje editado por el usuario
+                        additionalComments: additionalComments,  // Comentarios para proveedores
+                        internalComments: internalComments  // Comentarios internos (no se envían)
                     })
                 });
                 
