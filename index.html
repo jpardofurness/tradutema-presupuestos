@@ -638,6 +638,13 @@
                 </div>
             </div>
             
+            <!-- Notas internas -->
+            <div class="form-group" style="margin-top: 16px;">
+                <label>📝 Notas internas (opcional)</label>
+                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2, Documento bilingüe, Revisar formato..." style="min-height: 60px;"></textarea>
+                <small style="color: #666; font-size: 11px;">Solo para ti. Aparecerán en el listado de presupuestos.</small>
+            </div>
+            
             <button class="btn btn-primary action-btn" id="step1Btn" onclick="completeStep1()" disabled>
                 Continuar a Archivos →
             </button>
@@ -714,11 +721,6 @@
                         <span class="summary-label">Tarifa por páginas (<span id="langPairDisplay">--</span>):</span>
                         <span class="summary-value" id="summaryPricePages">-</span>
                     </div>
-                    <!-- Notas internas (si existen) -->
-                    <div class="summary-row internal-notes hidden" id="internalNotesRow" style="margin-top: 12px; border-top: 1px dashed #ddd; padding-top: 12px;">
-                        <span class="summary-label" style="color: #e67e22;">📝 Notas:</span>
-                        <span class="summary-value" id="internalNotesDisplay" style="color: #555; font-style: italic; white-space: pre-wrap;">-</span>
-                    </div>
                 </div>
                 
                 <!-- Info de tarifa por página -->
@@ -793,12 +795,6 @@
                     <input type="number" id="proposedTotal" step="0.01" min="0">
                     <span class="tariff-unit">€</span>
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <label>📝 Notas internas (no se envían)</label>
-                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2, Documento bilingüe, Revisar formato..." oninput="updateInternalNotesDisplay()"></textarea>
-                <small style="color: #666; font-size: 11px;">Solo para ti. Aparecerán en el resumen.</small>
             </div>
             
             <div class="form-group">
@@ -1205,13 +1201,9 @@
             const providerComments = document.getElementById('providerComments');
             if (providerComments) providerComments.value = '';
             
-            // Reset comentarios internos (paso 4)
+            // Reset comentarios internos (paso 1)
             const internalComments = document.getElementById('internalComments');
             if (internalComments) internalComments.value = '';
-            
-            // Ocultar notas internas en resumen
-            const internalNotesRow = document.getElementById('internalNotesRow');
-            if (internalNotesRow) internalNotesRow.classList.add('hidden');
             
             // Reset buttons
             if (step1Btn) step1Btn.disabled = true;
@@ -1696,8 +1688,6 @@
                     if (internalCommentsField) {
                         internalCommentsField.value = budgetData.internalComments;
                     }
-                    // Mostrar en resumen si hay notas
-                    updateInternalNotesDisplay();
                     
                     isResuming = true;
                     
@@ -2452,6 +2442,10 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span> Creando carpeta...';
             
+            // Capturar notas internas del paso 1
+            const internalComments = document.getElementById('internalComments').value.trim();
+            budgetData.internalComments = internalComments;
+            
             try {
                 showStatus('Creando carpeta y subiendo archivos...', 'loading');
                 
@@ -2464,6 +2458,7 @@
                         targetLang: budgetData.targetLang,
                         clientEmail: budgetData.clientEmail,
                         clientWhatsApp: budgetData.clientWhatsApp,
+                        internalComments: internalComments,
                         files: uploadedFiles
                     })
                 });
@@ -2696,24 +2691,6 @@
             document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
             document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
         }
-        
-        // Actualizar visualización de notas internas en el resumen
-        function updateInternalNotesDisplay() {
-            const internalCommentsField = document.getElementById('internalComments');
-            const internalNotesRow = document.getElementById('internalNotesRow');
-            const internalNotesDisplay = document.getElementById('internalNotesDisplay');
-            
-            if (!internalNotesRow || !internalNotesDisplay) return;
-            
-            const notes = internalCommentsField ? internalCommentsField.value.trim() : (budgetData.internalComments || '');
-            
-            if (notes) {
-                internalNotesDisplay.textContent = notes;
-                internalNotesRow.classList.remove('hidden');
-            } else {
-                internalNotesRow.classList.add('hidden');
-            }
-        }
 
         // ====== PROVIDERS ======
         function renderProviders() {
@@ -2909,7 +2886,6 @@
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             const customMessage = document.getElementById('providerMessageEdit').value;
             const additionalComments = document.getElementById('providerComments').value.trim();
-            const internalComments = document.getElementById('internalComments').value.trim();
             
             showStatus('Enviando emails a proveedores...', 'loading');
             
@@ -2924,8 +2900,7 @@
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
                         customMessage: customMessage,  // Mensaje editado por el usuario
-                        additionalComments: additionalComments,  // Comentarios para proveedores
-                        internalComments: internalComments  // Comentarios internos (no se envían)
+                        additionalComments: additionalComments  // Comentarios para proveedores
                     })
                 });
                 
