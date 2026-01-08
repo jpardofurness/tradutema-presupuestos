@@ -1939,10 +1939,16 @@
             if (emailStep1) budgetData.clientEmail = emailStep1.value;
             if (whatsAppStep1) budgetData.clientWhatsApp = whatsAppStep1.value;
             
+            // Capturar notas internas
+            const internalCommentsField = document.getElementById('internalComments');
+            if (internalCommentsField) {
+                budgetData.internalComments = internalCommentsField.value.trim();
+            }
+            
             completedSteps.add(1);
             updateProgressSteps();
             
-            // Si ya existe el presupuesto, guardar cambios de idioma/canal/contacto
+            // Si ya existe el presupuesto, guardar cambios de idioma/canal/contacto/notas
             if (budgetData.id) {
                 saveBudgetDataIfNeeded();
             }
@@ -2000,7 +2006,8 @@
                         numArchivos: budgetData.numArchivos,
                         paginas: budgetData.pageCount,
                         emailCliente: budgetData.clientEmail,
-                        whatsappCliente: budgetData.clientWhatsApp
+                        whatsappCliente: budgetData.clientWhatsApp,
+                        comentariosInternos: budgetData.internalComments || ''
                     })
                 });
                 console.log('Datos básicos guardados');
