@@ -141,12 +141,17 @@
         .result-item.full-width { grid-column: 1 / -1; }
         
         /* WORD COUNT TABLE */
-        .word-count-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
+        .word-count-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; table-layout: fixed; }
         .word-count-table th, .word-count-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .word-count-table th:first-child, .word-count-table td:first-child { width: 55%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .word-count-table th:nth-child(2), .word-count-table td:nth-child(2) { width: 25%; text-align: right; }
+        .word-count-table th:nth-child(3), .word-count-table td:nth-child(3) { width: 20%; text-align: right; }
         .word-count-table th { background: var(--bg-primary); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); }
-        .word-count-table td.number { font-family: 'Space Mono', monospace; text-align: right; }
+        .word-count-table td.number { font-family: 'Space Mono', monospace; }
         .word-count-table tr.total { background: var(--tradutema-blue); color: white; font-weight: 600; }
         .word-count-table tr.total td { border-bottom: none; }
+        .btn-mini-breakdown { background: var(--tradutema-orange); color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; cursor: pointer; margin-left: 8px; vertical-align: middle; }
+        .btn-mini-breakdown:hover { background: #e67e22; }
         
         /* TARIFF EDITOR */
         .tariff-editor { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.1); border-radius: var(--radius-sm); }
@@ -775,11 +780,6 @@
                     <tbody id="wordCountBody"></tbody>
                 </table>
                 
-                <!-- Botón Ver Desglose -->
-                <button class="btn btn-secondary btn-breakdown hidden" id="btnShowBreakdown" onclick="showBreakdownModal()">
-                    📄 Ver desglose por página
-                </button>
-                
                 <!-- Resumen de totales y tarifa -->
                 <div class="analysis-summary" id="analysisSummary">
                     <div class="summary-row">
@@ -1058,8 +1058,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.0';
-        const HTML_DATE = '09/01/2026 15:45';
+        const HTML_VERSION = '3.2.4';
+        const HTML_DATE = '09/01/2026 17:20';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1706,7 +1706,7 @@
             }
             
             window.analysisData = data;  // Para reusar las funciones de desglose
-            showBreakdownModal();
+            showBreakdownModal(0);  // Mostrar primer archivo
         }
         
         function applyQuickBreakdown() {
@@ -2941,26 +2941,25 @@
             const results = document.getElementById('step3Results');
             const tbody = document.getElementById('wordCountBody');
             const editor = document.getElementById('tariffEditorWords');
-            const btnBreakdown = document.getElementById('btnShowBreakdown');
             
             // Guardar datos de análisis globalmente para el desglose
             window.analysisData = data;
             
             let html = '';
-            let hasBreakdown = false;
             
-            data.analysis.forEach(file => {
+            data.analysis.forEach((file, index) => {
                 const fileName = file.fileName || file.name || 'Sin nombre';
+                const hasBreakdown = file.breakdown && file.breakdown.length > 0;
                 
-                // Verificar si tiene desglose
-                if (file.breakdown && file.breakdown.length > 0) {
-                    hasBreakdown = true;
-                }
+                // Botón de desglose si tiene breakdown
+                const breakdownBtn = hasBreakdown 
+                    ? `<button class="btn-mini-breakdown" onclick="showBreakdownModal(${index})" title="Ver desglose por página">📄</button>`
+                    : '';
                 
                 html += `
-                    <tr>
+                    <tr data-file-index="${index}">
                         <td>${fileName}</td>
-                        <td class="number">${file.words.toLocaleString('es-ES')}</td>
+                        <td class="number">${file.words.toLocaleString('es-ES')} ${breakdownBtn}</td>
                         <td class="number">${file.pages}</td>
                     </tr>
                 `;
@@ -2969,8 +2968,8 @@
             html += `
                 <tr class="total">
                     <td>TOTAL</td>
-                    <td class="number">${data.totalWords.toLocaleString('es-ES')}</td>
-                    <td class="number">${data.totalPages}</td>
+                    <td class="number" id="totalWordsCell">${data.totalWords.toLocaleString('es-ES')}</td>
+                    <td class="number" id="totalPagesCell">${data.totalPages}</td>
                 </tr>
             `;
             
@@ -2980,41 +2979,35 @@
             document.getElementById('summaryFiles').textContent = data.analysis.length;
             document.getElementById('summaryPages').textContent = data.totalPages;
             
-            // Mostrar botón de desglose si hay breakdown
-            if (btnBreakdown) {
-                if (hasBreakdown) {
-                    btnBreakdown.classList.remove('hidden');
-                } else {
-                    btnBreakdown.classList.add('hidden');
-                }
-            }
-            
             // Mostrar editor de tarifa por palabra
             if (editor) editor.classList.remove('hidden');
             if (results) results.classList.remove('hidden');
         }
         
-        // ====== FUNCIONES DE DESGLOSE ======
+        // ====== FUNCIONES DE DESGLOSE POR ARCHIVO ======
         let currentBreakdown = [];
         let currentFileIndex = 0;
         
-        function showBreakdownModal() {
+        function showBreakdownModal(fileIndex) {
             const modal = document.getElementById('breakdownModal');
             const data = window.analysisData;
             
-            if (!data || !data.analysis || data.analysis.length === 0) {
+            if (!data || !data.analysis || !data.analysis[fileIndex]) {
                 showStatus('No hay datos de análisis', 'error');
                 return;
             }
             
-            // Por ahora solo soportamos 1 archivo
-            const file = data.analysis[0];
-            currentFileIndex = 0;
+            const file = data.analysis[fileIndex];
+            currentFileIndex = fileIndex;
             
             if (!file.breakdown || file.breakdown.length === 0) {
                 showStatus('No hay desglose disponible para este archivo', 'error');
                 return;
             }
+            
+            // Mostrar nombre del archivo en el modal
+            const fileName = file.fileName || file.name || 'Archivo';
+            document.querySelector('#breakdownModal .modal-header h3').textContent = '📄 ' + fileName;
             
             // Copiar breakdown para edición
             currentBreakdown = JSON.parse(JSON.stringify(file.breakdown));
@@ -3068,43 +3061,72 @@
         function resetBreakdown() {
             const data = window.analysisData;
             if (data && data.analysis && data.analysis[currentFileIndex]) {
-                currentBreakdown = JSON.parse(JSON.stringify(data.analysis[currentFileIndex].breakdown));
+                // Restaurar del original
+                const originalFile = data.analysis[currentFileIndex];
+                if (originalFile.originalBreakdown) {
+                    currentBreakdown = JSON.parse(JSON.stringify(originalFile.originalBreakdown));
+                } else {
+                    // Si no hay original guardado, marcar todas como incluidas
+                    currentBreakdown.forEach(item => item.included = true);
+                }
                 renderBreakdown();
             }
         }
         
         function applyBreakdown() {
-            const includedItems = currentBreakdown.filter(item => item.included);
-            const newTotalWords = includedItems.reduce((sum, item) => sum + item.words, 0);
-            const newTotalPages = includedItems.length;
+            const data = window.analysisData;
+            if (!data || !data.analysis[currentFileIndex]) return;
             
-            // Actualizar datos
-            if (window.analysisData && window.analysisData.analysis[currentFileIndex]) {
-                window.analysisData.analysis[currentFileIndex].words = newTotalWords;
-                window.analysisData.analysis[currentFileIndex].pages = newTotalPages;
-                window.analysisData.analysis[currentFileIndex].breakdown = currentBreakdown;
-                
-                // Recalcular totales
-                let totalWords = 0;
-                let totalPages = 0;
-                window.analysisData.analysis.forEach(file => {
-                    totalWords += file.words;
-                    totalPages += file.pages;
-                });
-                window.analysisData.totalWords = totalWords;
-                window.analysisData.totalPages = totalPages;
-                
-                // Actualizar budgetData
-                budgetData.wordCount = totalWords;
-                budgetData.pageCount = totalPages;
-                
-                // Actualizar display
-                displayWordCountResults(window.analysisData);
-                updateTotalPrice();
+            const file = data.analysis[currentFileIndex];
+            
+            // Guardar breakdown original si no existe
+            if (!file.originalBreakdown) {
+                file.originalBreakdown = JSON.parse(JSON.stringify(file.breakdown));
             }
             
+            // Actualizar breakdown del archivo
+            file.breakdown = currentBreakdown;
+            
+            // Calcular nuevos totales del archivo
+            const includedItems = currentBreakdown.filter(item => item.included);
+            file.words = includedItems.reduce((sum, item) => sum + item.words, 0);
+            file.pages = includedItems.length;
+            
+            // Recalcular totales globales
+            let totalWords = 0;
+            let totalPages = 0;
+            data.analysis.forEach(f => {
+                totalWords += f.words;
+                totalPages += f.pages;
+            });
+            data.totalWords = totalWords;
+            data.totalPages = totalPages;
+            
+            // Actualizar budgetData
+            budgetData.wordCount = totalWords;
+            budgetData.pageCount = totalPages;
+            
+            // Actualizar la fila del archivo en la tabla
+            const row = document.querySelector(`tr[data-file-index="${currentFileIndex}"]`);
+            if (row) {
+                const cells = row.querySelectorAll('td');
+                cells[1].innerHTML = `${file.words.toLocaleString('es-ES')} <button class="btn-mini-breakdown" onclick="showBreakdownModal(${currentFileIndex})" title="Ver desglose por página">📄</button>`;
+                cells[2].textContent = file.pages;
+            }
+            
+            // Actualizar fila de totales
+            document.getElementById('totalWordsCell').textContent = totalWords.toLocaleString('es-ES');
+            document.getElementById('totalPagesCell').textContent = totalPages;
+            
+            // Actualizar resumen
+            document.getElementById('summaryPages').textContent = totalPages;
+            
+            // Actualizar precio
+            updateTotalPrice();
+            
             closeBreakdownModal();
-            showStatus('Totales actualizados', 'success');
+            showStatus('Desglose actualizado', 'success');
+            setTimeout(hideStatus, 2000);
         }
 
         function updateTotalPrice() {
@@ -3654,6 +3676,10 @@
             const tgtLang = budgetData.targetLang || 'destino';
             const numDocs = uploadedFiles.length || budgetData.numArchivos || 1;
             
+            // Traducir idiomas al inglés
+            const srcLangEn = translateLanguageToEnglish(srcLang);
+            const tgtLangEn = translateLanguageToEnglish(tgtLang);
+            
             // Textos con singular/plural correctos
             const daysTextEs = days === 'X' ? 'X días laborables' : pluralizeEs(days, 'día laborable', 'días laborables');
             const daysTextEn = days === 'X' ? 'X working days' : pluralizeEn(days, 'working day', 'working days');
@@ -3663,7 +3689,8 @@
             const docTextEn = numDocs === 1 ? 'of the document sent' : `of the ${numDocs} documents sent`;
             
             // Calculate delivery date
-            let deliveryDate = '';
+            let deliveryDateEs = '';
+            let deliveryDateEn = '';
             if (days && days !== 'X' && !isNaN(parseInt(days))) {
                 const d = new Date();
                 let added = 0;
@@ -3671,9 +3698,11 @@
                     d.setDate(d.getDate() + 1);
                     if (d.getDay() !== 0 && d.getDay() !== 6) added++;
                 }
-                deliveryDate = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+                deliveryDateEs = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+                deliveryDateEn = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
             } else {
-                deliveryDate = 'la fecha indicada';
+                deliveryDateEs = 'la fecha indicada';
+                deliveryDateEn = 'the indicated date';
             }
             
             let message;
@@ -3690,7 +3719,7 @@ Plazo aproximado: ${daysTextEs}${urgencyText}.
 
 Para realizar el pedido:
 1. Haz clic en https://tradutema.com/cotizacion-personalizada/
-2. Selecciona los idiomas. En Referencia Cotización, introduce ${refId}. En Importe indica ${amount} EUR, indica Cómo quieres recibir la traducción, en plazo indica la fecha de ${deliveryDate} y Carga los documentos.
+2. Selecciona los idiomas. En Referencia Cotización, introduce ${refId}. En Importe indica ${amount} EUR, indica Cómo quieres recibir la traducción, en plazo indica la fecha de ${deliveryDateEs} y Carga los documentos.
 3. Carrito situado arriba a la derecha de la página.
 4. Haz clic en AÑADIR AL CARRITO y ve al carrito para finalizar la compra.
 
@@ -3709,13 +3738,13 @@ Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI
                 
                 message = `Hello,
 
-The fee for the sworn translation from ${srcLang} to ${tgtLang} ${docTextEn} is ${amount} EUR (VAT included).
+The fee for the sworn translation from ${srcLangEn} to ${tgtLangEn} ${docTextEn} is ${amount} EUR (VAT included).
 
 Estimated delivery: ${daysTextEn}${urgencyTextEn}.
 
 To place your order:
-1. Click on https://tradutema.com/cotizacion-personalizada/
-2. Select the languages. In Quote Reference, enter ${refId}. In Amount enter ${amount} EUR, indicate how you want to receive the translation, in deadline enter the date ${deliveryDate} and upload the documents.
+1. Click on https://tradutema.com/en/personalized-quote/
+2. Select the languages. In Quote Reference, enter ${refId}. In Amount enter ${amount} EUR, indicate how you want to receive the translation, in deadline enter the date ${deliveryDateEn} and upload the documents.
 3. Shopping cart located at the top right of the page.
 4. Click ADD TO CART and go to cart to complete your purchase.
 
@@ -3731,6 +3760,56 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             }
             
             document.getElementById('clientMessageEdit').value = message;
+        }
+        
+        // Traducir nombres de idiomas al inglés
+        function translateLanguageToEnglish(lang) {
+            const translations = {
+                'Español': 'Spanish',
+                'Inglés': 'English',
+                'Francés': 'French',
+                'Alemán': 'German',
+                'Italiano': 'Italian',
+                'Portugués': 'Portuguese',
+                'Catalán': 'Catalan',
+                'Gallego': 'Galician',
+                'Euskera': 'Basque',
+                'Neerlandés': 'Dutch',
+                'Polaco': 'Polish',
+                'Rumano': 'Romanian',
+                'Ruso': 'Russian',
+                'Chino': 'Chinese',
+                'Japonés': 'Japanese',
+                'Árabe': 'Arabic',
+                'Ucraniano': 'Ukrainian',
+                'Búlgaro': 'Bulgarian',
+                'Griego': 'Greek',
+                'Checo': 'Czech',
+                'Eslovaco': 'Slovak',
+                'Húngaro': 'Hungarian',
+                'Sueco': 'Swedish',
+                'Danés': 'Danish',
+                'Noruego': 'Norwegian',
+                'Finlandés': 'Finnish',
+                'Turco': 'Turkish',
+                'Hebreo': 'Hebrew',
+                'Coreano': 'Korean',
+                'Vietnamita': 'Vietnamese',
+                'Tailandés': 'Thai',
+                'Hindi': 'Hindi',
+                'Bengalí': 'Bengali',
+                'Urdu': 'Urdu',
+                'Persa': 'Persian',
+                'Indonesio': 'Indonesian',
+                'Malayo': 'Malay',
+                'Croata': 'Croatian',
+                'Serbio': 'Serbian',
+                'Esloveno': 'Slovenian',
+                'Lituano': 'Lithuanian',
+                'Letón': 'Latvian',
+                'Estonio': 'Estonian'
+            };
+            return translations[lang] || lang;
         }
         
         function regenerateClientMessage() {
