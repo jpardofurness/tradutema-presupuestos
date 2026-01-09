@@ -3,13 +3,14 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 3.1.8                                                ║
-║   FECHA:   09/01/2026 13:10                                     ║
+║   VERSIÓN: 3.1.9                                                ║
+║   FECHA:   09/01/2026 13:35                                     ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - FIX: Nombres de archivo "undefined" en Analizar Palabras    ║
-║   - Editar tarifas de proveedores (botón ✏️)                    ║
-║   - Cambios se guardan en Google Sheets automáticamente         ║
+║   - NUEVO: Botón "Consultar Proveedores" en inicio              ║
+║   - Filtros por idioma origen/destino                           ║
+║   - Ver y editar tarifas, email y comentarios                   ║
+║   - Cambios se guardan en Google Sheets                         ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -200,6 +201,23 @@
         .provider-comment { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; margin-top: 2px; line-height: 1.3; }
         .provider-edit-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 8px; font-size: 1rem; border-radius: var(--radius-sm); transition: all 0.2s; flex-shrink: 0; }
         .provider-edit-btn:hover { background: rgba(52,152,219,0.1); color: var(--tradutema-blue); }
+        
+        /* PROVIDERS CONSULT */
+        .providers-consult-list { display: flex; flex-direction: column; gap: 12px; }
+        .provider-consult-item { display: flex; align-items: flex-start; padding: 14px 16px; border: 2px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); transition: all 0.2s; gap: 12px; }
+        .provider-consult-item:hover { border-color: var(--tradutema-blue); background: rgba(52,152,219,0.03); }
+        .provider-consult-info { flex: 1; min-width: 0; }
+        .provider-consult-name { font-weight: 600; color: var(--text-primary); font-size: 1rem; margin-bottom: 4px; }
+        .provider-consult-email { font-size: 0.85rem; color: var(--tradutema-blue); margin-bottom: 6px; }
+        .provider-consult-langs { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px; padding: 4px 8px; background: var(--bg-secondary); border-radius: var(--radius-sm); display: inline-block; }
+        .provider-consult-tariffs { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+        .provider-consult-tariff { font-size: 0.85rem; color: var(--accent-green); font-weight: 600; }
+        .provider-consult-tariff span { color: var(--text-secondary); font-weight: 400; }
+        .provider-consult-comment { font-size: 0.8rem; color: var(--text-secondary); font-style: italic; line-height: 1.4; padding: 8px 10px; background: var(--bg-secondary); border-radius: var(--radius-sm); margin-top: 8px; }
+        .provider-consult-edit { background: var(--tradutema-blue); color: white; border: none; padding: 10px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; flex-shrink: 0; align-self: center; }
+        .provider-consult-edit:hover { background: var(--tradutema-blue-dark); }
+        .no-tariffs { color: var(--text-secondary); font-size: 0.85rem; font-style: italic; }
+        
         .select-all-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
         .select-all-btn { font-size: 0.85rem; color: var(--tradutema-blue); background: none; border: none; font-family: inherit; font-weight: 500; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); }
         .select-all-btn:hover { background: rgba(52,152,219,0.08); }
@@ -466,6 +484,13 @@
                         <div class="home-btn-desc">Recuento rápido sin crear presupuesto</div>
                     </div>
                 </button>
+                <button class="home-btn" onclick="showProvidersConsult()">
+                    <span class="home-btn-icon">👥</span>
+                    <div class="home-btn-text">
+                        <div class="home-btn-title">Consultar Proveedores</div>
+                        <div class="home-btn-desc">Ver y editar tarifas de traductores</div>
+                    </div>
+                </button>
             </div>
             
             <!-- Indicador de versiones y acceso rápido -->
@@ -530,6 +555,40 @@
                 <button class="btn btn-primary action-btn" onclick="copyQuickResults()" style="margin-top: 12px;">
                     📋 Copiar Resultado
                 </button>
+            </div>
+        </div>
+
+        <!-- PROVIDERS CONSULT SCREEN -->
+        <div class="card hidden" id="providersConsultScreen">
+            <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
+            
+            <div class="card-title">👥 Consultar Proveedores</div>
+            
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                Filtra por idiomas para ver tarifas y comentarios de los traductores.
+            </p>
+            
+            <div class="provider-filters" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Idioma Origen</label>
+                    <select id="consultSourceLang" onchange="filterConsultProviders()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Idioma Destino</label>
+                    <select id="consultTargetLang" onchange="filterConsultProviders()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="consult-stats" style="display: flex; gap: 16px; margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-md);">
+                <span style="color: var(--text-secondary);">Mostrando: <strong id="consultProviderCount">0</strong> proveedores</span>
+            </div>
+            
+            <div class="providers-consult-list" id="providersConsultList">
+                <!-- Se llena dinámicamente -->
             </div>
         </div>
 
@@ -901,7 +960,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2026 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v3.1.8 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v3.1.9 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -967,16 +1026,17 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.1.8
-         * Fecha: 09/01/2026 13:10
+         * HTML Version: 3.1.9
+         * Fecha: 09/01/2026 13:35
          * 
-         * CAMBIOS v3.1.8:
-         * - FIX: Nombres de archivo "undefined" en Analizar Palabras
-         * - NUEVO: Editar tarifas de proveedores desde la app (botón ✏️)
+         * CAMBIOS v3.1.9:
+         * - NUEVO: Botón "Consultar Proveedores" en pantalla de inicio
+         * - Filtros por idioma origen/destino
+         * - Ver y editar tarifas, email y comentarios de traductores
          */
 
-        const HTML_VERSION = '3.1.8';
-        const HTML_DATE = '09/01/2026 13:10';
+        const HTML_VERSION = '3.1.9';
+        const HTML_DATE = '09/01/2026 13:35';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1278,6 +1338,7 @@
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
             document.getElementById('quickCountScreen').classList.remove('hidden');
+            document.getElementById('providersConsultScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
             
@@ -1289,6 +1350,131 @@
             document.getElementById('quickCountResults').classList.add('hidden');
             document.getElementById('quickFileInput').value = '';
             document.getElementById('quickUploadArea').classList.remove('has-files');
+        }
+        
+        // ====== PROVIDERS CONSULT ======
+        let consultFilteredProviders = [];
+        
+        function showProvidersConsult() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('budgetListScreen').classList.add('hidden');
+            document.getElementById('quickCountScreen').classList.add('hidden');
+            document.getElementById('providersConsultScreen').classList.remove('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('homeBtn').style.display = 'flex';
+            
+            // Poblar selectores de idiomas
+            populateConsultLanguages();
+            
+            // Mostrar todos los proveedores inicialmente
+            filterConsultProviders();
+        }
+        
+        function populateConsultLanguages() {
+            const sourceSelect = document.getElementById('consultSourceLang');
+            const targetSelect = document.getElementById('consultTargetLang');
+            
+            // Obtener idiomas únicos
+            const sourceLanguages = [...new Set(allProviders.map(p => p.idiomaOrigen))].sort();
+            const targetLanguages = [...new Set(allProviders.map(p => p.idiomaDestino))].sort();
+            
+            // Poblar selector origen
+            sourceSelect.innerHTML = '<option value="">Todos</option>';
+            sourceLanguages.forEach(lang => {
+                if (lang) sourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+            
+            // Poblar selector destino
+            targetSelect.innerHTML = '<option value="">Todos</option>';
+            targetLanguages.forEach(lang => {
+                if (lang) targetSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
+            });
+        }
+        
+        function filterConsultProviders() {
+            const sourceLang = document.getElementById('consultSourceLang').value;
+            const targetLang = document.getElementById('consultTargetLang').value;
+            
+            consultFilteredProviders = allProviders.filter(p => {
+                const matchSource = !sourceLang || p.idiomaOrigen === sourceLang;
+                const matchTarget = !targetLang || p.idiomaDestino === targetLang;
+                return matchSource && matchTarget;
+            });
+            
+            renderConsultProviders();
+        }
+        
+        function renderConsultProviders() {
+            const list = document.getElementById('providersConsultList');
+            const countEl = document.getElementById('consultProviderCount');
+            
+            countEl.textContent = consultFilteredProviders.length;
+            
+            if (consultFilteredProviders.length === 0) {
+                list.innerHTML = `
+                    <div class="no-providers">
+                        <div>No hay proveedores para esta combinación de idiomas</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            consultFilteredProviders.forEach((p, index) => {
+                // Construir info de tarifas
+                let tarifasHtml = '';
+                if (p.tarifaMinima || p.tarifaPalabra) {
+                    tarifasHtml = '<div class="provider-consult-tariffs">';
+                    if (p.tarifaMinima) {
+                        tarifasHtml += `<div class="provider-consult-tariff"><span>Mínimo:</span> ${p.tarifaMinima}€</div>`;
+                    }
+                    if (p.tarifaPalabra) {
+                        tarifasHtml += `<div class="provider-consult-tariff"><span>Por palabra:</span> ${p.tarifaPalabra}€</div>`;
+                    }
+                    tarifasHtml += '</div>';
+                } else {
+                    tarifasHtml = '<div class="no-tariffs">Sin tarifas definidas</div>';
+                }
+                
+                // Comentarios
+                let comentarioHtml = '';
+                if (p.comentarios) {
+                    comentarioHtml = `<div class="provider-consult-comment">💬 ${p.comentarios}</div>`;
+                }
+                
+                html += `
+                    <div class="provider-consult-item">
+                        <div class="provider-consult-info">
+                            <div class="provider-consult-name">${p.nombre}</div>
+                            <div class="provider-consult-email">📧 ${p.email}</div>
+                            <div class="provider-consult-langs">${p.idiomaOrigen} → ${p.idiomaDestino}</div>
+                            ${tarifasHtml}
+                            ${comentarioHtml}
+                        </div>
+                        <button class="provider-consult-edit" onclick="openEditConsultProvider(${index})">✏️ Editar</button>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+        }
+        
+        function openEditConsultProvider(index) {
+            const p = consultFilteredProviders[index];
+            if (!p) return;
+            
+            // Usar el mismo modal de edición, pero guardar el índice de consultFilteredProviders
+            editingProviderIndex = index;
+            editingFromConsult = true; // Flag para saber que viene de consulta
+            
+            document.getElementById('editProviderName').textContent = p.nombre;
+            document.getElementById('editProviderEmail').textContent = p.email;
+            document.getElementById('editProviderIdiomas').textContent = `${p.idiomaOrigen} → ${p.idiomaDestino}`;
+            document.getElementById('editTarifaMinima').value = p.tarifaMinima || '';
+            document.getElementById('editTarifaPalabra').value = p.tarifaPalabra || '';
+            document.getElementById('editComentarios').value = p.comentarios || '';
+            
+            document.getElementById('editProviderModal').classList.add('visible');
         }
         
         function handleQuickFiles(files) {
@@ -2809,12 +2995,14 @@
 
         // ====== EDITAR TARIFAS PROVEEDOR ======
         let editingProviderIndex = null;
+        let editingFromConsult = false; // Flag para saber de dónde viene la edición
         
         function openEditProvider(index) {
             const p = filteredProviders[index];
             if (!p) return;
             
             editingProviderIndex = index;
+            editingFromConsult = false; // Viene del paso 4
             
             document.getElementById('editProviderName').textContent = p.nombre;
             document.getElementById('editProviderEmail').textContent = p.email;
@@ -2829,12 +3017,19 @@
         function closeEditProviderModal() {
             document.getElementById('editProviderModal').classList.remove('visible');
             editingProviderIndex = null;
+            editingFromConsult = false;
         }
         
         async function saveProviderTariffs() {
             if (editingProviderIndex === null) return;
             
-            const p = filteredProviders[editingProviderIndex];
+            // Obtener el proveedor del array correcto según el contexto
+            const p = editingFromConsult 
+                ? consultFilteredProviders[editingProviderIndex]
+                : filteredProviders[editingProviderIndex];
+                
+            if (!p) return;
+            
             const tarifaMinima = document.getElementById('editTarifaMinima').value.trim();
             const tarifaPalabra = document.getElementById('editTarifaPalabra').value.trim();
             const comentarios = document.getElementById('editComentarios').value.trim();
@@ -2859,12 +3054,12 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Actualizar datos locales
+                    // Actualizar datos locales en el proveedor actual
                     p.tarifaMinima = tarifaMinima;
                     p.tarifaPalabra = tarifaPalabra;
                     p.comentarios = comentarios;
                     
-                    // También actualizar en allProviders
+                    // También actualizar en allProviders (la fuente principal)
                     const allIndex = allProviders.findIndex(ap => 
                         ap.email === p.email && 
                         ap.idiomaOrigen === p.idiomaOrigen && 
@@ -2876,7 +3071,13 @@
                         allProviders[allIndex].comentarios = comentarios;
                     }
                     
-                    renderProviders();
+                    // Re-renderizar la lista correcta según el contexto
+                    if (editingFromConsult) {
+                        renderConsultProviders();
+                    } else {
+                        renderProviders();
+                    }
+                    
                     closeEditProviderModal();
                     showStatus('✓ Tarifas actualizadas', 'success');
                     setTimeout(hideStatus, 2000);
