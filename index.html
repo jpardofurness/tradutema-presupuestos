@@ -3,12 +3,12 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 3.1.7                                                ║
-║   FECHA:   09/01/2026 12:45                                     ║
+║   VERSIÓN: 3.1.8                                                ║
+║   FECHA:   09/01/2026 13:10                                     ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - NUEVO: Editar tarifas de proveedores (botón ✏️)             ║
-║   - Modal para tarifa mínima, tarifa/palabra y comentarios      ║
+║   - FIX: Nombres de archivo "undefined" en Analizar Palabras    ║
+║   - Editar tarifas de proveedores (botón ✏️)                    ║
 ║   - Cambios se guardan en Google Sheets automáticamente         ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
@@ -901,7 +901,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2026 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v3.1.7 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v3.1.8 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -967,17 +967,16 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.1.7
-         * Fecha: 09/01/2026 12:45
+         * HTML Version: 3.1.8
+         * Fecha: 09/01/2026 13:10
          * 
-         * CAMBIOS v3.1.7:
+         * CAMBIOS v3.1.8:
+         * - FIX: Nombres de archivo "undefined" en Analizar Palabras
          * - NUEVO: Editar tarifas de proveedores desde la app (botón ✏️)
-         * - Modal para editar tarifa mínima, tarifa por palabra y comentarios
-         * - Cambios se guardan automáticamente en Google Sheets
          */
 
-        const HTML_VERSION = '3.1.7';
-        const HTML_DATE = '09/01/2026 12:45';
+        const HTML_VERSION = '3.1.8';
+        const HTML_DATE = '09/01/2026 13:10';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2681,9 +2680,10 @@
             
             let html = '';
             data.analysis.forEach(file => {
+                const fileName = file.fileName || file.name || 'Sin nombre';
                 html += `
                     <tr>
-                        <td>${file.name}</td>
+                        <td>${fileName}</td>
                         <td class="number">${file.words.toLocaleString('es-ES')}</td>
                         <td class="number">${file.pages}</td>
                     </tr>
