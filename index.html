@@ -3,13 +3,13 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 2.9.3                                                ║
-║   FECHA:   31/12/2025                                           ║
+║   VERSIÓN: 3.1.6                                                ║
+║   FECHA:   09/01/2026 11:50                                     ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - Conteo rápido: muestra páginas al cargar archivos           ║
-║   - Conteo rápido: OCR habilitado para imágenes (JPG, PNG...)   ║
-║   - Nuevo título: "Contar Palabras y Páginas"                   ║
+║   - NUEVO: Muestra tarifas de proveedores en Paso 4             ║
+║   - Tarifa mínima, tarifa por palabra y comentarios visibles    ║
+║   - Datos provienen de columnas E, F, G de hoja Traductores     ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -196,6 +196,8 @@
         .provider-info { flex: 1; min-width: 0; }
         .provider-name { font-weight: 600; color: var(--text-primary); }
         .provider-email { font-size: 0.8rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
+        .provider-tariff { font-size: 0.8rem; color: var(--accent-green); font-weight: 600; margin-top: 4px; }
+        .provider-comment { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; margin-top: 2px; line-height: 1.3; }
         .select-all-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
         .select-all-btn { font-size: 0.85rem; color: var(--tradutema-blue); background: none; border: none; font-family: inherit; font-weight: 500; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); }
         .select-all-btn:hover { background: rgba(52,152,219,0.08); }
@@ -896,8 +898,8 @@
     </main>
 
     <footer class="footer">
-        <div>Tradutema QUOTES 2025 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v2.9.1 | API: ?</div>
+        <div>Tradutema QUOTES 2026 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
+        <div class="version-info" id="versionInfo">HTML v3.1.6 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -929,21 +931,17 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.0.9
-         * Fecha: 07/01/2026
+         * HTML Version: 3.1.6
+         * Fecha: 09/01/2026 11:50
          * 
-         * CAMBIOS v3.0.9:
-         * - NUEVO: Botón para eliminar presupuesto y carpeta (🗑️)
-         * - Aparece junto al ID del presupuesto cuando hay uno activo
-         * - Pide confirmación antes de eliminar
-         * - Elimina tanto el registro como la carpeta de Drive
-         * 
-         * CAMBIOS v3.0.8:
-         * - Al enviar tasación a nuevos proveedores, se añaden a la lista
+         * CAMBIOS v3.1.6:
+         * - NUEVO: Muestra tarifas de proveedores en Paso 4
+         * - Tarifa mínima, tarifa por palabra y comentarios visibles
+         * - Datos provienen de columnas E, F, G de hoja Traductores
          */
 
-        const HTML_VERSION = '3.0.9';
-        const HTML_DATE = '07/01/2026';
+        const HTML_VERSION = '3.1.6';
+        const HTML_DATE = '09/01/2026 11:50';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2716,12 +2714,30 @@
             let html = '';
             filteredProviders.forEach((p, i) => {
                 const selected = selectedProviders.has(i) ? 'selected' : '';
+                
+                // Construir info de tarifas
+                let tarifaInfo = '';
+                if (p.tarifaMinima || p.tarifaPalabra) {
+                    const partes = [];
+                    if (p.tarifaMinima) partes.push(`Mín: ${p.tarifaMinima}€`);
+                    if (p.tarifaPalabra) partes.push(`${p.tarifaPalabra}€/pal`);
+                    tarifaInfo = `<div class="provider-tariff">${partes.join(' · ')}</div>`;
+                }
+                
+                // Comentarios del proveedor
+                let comentarioInfo = '';
+                if (p.comentarios) {
+                    comentarioInfo = `<div class="provider-comment">${p.comentarios}</div>`;
+                }
+                
                 html += `
                     <div class="provider-item ${selected}" onclick="toggleProvider(${i})">
                         <div class="provider-checkbox"></div>
                         <div class="provider-info">
                             <div class="provider-name">${p.nombre}</div>
                             <div class="provider-email">${p.email}</div>
+                            ${tarifaInfo}
+                            ${comentarioInfo}
                         </div>
                     </div>
                 `;
