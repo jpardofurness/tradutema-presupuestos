@@ -617,9 +617,9 @@
                     <label>Estado</label>
                     <select id="filterStatus" onchange="filterBudgets()">
                         <option value="" selected>Todos</option>
-                        <option value="Pendiente">Pendiente</option>
-                        <option value="Tasación enviada">Tasación enviada</option>
-                        <option value="Enviado">Enviado</option>
+                        <option value="0-Pendiente">0-Pendiente</option>
+                        <option value="1-Tasación Solicitada">1-Tasación Solicitada</option>
+                        <option value="2-Presupuesto Enviado">2-Presupuesto Enviado</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1058,8 +1058,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.4';
-        const HTML_DATE = '09/01/2026 17:20';
+        const HTML_VERSION = '3.2.5';
+        const HTML_DATE = '10/01/2026 09:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1866,8 +1866,11 @@
             
             let html = '';
             filteredBudgets.forEach(b => {
-                const statusClass = b.estado === 'Pendiente' ? 'pendiente' : 
-                                   b.estado === 'Tasación enviada' ? 'tasacion' : 'enviado';
+                // Asignar clase según el estado (soporta formatos con y sin prefijo numérico)
+                const estado = b.estado || '';
+                const statusClass = estado.startsWith('0-') || estado === 'Pendiente' ? 'pendiente' : 
+                                   estado.startsWith('1-') || estado === 'Tasación enviada' ? 'tasacion' : 
+                                   estado.startsWith('2-') || estado === 'Enviado' ? 'enviado' : 'pendiente';
                 const fecha = new Date(b.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
                 const canal = b.canal === 'W' ? '📱 WhatsApp' : b.canal === 'M' ? '📧 Mail' : '📝 Form';
                 
@@ -1996,8 +1999,9 @@
                     completedSteps.add(1); // Languages always done
                     completedSteps.add(2); // Files + Folder always done when resuming
                     if (budgetData.wordCount || budgetData.pageCount) completedSteps.add(3);
-                    if (b.estado === 'Tasación enviada' || b.estado === 'Enviado') completedSteps.add(4);
-                    if (b.estado === 'Enviado') completedSteps.add(5);
+                    const estado = b.estado || '';
+                    if (estado.startsWith('1-') || estado.startsWith('2-') || estado === 'Tasación enviada' || estado === 'Enviado') completedSteps.add(4);
+                    if (estado.startsWith('2-') || estado === 'Enviado') completedSteps.add(5);
                     
                     // Update UI - Paso 1
                     document.getElementById('sourceLang').value = budgetData.sourceLang;
@@ -2061,7 +2065,7 @@
                     // Go to the appropriate step (ahora 5 pasos)
                     let targetStep = 5; // Default to client step (paso 5)
                     if (!budgetData.wordCount && !budgetData.pageCount) targetStep = 3;
-                    if (b.estado === 'Enviado') targetStep = 5;
+                    if (estado.startsWith('2-') || estado === 'Enviado') targetStep = 5;
                     
                     showCard(targetStep);
                     
@@ -3871,6 +3875,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 showStatus('Copiado para WhatsApp ✓', 'success');
                 // Guardar datos del cliente
                 await saveClientData();
+                // Actualizar estado a "2-Presupuesto Enviado"
+                await updateBudgetStatusFE('2-Presupuesto Enviado');
                 completedSteps.add(5);
                 updateProgressSteps();
                 setTimeout(hideStatus, 2000);
@@ -3885,10 +3891,30 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 showStatus('Copiado para Email ✓', 'success');
                 // Guardar datos del cliente
                 await saveClientData();
+                // Actualizar estado a "2-Presupuesto Enviado"
+                await updateBudgetStatusFE('2-Presupuesto Enviado');
                 completedSteps.add(5);
                 updateProgressSteps();
                 setTimeout(hideStatus, 2000);
             });
+        }
+        
+        // Función para actualizar estado del presupuesto
+        async function updateBudgetStatusFE(status) {
+            if (!budgetData.id) return;
+            try {
+                await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'updateStatus',
+                        budgetId: budgetData.id,
+                        status: status
+                    })
+                });
+                console.log('Estado actualizado a: ' + status);
+            } catch (error) {
+                console.log('Error actualizando estado:', error);
+            }
         }
 
         async function sendClientEmail() {
