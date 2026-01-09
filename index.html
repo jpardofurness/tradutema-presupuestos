@@ -3,14 +3,14 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 3.1.9                                                ║
-║   FECHA:   09/01/2026 13:35                                     ║
+║   VERSIÓN: 3.2.0                                                ║
+║   FECHA:   09/01/2026 15:45                                     ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - NUEVO: Botón "Consultar Proveedores" en inicio              ║
-║   - Filtros por idioma origen/destino                           ║
-║   - Ver y editar tarifas, email y comentarios                   ║
-║   - Cambios se guardan en Google Sheets                         ║
+║   - NUEVO: Desglose de palabras por página                      ║
+║   - Botón "Ver desglose" para ver palabras por página           ║
+║   - Excluir páginas del total con un clic                       ║
+║   - Recálculo automático de totales                             ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -290,6 +290,7 @@
         /* MODALS */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px; }
         .modal-overlay.visible { display: flex; }
+        .modal-overlay:not(.visible).hidden { display: none; }
         .modal { background: white; width: 100%; max-width: 500px; max-height: 90vh; border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; }
         .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .modal-title { font-weight: 600; font-size: 1.1rem; }
@@ -297,6 +298,27 @@
         .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
         .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; flex-shrink: 0; background: var(--bg-primary); }
         .modal-footer .btn { flex: 1; }
+        
+        /* MODAL DESGLOSE */
+        .modal-content { background: white; width: 100%; max-width: 450px; max-height: 85vh; border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; }
+        .modal-content .modal-header { background: var(--tradutema-blue); color: white; }
+        .modal-content .modal-header h3 { margin: 0; font-size: 1.1rem; }
+        .modal-content .modal-close { background: rgba(255,255,255,0.2); color: white; }
+        .breakdown-instruction { font-size: 0.85rem; color: #666; margin-bottom: 12px; text-align: center; }
+        .breakdown-list { max-height: 300px; overflow-y: auto; }
+        .breakdown-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border-color); gap: 12px; }
+        .breakdown-item.excluded { opacity: 0.4; text-decoration: line-through; background: #f9f9f9; }
+        .breakdown-item .page-num { font-weight: 600; color: var(--tradutema-blue); min-width: 60px; }
+        .breakdown-item .page-words { flex: 1; text-align: right; font-size: 0.95rem; }
+        .breakdown-item .page-words strong { font-size: 1.1rem; }
+        .breakdown-item .page-remove { width: 28px; height: 28px; border: none; background: #fee; color: #c00; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .breakdown-item .page-remove:hover { background: #fcc; }
+        .breakdown-item.excluded .page-remove { background: #efe; color: #0a0; }
+        .breakdown-total { padding: 16px; background: var(--bg-primary); display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 12px; border-radius: var(--radius-md); }
+        .breakdown-total strong { font-size: 1.3rem; color: var(--tradutema-orange); }
+        .breakdown-pages { color: #666; font-size: 0.9rem; }
+        .btn-breakdown { margin-top: 12px; width: 100%; }
+        .breakdown-item .page-estimated { font-size: 0.75rem; color: #999; margin-left: 4px; }
         
         /* EDITABLE MESSAGE */
         .editable-message { width: 100%; min-height: 200px; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit; font-size: 0.9rem; line-height: 1.5; resize: vertical; }
@@ -770,6 +792,11 @@
                     <tbody id="wordCountBody"></tbody>
                 </table>
                 
+                <!-- Botón Ver Desglose -->
+                <button class="btn btn-secondary btn-breakdown hidden" id="btnShowBreakdown" onclick="showBreakdownModal()">
+                    📄 Ver desglose por página
+                </button>
+                
                 <!-- Resumen de totales y tarifa -->
                 <div class="analysis-summary" id="analysisSummary">
                     <div class="summary-row">
@@ -808,6 +835,29 @@
             <div class="btn-row" style="margin-top: 16px;">
                 <button class="btn btn-secondary" onclick="skipToStep(4)">Saltar</button>
                 <button class="btn btn-primary" onclick="completeStep3()">Continuar →</button>
+            </div>
+        </div>
+
+        <!-- MODAL DESGLOSE POR PÁGINA -->
+        <div class="modal-overlay" id="breakdownModal">
+            <div class="modal-content modal-breakdown">
+                <div class="modal-header">
+                    <h3>📄 Desglose por página</h3>
+                    <button class="modal-close" onclick="closeBreakdownModal()">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="breakdown-instruction">Haz clic en ✕ para excluir una página del total</p>
+                    <div class="breakdown-list" id="breakdownList"></div>
+                    <div class="breakdown-total">
+                        <span>TOTAL:</span>
+                        <strong><span id="breakdownTotalWords">0</span> palabras</strong>
+                        <span class="breakdown-pages">(<span id="breakdownTotalPages">0</span> páginas)</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="resetBreakdown()">Restaurar todo</button>
+                    <button class="btn btn-primary" onclick="applyBreakdown()">Aplicar cambios</button>
+                </div>
             </div>
         </div>
 
@@ -1622,18 +1672,23 @@
                 if (data.success) {
                     hideStatus();
                     
+                    // Guardar datos para desglose
+                    window.quickAnalysisData = data;
+                    
                     // Render results table
                     const tbody = document.getElementById('quickCountBody');
                     let html = '';
                     let totalWords = 0;
                     let totalPages = 0;
+                    let hasBreakdown = false;
                     
-                    data.files.forEach(f => {
+                    (data.analysis || []).forEach(f => {
                         totalWords += f.words || 0;
                         totalPages += f.pages || 0;
+                        if (f.breakdown && f.breakdown.length > 0) hasBreakdown = true;
                         html += `
                             <tr>
-                                <td>${f.name}</td>
+                                <td>${f.fileName || f.name}</td>
                                 <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
                                 <td style="text-align:right">${f.pages || 0}</td>
                             </tr>
@@ -1653,6 +1708,7 @@
                                 <div class="result-value">${totalPages}</div>
                             </div>
                         </div>
+                        ${hasBreakdown ? '<button class="btn btn-secondary btn-breakdown" onclick="showQuickBreakdownModal()" style="margin-top:12px;width:100%;">📄 Ver desglose por página</button>' : ''}
                     `;
                     
                     document.getElementById('quickCountResults').classList.remove('hidden');
@@ -1667,6 +1723,58 @@
             
             btn.disabled = false;
             btn.innerHTML = '🔢 Contar Palabras';
+        }
+        
+        function showQuickBreakdownModal() {
+            const data = window.quickAnalysisData;
+            if (!data || !data.analysis || data.analysis.length === 0) {
+                showStatus('No hay datos de análisis', 'error');
+                return;
+            }
+            
+            window.analysisData = data;  // Para reusar las funciones de desglose
+            showBreakdownModal();
+        }
+        
+        function applyQuickBreakdown() {
+            // Recalcular totales para quick count
+            const data = window.quickAnalysisData;
+            if (!data) return;
+            
+            let totalWords = 0;
+            let totalPages = 0;
+            
+            (data.analysis || []).forEach(file => {
+                if (file.breakdown && file.breakdown.length > 0) {
+                    const included = file.breakdown.filter(b => b.included);
+                    file.words = included.reduce((sum, b) => sum + b.words, 0);
+                    file.pages = included.length;
+                }
+                totalWords += file.words;
+                totalPages += file.pages;
+            });
+            
+            data.totalWords = totalWords;
+            data.totalPages = totalPages;
+            
+            // Re-render
+            const tbody = document.getElementById('quickCountBody');
+            let html = '';
+            (data.analysis || []).forEach(f => {
+                html += `
+                    <tr>
+                        <td>${f.fileName || f.name}</td>
+                        <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
+                        <td style="text-align:right">${f.pages || 0}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+            
+            // Update totals display
+            const totalsDiv = document.getElementById('quickCountTotals');
+            totalsDiv.querySelector('.result-value').textContent = totalWords.toLocaleString('es-ES');
+            totalsDiv.querySelectorAll('.result-value')[1].textContent = totalPages;
         }
         
         function copyQuickResults() {
@@ -2863,10 +2971,22 @@
             const results = document.getElementById('step3Results');
             const tbody = document.getElementById('wordCountBody');
             const editor = document.getElementById('tariffEditorWords');
+            const btnBreakdown = document.getElementById('btnShowBreakdown');
+            
+            // Guardar datos de análisis globalmente para el desglose
+            window.analysisData = data;
             
             let html = '';
+            let hasBreakdown = false;
+            
             data.analysis.forEach(file => {
                 const fileName = file.fileName || file.name || 'Sin nombre';
+                
+                // Verificar si tiene desglose
+                if (file.breakdown && file.breakdown.length > 0) {
+                    hasBreakdown = true;
+                }
+                
                 html += `
                     <tr>
                         <td>${fileName}</td>
@@ -2890,9 +3010,131 @@
             document.getElementById('summaryFiles').textContent = data.analysis.length;
             document.getElementById('summaryPages').textContent = data.totalPages;
             
+            // Mostrar botón de desglose si hay breakdown
+            if (btnBreakdown) {
+                if (hasBreakdown) {
+                    btnBreakdown.classList.remove('hidden');
+                } else {
+                    btnBreakdown.classList.add('hidden');
+                }
+            }
+            
             // Mostrar editor de tarifa por palabra
             if (editor) editor.classList.remove('hidden');
             if (results) results.classList.remove('hidden');
+        }
+        
+        // ====== FUNCIONES DE DESGLOSE ======
+        let currentBreakdown = [];
+        let currentFileIndex = 0;
+        
+        function showBreakdownModal() {
+            const modal = document.getElementById('breakdownModal');
+            const data = window.analysisData;
+            
+            if (!data || !data.analysis || data.analysis.length === 0) {
+                showStatus('No hay datos de análisis', 'error');
+                return;
+            }
+            
+            // Por ahora solo soportamos 1 archivo
+            const file = data.analysis[0];
+            currentFileIndex = 0;
+            
+            if (!file.breakdown || file.breakdown.length === 0) {
+                showStatus('No hay desglose disponible para este archivo', 'error');
+                return;
+            }
+            
+            // Copiar breakdown para edición
+            currentBreakdown = JSON.parse(JSON.stringify(file.breakdown));
+            
+            renderBreakdown();
+            modal.classList.add('visible');
+        }
+        
+        function closeBreakdownModal() {
+            const modal = document.getElementById('breakdownModal');
+            modal.classList.remove('visible');
+        }
+        
+        function renderBreakdown() {
+            const list = document.getElementById('breakdownList');
+            let html = '';
+            
+            currentBreakdown.forEach((item, index) => {
+                const excluded = !item.included;
+                const estimated = item.estimated ? '<span class="page-estimated">(est.)</span>' : '';
+                
+                html += `
+                    <div class="breakdown-item ${excluded ? 'excluded' : ''}" data-index="${index}">
+                        <span class="page-num">Página ${item.page}</span>
+                        <span class="page-words"><strong>${item.words.toLocaleString('es-ES')}</strong> palabras ${estimated}</span>
+                        <button class="page-remove" onclick="togglePage(${index})" title="${excluded ? 'Incluir' : 'Excluir'}">
+                            ${excluded ? '✓' : '✕'}
+                        </button>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+            updateBreakdownTotals();
+        }
+        
+        function togglePage(index) {
+            currentBreakdown[index].included = !currentBreakdown[index].included;
+            renderBreakdown();
+        }
+        
+        function updateBreakdownTotals() {
+            const includedItems = currentBreakdown.filter(item => item.included);
+            const totalWords = includedItems.reduce((sum, item) => sum + item.words, 0);
+            const totalPages = includedItems.length;
+            
+            document.getElementById('breakdownTotalWords').textContent = totalWords.toLocaleString('es-ES');
+            document.getElementById('breakdownTotalPages').textContent = totalPages;
+        }
+        
+        function resetBreakdown() {
+            const data = window.analysisData;
+            if (data && data.analysis && data.analysis[currentFileIndex]) {
+                currentBreakdown = JSON.parse(JSON.stringify(data.analysis[currentFileIndex].breakdown));
+                renderBreakdown();
+            }
+        }
+        
+        function applyBreakdown() {
+            const includedItems = currentBreakdown.filter(item => item.included);
+            const newTotalWords = includedItems.reduce((sum, item) => sum + item.words, 0);
+            const newTotalPages = includedItems.length;
+            
+            // Actualizar datos
+            if (window.analysisData && window.analysisData.analysis[currentFileIndex]) {
+                window.analysisData.analysis[currentFileIndex].words = newTotalWords;
+                window.analysisData.analysis[currentFileIndex].pages = newTotalPages;
+                window.analysisData.analysis[currentFileIndex].breakdown = currentBreakdown;
+                
+                // Recalcular totales
+                let totalWords = 0;
+                let totalPages = 0;
+                window.analysisData.analysis.forEach(file => {
+                    totalWords += file.words;
+                    totalPages += file.pages;
+                });
+                window.analysisData.totalWords = totalWords;
+                window.analysisData.totalPages = totalPages;
+                
+                // Actualizar budgetData
+                budgetData.wordCount = totalWords;
+                budgetData.pageCount = totalPages;
+                
+                // Actualizar display
+                displayWordCountResults(window.analysisData);
+                updateTotalPrice();
+            }
+            
+            closeBreakdownModal();
+            showStatus('Totales actualizados', 'success');
         }
 
         function updateTotalPrice() {
