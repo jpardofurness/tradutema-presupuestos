@@ -1,21 +1,4 @@
-<!--
-╔══════════════════════════════════════════════════════════════════╗
-║                                                                  ║
-║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
-║                                                                  ║
-║   VERSIÓN: 3.2.0                                                ║
-║   FECHA:   09/01/2026 15:45                                     ║
-║                                                                  ║
-║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - NUEVO: Desglose de palabras por página                      ║
-║   - Botón "Ver desglose" para ver palabras por página           ║
-║   - Excluir páginas del total con un clic                       ║
-║   - Recálculo automático de totales                             ║
-║                                                                  ║
-║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
--->
+<!-- TRADUTEMA QUOTES - Gestor de Presupuestos -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1010,7 +993,6 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2026 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v3.1.9 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -1074,19 +1056,10 @@
     </div>
 
     <script>
-        /**
-         * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.1.9
-         * Fecha: 09/01/2026 13:35
-         * 
-         * CAMBIOS v3.1.9:
-         * - NUEVO: Botón "Consultar Proveedores" en pantalla de inicio
-         * - Filtros por idioma origen/destino
-         * - Ver y editar tarifas, email y comentarios de traductores
-         */
+        // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.1.9';
-        const HTML_DATE = '09/01/2026 13:35';
+        const HTML_VERSION = '3.2.0';
+        const HTML_DATE = '09/01/2026 15:45';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2119,9 +2092,6 @@
                     allTariffs = data.tariffs || [];
                     apiVersion = data.version || '?';
                     apiDate = data.versionDate || '';
-                    
-                    // Actualizar footer
-                    document.getElementById('versionInfo').textContent = `HTML v${HTML_VERSION} | API: ${apiVersion}`;
                     
                     // Actualizar indicador en home
                     updateVersionIndicator();
