@@ -3,13 +3,13 @@
 ║                                                                  ║
 ║   TRADUTEMA QUOTES - GESTOR DE PRESUPUESTOS                     ║
 ║                                                                  ║
-║   VERSIÓN: 3.1.6                                                ║
-║   FECHA:   09/01/2026 11:50                                     ║
+║   VERSIÓN: 3.1.7                                                ║
+║   FECHA:   09/01/2026 12:45                                     ║
 ║                                                                  ║
 ║   CAMBIOS EN ESTA VERSIÓN:                                      ║
-║   - NUEVO: Muestra tarifas de proveedores en Paso 4             ║
-║   - Tarifa mínima, tarifa por palabra y comentarios visibles    ║
-║   - Datos provienen de columnas E, F, G de hoja Traductores     ║
+║   - NUEVO: Editar tarifas de proveedores (botón ✏️)             ║
+║   - Modal para tarifa mínima, tarifa/palabra y comentarios      ║
+║   - Cambios se guardan en Google Sheets automáticamente         ║
 ║                                                                  ║
 ║   ARCHIVO: index.html (subir a GitHub Pages)                    ║
 ║                                                                  ║
@@ -198,6 +198,8 @@
         .provider-email { font-size: 0.8rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
         .provider-tariff { font-size: 0.8rem; color: var(--accent-green); font-weight: 600; margin-top: 4px; }
         .provider-comment { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; margin-top: 2px; line-height: 1.3; }
+        .provider-edit-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 8px; font-size: 1rem; border-radius: var(--radius-sm); transition: all 0.2s; flex-shrink: 0; }
+        .provider-edit-btn:hover { background: rgba(52,152,219,0.1); color: var(--tradutema-blue); }
         .select-all-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
         .select-all-btn { font-size: 0.85rem; color: var(--tradutema-blue); background: none; border: none; font-family: inherit; font-weight: 500; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); }
         .select-all-btn:hover { background: rgba(52,152,219,0.08); }
@@ -899,7 +901,7 @@
 
     <footer class="footer">
         <div>Tradutema QUOTES 2026 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
-        <div class="version-info" id="versionInfo">HTML v3.1.6 | API: ?</div>
+        <div class="version-info" id="versionInfo">HTML v3.1.7 | API: ?</div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -921,6 +923,40 @@
         </div>
     </div>
 
+    <!-- Modal Editar Tarifas Proveedor -->
+    <div class="modal-overlay" id="editProviderModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <span class="modal-title">✏️ Editar Tarifas</span>
+                <button class="modal-close" onclick="closeEditProviderModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="editProviderName" style="font-weight: 600; font-size: 1.1rem; margin-bottom: 4px;"></div>
+                <div id="editProviderEmail" style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;"></div>
+                <div id="editProviderIdiomas" style="color: var(--tradutema-blue); font-size: 0.85rem; margin-bottom: 16px;"></div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="font-weight: 500; display: block; margin-bottom: 6px;">Tarifa Mínima (€)</label>
+                    <input type="text" id="editTarifaMinima" class="form-control" placeholder="Ej: 20">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="font-weight: 500; display: block; margin-bottom: 6px;">Tarifa por Palabra (€)</label>
+                    <input type="text" id="editTarifaPalabra" class="form-control" placeholder="Ej: 0.08">
+                </div>
+                
+                <div style="margin-bottom: 8px;">
+                    <label style="font-weight: 500; display: block; margin-bottom: 6px;">Comentarios</label>
+                    <textarea id="editComentarios" class="form-control" rows="3" placeholder="Notas sobre este proveedor..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditProviderModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveProviderTariffs()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Success Overlay -->
     <div class="success-overlay" id="successOverlay">
         <div class="success-checkmark">✓</div>
@@ -931,17 +967,17 @@
     <script>
         /**
          * TRADUTEMA QUOTES - Gestor de Presupuestos
-         * HTML Version: 3.1.6
-         * Fecha: 09/01/2026 11:50
+         * HTML Version: 3.1.7
+         * Fecha: 09/01/2026 12:45
          * 
-         * CAMBIOS v3.1.6:
-         * - NUEVO: Muestra tarifas de proveedores en Paso 4
-         * - Tarifa mínima, tarifa por palabra y comentarios visibles
-         * - Datos provienen de columnas E, F, G de hoja Traductores
+         * CAMBIOS v3.1.7:
+         * - NUEVO: Editar tarifas de proveedores desde la app (botón ✏️)
+         * - Modal para editar tarifa mínima, tarifa por palabra y comentarios
+         * - Cambios se guardan automáticamente en Google Sheets
          */
 
-        const HTML_VERSION = '3.1.6';
-        const HTML_DATE = '09/01/2026 11:50';
+        const HTML_VERSION = '3.1.7';
+        const HTML_DATE = '09/01/2026 12:45';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2731,14 +2767,15 @@
                 }
                 
                 html += `
-                    <div class="provider-item ${selected}" onclick="toggleProvider(${i})">
-                        <div class="provider-checkbox"></div>
-                        <div class="provider-info">
+                    <div class="provider-item ${selected}">
+                        <div class="provider-checkbox" onclick="toggleProvider(${i})"></div>
+                        <div class="provider-info" onclick="toggleProvider(${i})">
                             <div class="provider-name">${p.nombre}</div>
                             <div class="provider-email">${p.email}</div>
                             ${tarifaInfo}
                             ${comentarioInfo}
                         </div>
+                        <button class="provider-edit-btn" onclick="event.stopPropagation(); openEditProvider(${i})" title="Editar tarifas">✏️</button>
                     </div>
                 `;
             });
@@ -2768,6 +2805,88 @@
         function updateSelectedCount() {
             document.getElementById('selectedCount').textContent = selectedProviders.size + ' seleccionados';
             document.getElementById('sendQuoteBtn').disabled = selectedProviders.size === 0;
+        }
+
+        // ====== EDITAR TARIFAS PROVEEDOR ======
+        let editingProviderIndex = null;
+        
+        function openEditProvider(index) {
+            const p = filteredProviders[index];
+            if (!p) return;
+            
+            editingProviderIndex = index;
+            
+            document.getElementById('editProviderName').textContent = p.nombre;
+            document.getElementById('editProviderEmail').textContent = p.email;
+            document.getElementById('editProviderIdiomas').textContent = `${p.idiomaOrigen} → ${p.idiomaDestino}`;
+            document.getElementById('editTarifaMinima').value = p.tarifaMinima || '';
+            document.getElementById('editTarifaPalabra').value = p.tarifaPalabra || '';
+            document.getElementById('editComentarios').value = p.comentarios || '';
+            
+            document.getElementById('editProviderModal').classList.add('visible');
+        }
+        
+        function closeEditProviderModal() {
+            document.getElementById('editProviderModal').classList.remove('visible');
+            editingProviderIndex = null;
+        }
+        
+        async function saveProviderTariffs() {
+            if (editingProviderIndex === null) return;
+            
+            const p = filteredProviders[editingProviderIndex];
+            const tarifaMinima = document.getElementById('editTarifaMinima').value.trim();
+            const tarifaPalabra = document.getElementById('editTarifaPalabra').value.trim();
+            const comentarios = document.getElementById('editComentarios').value.trim();
+            
+            showStatus('Guardando...', 'loading');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: 'updateProviderTariffs',
+                        email: p.email,
+                        idiomaOrigen: p.idiomaOrigen,
+                        idiomaDestino: p.idiomaDestino,
+                        tarifaMinima: tarifaMinima,
+                        tarifaPalabra: tarifaPalabra,
+                        comentarios: comentarios
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Actualizar datos locales
+                    p.tarifaMinima = tarifaMinima;
+                    p.tarifaPalabra = tarifaPalabra;
+                    p.comentarios = comentarios;
+                    
+                    // También actualizar en allProviders
+                    const allIndex = allProviders.findIndex(ap => 
+                        ap.email === p.email && 
+                        ap.idiomaOrigen === p.idiomaOrigen && 
+                        ap.idiomaDestino === p.idiomaDestino
+                    );
+                    if (allIndex >= 0) {
+                        allProviders[allIndex].tarifaMinima = tarifaMinima;
+                        allProviders[allIndex].tarifaPalabra = tarifaPalabra;
+                        allProviders[allIndex].comentarios = comentarios;
+                    }
+                    
+                    renderProviders();
+                    closeEditProviderModal();
+                    showStatus('✓ Tarifas actualizadas', 'success');
+                    setTimeout(hideStatus, 2000);
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
         }
 
         // ====== DEADLINE ======
