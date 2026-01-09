@@ -757,8 +757,8 @@
                 <span class="step-badge">PASO 3 - Opcional</span>
             </div>
             
-            <!-- Loading mientras se analiza -->
-            <div id="step3Loading" class="loading-box">
+            <!-- Loading mientras se analiza (oculto por defecto) -->
+            <div id="step3Loading" class="loading-box hidden">
                 <div class="loading-message">
                     <span class="spinner"></span> Analizando documentos...
                 </div>
@@ -811,8 +811,8 @@
             </div>
             
             <!-- Botón para análisis profundo de palabras -->
-            <button class="btn btn-primary btn-orange action-btn hidden" id="countWordsBtn" onclick="countWords()">
-                🔢 Analizar Palabras <span class="btn-hint">(más lento, para presupuesto por palabra)</span>
+            <button class="btn btn-primary btn-orange action-btn" id="countWordsBtn" onclick="countWords()">
+                🔢 Analizar Páginas y Palabras
             </button>
             
             <div class="btn-row" style="margin-top: 16px;">
@@ -1058,8 +1058,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.5';
-        const HTML_DATE = '10/01/2026 09:30';
+        const HTML_VERSION = '3.2.6';
+        const HTML_DATE = '10/01/2026 10:00';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2346,13 +2346,9 @@
                     // Ya hay datos de páginas guardados - mostrarlos
                     console.log('showCard: Mostrando resultados existentes (páginas:', budgetData.pageCount, ')');
                     showExistingWordCountResults();
-                } else if (budgetData.folderId) {
-                    // No hay páginas pero sí carpeta - ejecutar análisis
-                    console.log('showCard: Ejecutando autoCountPages (folderId existe, sin páginas guardadas)');
-                    autoCountPages();
                 } else {
-                    // Sin carpeta ni datos - mostrar botón manual
-                    console.log('showCard: Sin carpeta, mostrando botón manual');
+                    // Sin datos de análisis - mostrar botón para analizar
+                    console.log('showCard: Sin análisis previo, mostrando botón');
                     document.getElementById('step3Loading').classList.add('hidden');
                     document.getElementById('countWordsBtn').classList.remove('hidden');
                 }
@@ -2410,12 +2406,12 @@
             const countWordsBtn = document.getElementById('countWordsBtn');
             const editor = document.getElementById('tariffEditorWords');
             
-            // Mostrar loading por defecto
-            if (loading) loading.classList.remove('hidden');
+            // Ocultar loading
+            if (loading) loading.classList.add('hidden');
             // Ocultar resultados
             if (results) results.classList.add('hidden');
-            // Ocultar botón de palabras
-            if (countWordsBtn) countWordsBtn.classList.add('hidden');
+            // Mostrar botón de análisis
+            if (countWordsBtn) countWordsBtn.classList.remove('hidden');
             // Ocultar editor de tarifa
             if (editor) editor.classList.add('hidden');
             
@@ -2426,123 +2422,6 @@
             document.getElementById('calcPagesRest').textContent = '0';
             document.getElementById('calcTotal').textContent = '0,00';
             document.getElementById('wordCountBody').innerHTML = '';
-        }
-        
-        // Función para ejecutar análisis automático de páginas
-        async function autoCountPages() {
-            const loading = document.getElementById('step3Loading');
-            const results = document.getElementById('step3Results');
-            const countWordsBtn = document.getElementById('countWordsBtn');
-            
-            // Mostrar loading, ocultar resultados
-            if (loading) loading.classList.remove('hidden');
-            if (results) results.classList.add('hidden');
-            if (countWordsBtn) countWordsBtn.classList.add('hidden');
-            
-            try {
-                console.log('autoCountPages: Iniciando análisis para folderId:', budgetData.folderId);
-                
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'countPagesOnly',
-                        folderId: budgetData.folderId
-                    })
-                });
-                
-                const data = await response.json();
-                console.log('autoCountPages: Respuesta:', data);
-                
-                if (data.success && data.analysis && data.analysis.length > 0) {
-                    budgetData.wordCount = null;  // No contamos palabras aún
-                    budgetData.pageCount = data.totalPages;
-                    budgetData.numArchivos = data.analysis.length;
-                    
-                    // Display results (convertir fileName a name para compatibilidad)
-                    const filesForDisplay = data.analysis.map(f => ({
-                        name: f.fileName || f.name,
-                        pages: f.pages
-                    }));
-                    displayPageResults(filesForDisplay, data.totalPages);
-                    
-                    // Guardar automáticamente los resultados del análisis
-                    saveBudgetDataIfNeeded();
-                    
-                    // Ocultar loading, mostrar resultados DESPUÉS de tener datos
-                    if (loading) loading.classList.add('hidden');
-                    if (results) results.classList.remove('hidden');
-                    if (countWordsBtn) countWordsBtn.classList.remove('hidden');
-                    
-                } else if (data.success && (!data.analysis || data.analysis.length === 0)) {
-                    // Carpeta vacía o sin archivos procesables
-                    if (loading) loading.classList.add('hidden');
-                    showStatus('No se encontraron archivos para analizar', 'warning');
-                    setTimeout(hideStatus, 3000);
-                    // Mostrar botón de análisis manual
-                    if (countWordsBtn) countWordsBtn.classList.remove('hidden');
-                } else {
-                    throw new Error(data.error || 'Error desconocido');
-                }
-            } catch (error) {
-                console.log('autoCountPages: Error:', error);
-                if (loading) loading.classList.add('hidden');
-                showStatus('Error al analizar: ' + error.message, 'error');
-                setTimeout(hideStatus, 3000);
-                // Mostrar botón de análisis manual para reintentar
-                if (countWordsBtn) countWordsBtn.classList.remove('hidden');
-            }
-        }
-        
-        // Mostrar resultados de páginas
-        function displayPageResults(files, totalPages) {
-            const tbody = document.getElementById('wordCountBody');
-            const results = document.getElementById('step3Results');
-            
-            if (!files || files.length === 0) return;
-            
-            // Build table
-            tbody.innerHTML = files.map(file => `
-                <tr>
-                    <td>${file.name}</td>
-                    <td style="text-align:right; color: var(--text-secondary);">-</td>
-                    <td style="text-align:right; font-weight: 600;">${file.pages}</td>
-                </tr>
-            `).join('');
-            
-            // Add totals row
-            tbody.innerHTML += `
-                <tr class="totals-row">
-                    <td><strong>TOTAL</strong></td>
-                    <td style="text-align:right; color: var(--text-secondary);">-</td>
-                    <td style="text-align:right;"><strong>${totalPages}</strong></td>
-                </tr>
-            `;
-            
-            // Update summary
-            document.getElementById('summaryFiles').textContent = files.length;
-            document.getElementById('summaryPages').textContent = totalPages;
-            document.getElementById('langPairDisplay').textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
-            
-            // Calculate price by pages
-            const page1 = budgetData.tariffPage1 || 0;
-            const page2 = budgetData.tariffPage2 || 0;
-            const pages = totalPages || 0;
-            const pagesRest = Math.max(0, pages - 1);
-            
-            let priceByPages = 0;
-            if (pages > 0) {
-                priceByPages = page1 + pagesRest * page2;
-            }
-            
-            // Update tariff display
-            document.getElementById('tariffPage1Display').textContent = page1.toFixed(2).replace('.', ',');
-            document.getElementById('tariffPage2Display').textContent = page2.toFixed(2).replace('.', ',');
-            document.getElementById('calcPagesRest').textContent = pagesRest;
-            document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
-            document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
-            
-            // Show results
-            if (results) results.classList.remove('hidden');
         }
         
         // Mostrar resultados existentes al retomar
