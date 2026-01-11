@@ -1058,8 +1058,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.6';
-        const HTML_DATE = '10/01/2026 10:00';
+        const HTML_VERSION = '3.2.7';
+        const HTML_DATE = '10/01/2026 10:45';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -3750,39 +3750,67 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             if (!validateClientFields()) return;
             
             const message = document.getElementById('clientMessageEdit').value;
-            navigator.clipboard.writeText(message).then(async () => {
-                showStatus('Copiado para WhatsApp ✓', 'success');
+            
+            try {
+                await navigator.clipboard.writeText(message);
+                showStatus('Guardando y copiando...', 'loading');
+                
                 // Guardar datos del cliente
                 await saveClientData();
+                
                 // Actualizar estado a "2-Presupuesto Enviado"
                 await updateBudgetStatusFE('2-Presupuesto Enviado');
+                
                 completedSteps.add(5);
                 updateProgressSteps();
-                setTimeout(hideStatus, 2000);
-            });
+                
+                showStatus('✓ Copiado para WhatsApp - Estado actualizado', 'success');
+                setTimeout(hideStatus, 2500);
+            } catch (error) {
+                console.error('Error en copyForWhatsApp:', error);
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
         }
 
         async function copyForEmail() {
             if (!validateClientFields()) return;
             
             const message = document.getElementById('clientMessageEdit').value;
-            navigator.clipboard.writeText(message).then(async () => {
-                showStatus('Copiado para Email ✓', 'success');
+            
+            try {
+                await navigator.clipboard.writeText(message);
+                showStatus('Guardando y copiando...', 'loading');
+                
                 // Guardar datos del cliente
                 await saveClientData();
+                
                 // Actualizar estado a "2-Presupuesto Enviado"
                 await updateBudgetStatusFE('2-Presupuesto Enviado');
+                
                 completedSteps.add(5);
                 updateProgressSteps();
-                setTimeout(hideStatus, 2000);
-            });
+                
+                showStatus('✓ Copiado para Email - Estado actualizado', 'success');
+                setTimeout(hideStatus, 2500);
+            } catch (error) {
+                console.error('Error en copyForEmail:', error);
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
         }
         
         // Función para actualizar estado del presupuesto
         async function updateBudgetStatusFE(status) {
-            if (!budgetData.id) return;
+            if (!budgetData.id) {
+                console.error('updateBudgetStatusFE: No hay budgetData.id');
+                return;
+            }
+            
+            console.log('Actualizando estado:', budgetData.id, '->', status);
+            
             try {
-                await fetch(apiUrl, {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     body: JSON.stringify({
                         action: 'updateStatus',
@@ -3790,9 +3818,18 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         status: status
                     })
                 });
-                console.log('Estado actualizado a: ' + status);
+                
+                const result = await response.json();
+                console.log('Respuesta updateStatus:', result);
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Error desconocido');
+                }
+                
+                return result;
             } catch (error) {
-                console.log('Error actualizando estado:', error);
+                console.error('Error actualizando estado:', error);
+                throw error;
             }
         }
 
