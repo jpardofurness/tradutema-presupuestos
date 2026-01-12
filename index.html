@@ -1058,8 +1058,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.9';
-        const HTML_DATE = '12/01/2026 14:45';
+        const HTML_VERSION = '3.2.10';
+        const HTML_DATE = '12/01/2026 15:15';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1995,6 +1995,9 @@
                         internalCommentsField.value = budgetData.internalComments;
                     }
                     
+                    // Restaurar análisis detallado (array de archivos con palabras/páginas)
+                    budgetData.fileAnalysis = b.analisisDetalle || [];
+                    
                     isResuming = true;
                     
                     // Set completed steps based on what data exists (ahora 5 pasos)
@@ -2439,18 +2442,57 @@
             if (loading) loading.classList.add('hidden');
             if (results) results.classList.remove('hidden');
             
-            // Mostrar tabla con datos guardados
             const hasWords = budgetData.wordCount && budgetData.wordCount > 0;
-            tbody.innerHTML = `
-                <tr class="totals-row">
-                    <td><strong>TOTAL (guardado)</strong></td>
-                    <td style="text-align:right;"><strong>${hasWords ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</strong></td>
-                    <td style="text-align:right;"><strong>${budgetData.pageCount || '-'}</strong></td>
-                </tr>
-            `;
+            const hasDetailedAnalysis = budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0;
+            
+            // Mostrar tabla con análisis detallado si existe
+            if (hasDetailedAnalysis) {
+                let html = '';
+                budgetData.fileAnalysis.forEach((file, index) => {
+                    const fileName = file.fileName || file.name || 'Archivo ' + (index + 1);
+                    const hasBreakdown = file.breakdown && file.breakdown.length > 0;
+                    const breakdownBtn = hasBreakdown 
+                        ? `<button class="btn-mini-breakdown" onclick="showBreakdownModal(${index})" title="Ver desglose por página">📄</button>`
+                        : '';
+                    
+                    html += `
+                        <tr data-file-index="${index}">
+                            <td>${fileName}</td>
+                            <td class="number">${file.words ? file.words.toLocaleString('es-ES') : '-'} ${breakdownBtn}</td>
+                            <td class="number">${file.pages || '-'}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                    <tr class="total">
+                        <td>TOTAL</td>
+                        <td class="number" id="totalWordsCell">${hasWords ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</td>
+                        <td class="number" id="totalPagesCell">${budgetData.pageCount || '-'}</td>
+                    </tr>
+                `;
+                
+                tbody.innerHTML = html;
+                
+                // Guardar en window.analysisData para funciones de desglose
+                window.analysisData = {
+                    analysis: budgetData.fileAnalysis,
+                    totalWords: budgetData.wordCount,
+                    totalPages: budgetData.pageCount
+                };
+            } else {
+                // Solo mostrar totales si no hay detalle
+                tbody.innerHTML = `
+                    <tr class="totals-row">
+                        <td><strong>TOTAL (guardado)</strong></td>
+                        <td style="text-align:right;"><strong>${hasWords ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</strong></td>
+                        <td style="text-align:right;"><strong>${budgetData.pageCount || '-'}</strong></td>
+                    </tr>
+                `;
+            }
             
             // Update summary
-            document.getElementById('summaryFiles').textContent = budgetData.numArchivos || '-';
+            document.getElementById('summaryFiles').textContent = budgetData.numArchivos || budgetData.fileAnalysis?.length || '-';
             document.getElementById('summaryPages').textContent = budgetData.pageCount || '-';
             document.getElementById('langPairDisplay').textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
             
