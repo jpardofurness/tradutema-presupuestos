@@ -240,7 +240,7 @@
         
         /* PROVIDER TAGS IN BUDGET LIST */
         .budget-item-providers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
-        .budget-item-notes { margin-top: 10px; padding: 8px 10px; background: rgba(230, 126, 34, 0.08); border-left: 3px solid #e67e22; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.8rem; color: #a04000; font-style: italic; }
+        .budget-item-notes { margin-top: 10px; padding: 8px 10px; background: rgba(230, 126, 34, 0.08); border-left: 3px solid #e67e22; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.8rem; color: #a04000; font-style: italic; cursor: help; }
         .provider-tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; background: rgba(52,152,219,0.1); color: var(--tradutema-blue); font-weight: 500; }
         .provider-tag.chosen { background: var(--accent-green); color: white; }
         
@@ -1058,8 +1058,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.8';
-        const HTML_DATE = '12/01/2026 14:30';
+        const HTML_VERSION = '3.2.9';
+        const HTML_DATE = '12/01/2026 14:45';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1897,10 +1897,13 @@
                     }
                 }
                 
-                // Mostrar comentarios internos si existen
+                // Mostrar comentarios internos si existen (truncados con tooltip)
                 let notasHtml = '';
                 if (b.comentariosInternos) {
-                    notasHtml = `<div class="budget-item-notes">📝 ${b.comentariosInternos}</div>`;
+                    const maxLen = 100;
+                    const fullText = b.comentariosInternos;
+                    const truncated = fullText.length > maxLen ? fullText.substring(0, maxLen) + '...' : fullText;
+                    notasHtml = `<div class="budget-item-notes" title="${fullText.replace(/"/g, '&quot;')}">📝 ${truncated}</div>`;
                 }
                 
                 html += `
