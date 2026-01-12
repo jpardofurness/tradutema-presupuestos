@@ -1058,8 +1058,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.7';
-        const HTML_DATE = '10/01/2026 10:45';
+        const HTML_VERSION = '3.2.8';
+        const HTML_DATE = '12/01/2026 14:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2296,24 +2296,25 @@
             if (!budgetData.id) return;  // Solo si existe el presupuesto
             
             try {
-                await fetch(apiUrl, {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     body: JSON.stringify({
                         action: 'updateBudgetBasicData',
                         budgetId: budgetData.id,
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
-                        canal: budgetData.channel,
+                        channel: budgetData.channel,
                         numArchivos: budgetData.numArchivos,
-                        paginas: budgetData.pageCount,
-                        emailCliente: budgetData.clientEmail,
-                        whatsappCliente: budgetData.clientWhatsApp,
-                        comentariosInternos: budgetData.internalComments || ''
+                        pages: budgetData.pageCount,
+                        clientEmail: budgetData.clientEmail,
+                        clientWhatsApp: budgetData.clientWhatsApp,
+                        internalComments: budgetData.internalComments || ''
                     })
                 });
-                console.log('Datos básicos guardados');
+                const result = await response.json();
+                console.log('Datos básicos guardados:', result);
             } catch (error) {
-                console.log('Error guardando datos básicos:', error);
+                console.error('Error guardando datos básicos:', error);
             }
         }
 
