@@ -152,6 +152,8 @@
         .word-count-table tr.total td { border-bottom: none; }
         .btn-mini-breakdown { background: var(--tradutema-orange); color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; cursor: pointer; margin-left: 8px; vertical-align: middle; }
         .btn-mini-breakdown:hover { background: #e67e22; }
+        .btn-preview { text-decoration: none; font-size: 1rem; margin-right: 6px; opacity: 0.7; transition: opacity 0.2s; }
+        .btn-preview:hover { opacity: 1; }
         
         /* TARIFF EDITOR */
         .tariff-editor { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.1); border-radius: var(--radius-sm); }
@@ -1058,8 +1060,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.10';
-        const HTML_DATE = '12/01/2026 15:15';
+        const HTML_VERSION = '3.2.11';
+        const HTML_DATE = '15/01/2026 10:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2451,13 +2453,19 @@
                 budgetData.fileAnalysis.forEach((file, index) => {
                     const fileName = file.fileName || file.name || 'Archivo ' + (index + 1);
                     const hasBreakdown = file.breakdown && file.breakdown.length > 0;
+                    
+                    // Icono de ojo para previsualizar en Google Drive
+                    const previewBtn = file.fileId 
+                        ? `<a href="https://drive.google.com/file/d/${file.fileId}/view" target="_blank" class="btn-preview" title="Ver archivo">👁️</a>`
+                        : '';
+                    
                     const breakdownBtn = hasBreakdown 
                         ? `<button class="btn-mini-breakdown" onclick="showBreakdownModal(${index})" title="Ver desglose por página">📄</button>`
                         : '';
                     
                     html += `
                         <tr data-file-index="${index}">
-                            <td>${fileName}</td>
+                            <td>${previewBtn} ${fileName}</td>
                             <td class="number">${file.words ? file.words.toLocaleString('es-ES') : '-'} ${breakdownBtn}</td>
                             <td class="number">${file.pages || '-'}</td>
                         </tr>
@@ -2880,6 +2888,11 @@
                 const fileName = file.fileName || file.name || 'Sin nombre';
                 const hasBreakdown = file.breakdown && file.breakdown.length > 0;
                 
+                // Icono de ojo para previsualizar en Google Drive
+                const previewBtn = file.fileId 
+                    ? `<a href="https://drive.google.com/file/d/${file.fileId}/view" target="_blank" class="btn-preview" title="Ver archivo">👁️</a>`
+                    : '';
+                
                 // Botón de desglose si tiene breakdown
                 const breakdownBtn = hasBreakdown 
                     ? `<button class="btn-mini-breakdown" onclick="showBreakdownModal(${index})" title="Ver desglose por página">📄</button>`
@@ -2887,7 +2900,7 @@
                 
                 html += `
                     <tr data-file-index="${index}">
-                        <td>${fileName}</td>
+                        <td>${previewBtn} ${fileName}</td>
                         <td class="number">${file.words.toLocaleString('es-ES')} ${breakdownBtn}</td>
                         <td class="number">${file.pages}</td>
                     </tr>
