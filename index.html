@@ -407,6 +407,14 @@
         
         /* QUOTE FORM */
         .quote-row { display: flex; gap: 12px; }
+        .tariff-calc-box { background: rgba(52, 152, 219, 0.08); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; }
+        .tariff-calc-header { font-weight: 600; color: var(--primary-blue); margin-bottom: 8px; }
+        .tariff-calc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .tariff-calc-row label { font-size: 0.9rem; color: var(--text-secondary); }
+        .tariff-calc-row input { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.9rem; text-align: center; }
+        .tariff-calc-hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
+        .tariff-calc-detail { font-size: 0.85rem; color: var(--text-secondary); padding: 8px 0; border-top: 1px dashed var(--border-color); margin-top: 8px; }
+        .tariff-calc-result { font-weight: 600; color: var(--primary-blue); font-size: 1rem; }
         .quote-row .form-group { flex: 1; }
         
         /* LINK TO FOLDER */
@@ -422,6 +430,11 @@
             .quote-row { flex-direction: column; gap: 0; }
         }
     </style>
+    <!-- PDF.js para contar páginas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 </head>
 <body>
     <header class="header">
@@ -947,6 +960,21 @@
                 <button onclick="setMessageLang('en')">English</button>
             </div>
             
+            <!-- Cálculo de tarifa por páginas -->
+            <div class="tariff-calc-box" id="step5TariffCalc">
+                <div class="tariff-calc-header">
+                    <span>📄 Cálculo por páginas (<span id="step5LangPair">-</span>)</span>
+                </div>
+                <div class="tariff-calc-row">
+                    <label>Nº páginas a traducir:</label>
+                    <input type="number" id="quotePagesCount" min="1" value="1" onchange="recalculateQuoteFromPages()" style="width: 80px;">
+                    <span class="tariff-calc-hint">(editable si el cliente excluye páginas)</span>
+                </div>
+                <div class="tariff-calc-detail" id="step5TariffDetail">
+                    <!-- Se rellena con JS -->
+                </div>
+            </div>
+            
             <div class="quote-row">
                 <div class="form-group">
                     <label>Importe (€, IVA incluido)</label>
@@ -1062,8 +1090,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.12';
-        const HTML_DATE = '16/01/2026 10:00';
+        const HTML_VERSION = '3.3.0';
+        const HTML_DATE = '16/01/2026 11:00';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2378,20 +2406,8 @@
                     clientWhatsApp.value = budgetData.clientWhatsApp;
                 }
                 
-                // Pre-rellenar importe con tarifa calculada por páginas (si no hay valor guardado)
-                const quoteAmount = document.getElementById('quoteAmount');
-                if (quoteAmount && !quoteAmount.value && !budgetData.savedAmount) {
-                    // Calcular precio por páginas
-                    const pages = budgetData.pageCount || 0;
-                    const page1 = budgetData.tariffPage1 || 0;
-                    const page2 = budgetData.tariffPage2 || 0;
-                    
-                    if (pages > 0 && (page1 > 0 || page2 > 0)) {
-                        const priceByPages = page1 + Math.max(0, pages - 1) * page2;
-                        quoteAmount.value = priceByPages.toFixed(2);
-                        console.log('Importe pre-rellenado:', priceByPages, '€ (', pages, 'páginas)');
-                    }
-                }
+                // Pre-rellenar número de páginas y calcular tarifa
+                initStep5TariffCalc();
                 
                 // Mostrar sección de traductores contactados si hay proveedores
                 const contactedSection = document.getElementById('contactedProvidersSection');
@@ -2593,22 +2609,55 @@
         }
 
         // ====== FILES ======
-        function handleFiles(files) {
+        async function handleFiles(files) {
             for (const file of files) {
                 if (uploadedFiles.some(f => f.name === file.name)) continue;
                 
+                // Leer archivo como base64
+                const base64 = await readFileAsBase64(file);
+                
+                // Contar páginas
+                let pages = 1;
+                if (file.type === 'application/pdf') {
+                    pages = await countPdfPages(base64);
+                } else if (file.type.startsWith('image/')) {
+                    pages = 1;
+                }
+                
+                uploadedFiles.push({
+                    name: file.name,
+                    size: file.size,
+                    type: file.type || 'application/octet-stream',
+                    content: base64,
+                    pages: pages
+                });
+                renderFiles();
+            }
+        }
+        
+        function readFileAsBase64(file) {
+            return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const base64 = e.target.result.split(',')[1];
-                    uploadedFiles.push({
-                        name: file.name,
-                        size: file.size,
-                        type: file.type || 'application/octet-stream',
-                        content: base64
-                    });
-                    renderFiles();
+                    resolve(base64);
                 };
                 reader.readAsDataURL(file);
+            });
+        }
+        
+        async function countPdfPages(base64) {
+            try {
+                const binaryString = atob(base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                return pdf.numPages;
+            } catch (error) {
+                console.error('Error contando páginas PDF:', error);
+                return 1;
             }
         }
 
@@ -2631,9 +2680,11 @@
             
             let html = '';
             let totalSize = 0;
+            let totalPages = 0;
             
             uploadedFiles.forEach((f, i) => {
                 totalSize += f.size;
+                totalPages += f.pages || 1;
                 const sizeClass = f.size > 2 * 1024 * 1024 ? 'file-size-large' : ''; // >2MB
                 
                 // Icono de previsualización (solo para PDF e imágenes)
@@ -2642,11 +2693,14 @@
                     ? `<button class="btn-preview-local" onclick="previewLocalFile(${i})" title="Ver archivo">👁️</button>`
                     : '';
                 
+                // Mostrar páginas
+                const pagesStr = f.pages ? `${f.pages} pág${f.pages > 1 ? 's' : ''}` : '';
+                
                 html += `
                     <div class="file-item">
                         <div class="file-item-info">
                             <span class="file-item-name">${previewBtn} ${f.name}</span>
-                            <span class="file-item-size ${sizeClass}">${formatFileSize(f.size)}</span>
+                            <span class="file-item-size ${sizeClass}">${formatFileSize(f.size)}${pagesStr ? ' · ' + pagesStr : ''}</span>
                         </div>
                         <div class="file-item-actions">
                             <button class="file-item-remove" onclick="removeFile(${i})">✕</button>
@@ -2657,7 +2711,10 @@
             
             list.innerHTML = html;
             
-            total.innerHTML = `<strong>${uploadedFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total`;
+            // Guardar total de páginas para usar después
+            budgetData.pageCount = totalPages;
+            
+            total.innerHTML = `<strong>${uploadedFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${totalPages}</strong> página(s)`;
             total.style.display = 'block';
         }
 
@@ -2713,6 +2770,10 @@
             const internalComments = document.getElementById('internalComments').value.trim();
             budgetData.internalComments = internalComments;
             
+            // Calcular total de páginas
+            const totalPages = uploadedFiles.reduce((sum, f) => sum + (f.pages || 1), 0);
+            budgetData.pageCount = totalPages;
+            
             try {
                 showStatus('Creando carpeta y subiendo archivos...', 'loading');
                 
@@ -2726,6 +2787,7 @@
                         clientEmail: budgetData.clientEmail,
                         clientWhatsApp: budgetData.clientWhatsApp,
                         internalComments: internalComments,
+                        totalPages: totalPages,
                         files: uploadedFiles
                     })
                 });
@@ -3632,6 +3694,78 @@
             return pluralize(count, singular, plural);
         }
         
+        // ====== CÁLCULO DE TARIFA EN PASO 5 ======
+        function initStep5TariffCalc() {
+            const quotePagesCount = document.getElementById('quotePagesCount');
+            const quoteAmount = document.getElementById('quoteAmount');
+            const langPairSpan = document.getElementById('step5LangPair');
+            const detailDiv = document.getElementById('step5TariffDetail');
+            
+            // Mostrar combinación de idiomas
+            if (langPairSpan) {
+                langPairSpan.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
+            }
+            
+            // Pre-rellenar número de páginas
+            const pages = budgetData.pageCount || 1;
+            if (quotePagesCount) {
+                quotePagesCount.value = pages;
+            }
+            
+            // Obtener tarifas
+            const page1 = budgetData.tariffPage1 || 0;
+            const page2 = budgetData.tariffPage2 || 0;
+            
+            // Calcular precio
+            const priceByPages = page1 + Math.max(0, pages - 1) * page2;
+            
+            // Mostrar detalle del cálculo
+            if (detailDiv) {
+                detailDiv.innerHTML = `
+                    Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pages - 1)} págs resto) = 
+                    <span class="tariff-calc-result">${priceByPages.toFixed(2).replace('.', ',')} €</span>
+                `;
+            }
+            
+            // Pre-rellenar importe (solo si no hay valor guardado)
+            if (quoteAmount && !quoteAmount.value && !budgetData.savedAmount) {
+                quoteAmount.value = priceByPages.toFixed(2);
+                console.log('Importe pre-rellenado:', priceByPages, '€ (', pages, 'páginas)');
+            }
+        }
+        
+        function recalculateQuoteFromPages() {
+            const quotePagesCount = document.getElementById('quotePagesCount');
+            const quoteAmount = document.getElementById('quoteAmount');
+            const detailDiv = document.getElementById('step5TariffDetail');
+            
+            const pages = parseInt(quotePagesCount.value) || 1;
+            const page1 = budgetData.tariffPage1 || 0;
+            const page2 = budgetData.tariffPage2 || 0;
+            
+            // Calcular nuevo precio
+            const priceByPages = page1 + Math.max(0, pages - 1) * page2;
+            
+            // Actualizar detalle del cálculo
+            if (detailDiv) {
+                detailDiv.innerHTML = `
+                    Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pages - 1)} págs resto) = 
+                    <span class="tariff-calc-result">${priceByPages.toFixed(2).replace('.', ',')} €</span>
+                `;
+            }
+            
+            // Actualizar importe
+            if (quoteAmount) {
+                quoteAmount.value = priceByPages.toFixed(2);
+            }
+            
+            // Guardar páginas editadas
+            budgetData.quotePagesCount = pages;
+            
+            // Actualizar mensaje
+            updateClientMessage();
+        }
+        
         function updateClientMessage() {
             // Si el usuario ya editó el mensaje, no sobrescribir
             if (clientMessageEdited) return;
@@ -3643,6 +3777,19 @@
             const srcLang = budgetData.sourceLang || 'origen';
             const tgtLang = budgetData.targetLang || 'destino';
             const numDocs = uploadedFiles.length || budgetData.numArchivos || 1;
+            
+            // Obtener páginas y lista de archivos
+            const quotePagesField = document.getElementById('quotePagesCount');
+            const totalPages = quotePagesField ? quotePagesField.value : (budgetData.pageCount || 0);
+            
+            // Lista de nombres de archivos
+            let fileNames = [];
+            if (uploadedFiles.length > 0) {
+                fileNames = uploadedFiles.map(f => f.name);
+            } else if (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) {
+                fileNames = budgetData.fileAnalysis.map(f => f.fileName || f.name);
+            }
+            const fileListStr = fileNames.join(', ') || 'documentos adjuntos';
             
             // Traducir idiomas al inglés
             const srcLangEn = translateLanguageToEnglish(srcLang);
@@ -3673,6 +3820,10 @@
                 deliveryDateEn = 'the indicated date';
             }
             
+            // Texto de páginas y archivos
+            const pagesTextEs = totalPages > 0 ? `\n---\nTotal páginas a traducir: ${totalPages}\nArchivos: ${fileListStr}` : '';
+            const pagesTextEn = totalPages > 0 ? `\n---\nTotal pages to translate: ${totalPages}\nFiles: ${fileListStr}` : '';
+            
             let message;
             
             if (messageLang === 'es') {
@@ -3699,7 +3850,7 @@ Coordinador en Tradutema.com
 info@tradutema.com
 +34 670 91 78 60
 
-Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI`;
+Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI${pagesTextEs}`;
             } else {
                 // Texto de urgencia en inglés
                 const urgencyTextEn = urgency ? ` (if you need it sooner, it's possible with an urgency surcharge of ${urgency} EUR)` : '';
@@ -3724,7 +3875,7 @@ Coordinator at Tradutema.com
 info@tradutema.com
 +34 670 91 78 60
 
-Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
+Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI${pagesTextEn}`;
             }
             
             document.getElementById('clientMessageEdit').value = message;
