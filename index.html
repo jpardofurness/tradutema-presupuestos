@@ -109,6 +109,13 @@
         .file-item-size.file-size-large { color: var(--accent-orange); font-weight: 600; }
         .file-item-actions { display: flex; align-items: center; gap: 8px; }
         .file-item-remove { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.2rem; padding: 4px 8px; }
+        .file-item-readonly { background: #f8f9fa; border-color: #dee2e6; opacity: 0.9; }
+        .folder-files-note { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px; font-style: italic; }
+        .send-history-note { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; background: rgba(52, 152, 219, 0.08); padding: 6px 10px; border-radius: var(--radius-sm); }
+        .send-history-note.success { color: #27ae60; background: rgba(39, 174, 96, 0.1); }
+        .client-send-history { margin-top: 12px; padding: 12px; background: rgba(39, 174, 96, 0.08); border-radius: var(--radius-md); border: 1px solid rgba(39, 174, 96, 0.2); }
+        .client-send-history-item { font-size: 0.85rem; color: #27ae60; margin-bottom: 6px; }
+        .client-send-history-item:last-child { margin-bottom: 0; }
         .file-total { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; padding: 8px 12px; background: rgba(52,152,219,0.05); border-radius: var(--radius-sm); }
         
         /* BUTTONS */
@@ -1017,6 +1024,9 @@
                 </button>
             </div>
             
+            <!-- Historial de envíos al cliente -->
+            <div id="clientSendHistoryContainer" class="client-send-history hidden"></div>
+            
             <button class="btn btn-primary btn-success action-btn" id="sendClientBtn" onclick="sendClientEmail()" style="margin-top: 12px;">
                 💾 Guardar y Enviar Email
             </button>
@@ -1090,8 +1100,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.3.1';
-        const HTML_DATE = '16/01/2026 11:30';
+        const HTML_VERSION = '3.4.0';
+        const HTML_DATE = '16/01/2026 13:00';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1122,11 +1132,14 @@
             wordCount: null,
             pageCount: null,
             fileAnalysis: [],
+            folderFiles: [],           // Archivos de la carpeta de Drive
             tariffPerWord: 0,
             tariffPage1: 0,
             tariffPage2: 0,
-            contactedProviders: [],  // Traductores a los que se envió tasación
-            chosenProvider: null     // Traductor elegido para el presupuesto
+            contactedProviders: [],    // Traductores a los que se envió tasación
+            chosenProvider: null,      // Traductor elegido para el presupuesto
+            historialTraductores: {},  // Historial de envíos a traductores
+            historialCliente: {}       // Historial de envíos al cliente
         };
         
         let deadlineType = 'open';
@@ -1281,8 +1294,10 @@
                 sourceLang: '', targetLang: '', channel: '',
                 clientEmail: '', clientWhatsApp: '',
                 wordCount: null, pageCount: null, fileAnalysis: [],
+                folderFiles: [],
                 tariffPerWord: 0, tariffPage1: 0, tariffPage2: 0,
-                contactedProviders: [], chosenProvider: null
+                contactedProviders: [], chosenProvider: null,
+                historialTraductores: {}, historialCliente: {}
             };
             uploadedFiles = [];
             selectedProviders.clear();
@@ -1290,6 +1305,10 @@
             currentStep = 1;
             isResuming = false;
             clientMessageEdited = false;  // Reset flag de mensaje editado
+            
+            // Ocultar historial de cliente
+            const historialContainer = document.getElementById('clientSendHistoryContainer');
+            if (historialContainer) historialContainer.classList.add('hidden');
             
             // Reset UI - con verificación de existencia
             const sourceLang = document.getElementById('sourceLang');
@@ -2030,6 +2049,15 @@
                     // Restaurar análisis detallado (array de archivos con palabras/páginas)
                     budgetData.fileAnalysis = b.analisisDetalle || [];
                     
+                    // Restaurar archivos de la carpeta de Drive
+                    budgetData.folderFiles = b.archivosEnCarpeta || [];
+                    
+                    // Restaurar historial de envíos a traductores
+                    budgetData.historialTraductores = b.historialTraductores || {};
+                    
+                    // Restaurar historial de envíos a cliente
+                    budgetData.historialCliente = b.historialCliente || {};
+                    
                     isResuming = true;
                     
                     // Set completed steps based on what data exists (ahora 5 pasos)
@@ -2372,6 +2400,11 @@
             // Update progress steps visual - usar función centralizada
             updateProgressSteps();
             
+            // Si es paso 2 (Archivos) y estamos retomando, mostrar archivos de la carpeta
+            if (step === 2 && isResuming && budgetData.folderFiles && budgetData.folderFiles.length > 0) {
+                renderFolderFiles();
+            }
+            
             // Si es paso 3 (Palabras), mostrar tarifas y ejecutar análisis automático de páginas
             if (step === 3) {
                 // Resetear estado visual del paso 3
@@ -2393,6 +2426,11 @@
                 }
             }
             
+            // Si es paso 4 (Tasación), mostrar historial de envíos a traductores
+            if (step === 4) {
+                renderProviderSendHistory();
+            }
+            
             // Si es paso 5 (Cliente), pre-llenar email/whatsapp con datos del paso 1
             if (step === 5) {
                 const clientEmail = document.getElementById('clientEmail');
@@ -2408,6 +2446,9 @@
                 
                 // Pre-rellenar número de páginas y calcular tarifa
                 initStep5TariffCalc();
+                
+                // Mostrar historial de envíos al cliente
+                renderClientSendHistory();
                 
                 // Mostrar sección de traductores contactados si hay proveedores
                 const contactedSection = document.getElementById('contactedProvidersSection');
@@ -2745,6 +2786,48 @@
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        // Mostrar archivos de la carpeta de Drive al retomar (Fase 2)
+        function renderFolderFiles() {
+            const list = document.getElementById('fileList');
+            const total = document.getElementById('fileTotal');
+            const area = document.getElementById('fileUploadArea');
+            const btn = document.getElementById('step2Btn');
+            
+            if (!budgetData.folderFiles || budgetData.folderFiles.length === 0) return;
+            
+            area.classList.add('has-files');
+            btn.disabled = true;  // Ya está creada la carpeta
+            btn.innerHTML = '✓ Carpeta ya creada';
+            btn.style.background = '#27ae60';
+            
+            let html = '<div class="folder-files-note">📁 Archivos ya subidos a Drive:</div>';
+            let totalSize = 0;
+            
+            budgetData.folderFiles.forEach((f, i) => {
+                totalSize += f.size || 0;
+                
+                // Icono de previsualización en Drive
+                const previewBtn = f.id 
+                    ? `<a href="https://drive.google.com/file/d/${f.id}/view" target="_blank" class="btn-preview" title="Ver archivo">👁️</a>`
+                    : '';
+                
+                html += `
+                    <div class="file-item file-item-readonly">
+                        <div class="file-item-info">
+                            <span class="file-item-name">${previewBtn} ${f.name}</span>
+                            <span class="file-item-size">${formatFileSize(f.size || 0)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+            
+            const totalPages = budgetData.pageCount || budgetData.folderFiles.length;
+            total.innerHTML = `<strong>${budgetData.folderFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${totalPages}</strong> página(s)`;
+            total.style.display = 'block';
         }
 
         // ====== FOLDER CREATION ======
@@ -3574,6 +3657,15 @@
             budgetData.contactedProviders.forEach((p, idx) => {
                 const isChosen = budgetData.chosenProvider === p.nombre;
                 const quote = budgetData.providerQuotes[p.nombre] || {};
+                
+                // Obtener historial de envíos para este proveedor
+                let sendHistoryHtml = '';
+                if (budgetData.historialTraductores && budgetData.historialTraductores[p.nombre]) {
+                    const envios = budgetData.historialTraductores[p.nombre];
+                    const ultimoEnvio = envios[envios.length - 1];
+                    sendHistoryHtml = `<div class="send-history-note success">📤 Tasación enviada el ${ultimoEnvio.fecha}</div>`;
+                }
+                
                 html += `
                     <div class="contacted-item ${isChosen ? 'chosen' : ''}">
                         <div class="contacted-header" onclick="chooseProvider(${idx})">
@@ -3581,6 +3673,7 @@
                             <div class="contacted-info">
                                 <div class="contacted-name">${p.nombre}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}</div>
                                 <div class="contacted-email">${p.email}</div>
+                                ${sendHistoryHtml}
                             </div>
                         </div>
                         <div class="contacted-quote-fields">
@@ -3605,6 +3698,17 @@
                 `;
             });
             container.innerHTML = html;
+        }
+        
+        // Función para actualizar historial de proveedores (llamada desde showCard)
+        function renderProviderSendHistory() {
+            // El historial ya se muestra en renderContactedProviders
+            // Esta función se llama para re-renderizar si es necesario
+            const contactedSection = document.getElementById('contactedProvidersSection');
+            if (budgetData.contactedProviders && budgetData.contactedProviders.length > 0) {
+                contactedSection.classList.remove('hidden');
+                renderContactedProviders();
+            }
         }
         
         // Actualizar cotización de un proveedor
@@ -4006,6 +4110,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             if (!validateClientFields()) return;
             
             const message = document.getElementById('clientMessageEdit').value;
+            const whatsapp = document.getElementById('clientWhatsApp').value.trim();
             
             try {
                 await navigator.clipboard.writeText(message);
@@ -4014,11 +4119,22 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 // Guardar datos del cliente
                 await saveClientData();
                 
+                // Guardar historial de envío
+                const historialResult = await saveClientSendHistoryFE('whatsapp', whatsapp);
+                
                 // Actualizar estado a "2-Presupuesto Enviado"
                 await updateBudgetStatusFE('2-Presupuesto Enviado');
                 
                 completedSteps.add(5);
                 updateProgressSteps();
+                
+                // Actualizar historial local y mostrar
+                if (historialResult && historialResult.fechaEnvio) {
+                    if (!budgetData.historialCliente) budgetData.historialCliente = {};
+                    if (!budgetData.historialCliente.whatsapp) budgetData.historialCliente.whatsapp = [];
+                    budgetData.historialCliente.whatsapp.push({ fecha: historialResult.fechaEnvio, destinatario: whatsapp });
+                    renderClientSendHistory();
+                }
                 
                 showStatus('✓ Copiado para WhatsApp - Estado actualizado', 'success');
                 setTimeout(hideStatus, 2500);
@@ -4033,6 +4149,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             if (!validateClientFields()) return;
             
             const message = document.getElementById('clientMessageEdit').value;
+            const emailRaw = document.getElementById('clientEmail').value.trim();
+            const email = extractEmail(emailRaw);
             
             try {
                 await navigator.clipboard.writeText(message);
@@ -4041,11 +4159,22 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 // Guardar datos del cliente
                 await saveClientData();
                 
+                // Guardar historial de envío
+                const historialResult = await saveClientSendHistoryFE('email_copiado', email);
+                
                 // Actualizar estado a "2-Presupuesto Enviado"
                 await updateBudgetStatusFE('2-Presupuesto Enviado');
                 
                 completedSteps.add(5);
                 updateProgressSteps();
+                
+                // Actualizar historial local y mostrar
+                if (historialResult && historialResult.fechaEnvio) {
+                    if (!budgetData.historialCliente) budgetData.historialCliente = {};
+                    if (!budgetData.historialCliente.email_copiado) budgetData.historialCliente.email_copiado = [];
+                    budgetData.historialCliente.email_copiado.push({ fecha: historialResult.fechaEnvio, destinatario: email });
+                    renderClientSendHistory();
+                }
                 
                 showStatus('✓ Copiado para Email - Estado actualizado', 'success');
                 setTimeout(hideStatus, 2500);
@@ -4054,6 +4183,64 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 showStatus('Error: ' + error.message, 'error');
                 setTimeout(hideStatus, 3000);
             }
+        }
+        
+        // Guardar historial de envío a cliente en backend
+        async function saveClientSendHistoryFE(tipo, destinatario) {
+            if (!budgetData.id) return null;
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'saveClientSendHistory',
+                        budgetId: budgetData.id,
+                        tipo: tipo,
+                        destinatario: destinatario
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    return data;
+                }
+                return null;
+            } catch (error) {
+                console.log('Error guardando historial:', error);
+                return null;
+            }
+        }
+        
+        // Mostrar historial de envíos al cliente
+        function renderClientSendHistory() {
+            const container = document.getElementById('clientSendHistoryContainer');
+            if (!budgetData.historialCliente || Object.keys(budgetData.historialCliente).length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            
+            let html = '<div class="client-send-history-title">📤 Historial de envíos:</div>';
+            
+            // WhatsApp
+            if (budgetData.historialCliente.whatsapp && budgetData.historialCliente.whatsapp.length > 0) {
+                const ultimo = budgetData.historialCliente.whatsapp[budgetData.historialCliente.whatsapp.length - 1];
+                html += `<div class="client-send-history-item">✓ Presupuesto copiado para WhatsApp el ${ultimo.fecha}</div>`;
+            }
+            
+            // Email copiado
+            if (budgetData.historialCliente.email_copiado && budgetData.historialCliente.email_copiado.length > 0) {
+                const ultimo = budgetData.historialCliente.email_copiado[budgetData.historialCliente.email_copiado.length - 1];
+                html += `<div class="client-send-history-item">✓ Presupuesto copiado para Email el ${ultimo.fecha}</div>`;
+            }
+            
+            // Email enviado
+            if (budgetData.historialCliente.email && budgetData.historialCliente.email.length > 0) {
+                const ultimo = budgetData.historialCliente.email[budgetData.historialCliente.email.length - 1];
+                html += `<div class="client-send-history-item">✓ Presupuesto enviado por Email el ${ultimo.fecha} a ${ultimo.destinatario}</div>`;
+            }
+            
+            container.innerHTML = html;
+            container.classList.remove('hidden');
         }
         
         // Función para actualizar estado del presupuesto
@@ -4130,6 +4317,14 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 const data = await response.json();
                 
                 if (data.success) {
+                    // Actualizar historial local
+                    if (data.fechaEnvio) {
+                        if (!budgetData.historialCliente) budgetData.historialCliente = {};
+                        if (!budgetData.historialCliente.email) budgetData.historialCliente.email = [];
+                        budgetData.historialCliente.email.push({ fecha: data.fechaEnvio, destinatario: email });
+                        renderClientSendHistory();
+                    }
+                    
                     hideStatus();
                     completedSteps.add(5);
                     updateProgressSteps();
