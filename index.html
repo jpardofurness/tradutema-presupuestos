@@ -154,6 +154,8 @@
         .btn-mini-breakdown:hover { background: #e67e22; }
         .btn-preview { text-decoration: none; font-size: 1rem; margin-right: 6px; opacity: 0.7; transition: opacity 0.2s; }
         .btn-preview:hover { opacity: 1; }
+        .btn-preview-local { background: none; border: none; font-size: 1rem; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; padding: 0; margin-right: 6px; vertical-align: middle; }
+        .btn-preview-local:hover { opacity: 1; }
         
         /* TARIFF EDITOR */
         .tariff-editor { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.1); border-radius: var(--radius-sm); }
@@ -1060,8 +1062,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.2.11';
-        const HTML_DATE = '15/01/2026 10:30';
+        const HTML_VERSION = '3.2.12';
+        const HTML_DATE = '16/01/2026 10:00';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2634,10 +2636,16 @@
                 totalSize += f.size;
                 const sizeClass = f.size > 2 * 1024 * 1024 ? 'file-size-large' : ''; // >2MB
                 
+                // Icono de previsualización (solo para PDF e imágenes)
+                const canPreview = f.type === 'application/pdf' || f.type.startsWith('image/');
+                const previewBtn = canPreview 
+                    ? `<button class="btn-preview-local" onclick="previewLocalFile(${i})" title="Ver archivo">👁️</button>`
+                    : '';
+                
                 html += `
                     <div class="file-item">
                         <div class="file-item-info">
-                            <span class="file-item-name">${f.name}</span>
+                            <span class="file-item-name">${previewBtn} ${f.name}</span>
                             <span class="file-item-size ${sizeClass}">${formatFileSize(f.size)}</span>
                         </div>
                         <div class="file-item-actions">
@@ -2656,6 +2664,24 @@
         function removeFile(index) {
             uploadedFiles.splice(index, 1);
             renderFiles();
+        }
+
+        function previewLocalFile(index) {
+            const file = uploadedFiles[index];
+            if (!file || !file.content) return;
+            
+            // Convertir base64 a blob
+            const byteCharacters = atob(file.content);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: file.type });
+            
+            // Crear URL y abrir en nueva pestaña
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
         }
 
         function formatFileSize(bytes) {
