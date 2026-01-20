@@ -396,8 +396,85 @@
         .budget-item-status.pendiente { background: rgba(243,156,18,0.15); color: #d68910; }
         .budget-item-status.tasacion { background: rgba(52,152,219,0.15); color: #2980b9; }
         .budget-item-status.enviado { background: rgba(46,204,113,0.15); color: #1e8449; }
+        .budget-item-status.pedido { background: rgba(155,89,182,0.15); color: #7d3c98; }
         .budget-item-details { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; color: var(--text-secondary); }
         .budget-item-detail { display: flex; align-items: center; gap: 4px; }
+        .budget-item-actions { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+        .budget-action-btn { padding: 6px 10px; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-card); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; }
+        .budget-action-btn:hover { background: var(--bg-secondary); border-color: var(--tradutema-blue); }
+        .budget-action-btn.danger:hover { background: rgba(231,76,60,0.1); border-color: #e74c3c; color: #c0392b; }
+        .budget-action-btn.success:hover { background: rgba(46,204,113,0.1); border-color: #2ecc71; color: #27ae60; }
+        .order-input-inline { width: 100px; padding: 4px 8px; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-left: 4px; }
+        
+        /* Analysis styles */
+        .analysis-section { margin-bottom: 24px; padding: 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
+        .analysis-title { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .analysis-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+        .analysis-stat-card { padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-md); text-align: center; }
+        .analysis-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--tradutema-blue); }
+        .analysis-stat-value.good { color: #27ae60; }
+        .analysis-stat-value.warning { color: #f39c12; }
+        .analysis-stat-value.bad { color: #e74c3c; }
+        .analysis-stat-label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
+        .analysis-table-container { overflow-x: auto; }
+        .analysis-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .analysis-table th, .analysis-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .analysis-table th { background: var(--bg-secondary); font-weight: 600; color: var(--text-primary); }
+        .analysis-table tr:hover { background: rgba(52,152,219,0.05); }
+        .analysis-table .good { color: #27ae60; font-weight: 600; }
+        .analysis-table .warning { color: #f39c12; font-weight: 600; }
+        .analysis-table .bad { color: #e74c3c; font-weight: 600; }
+        .suggestions-list { display: flex; flex-direction: column; gap: 12px; }
+        .suggestion-item { padding: 14px 16px; border-radius: var(--radius-md); display: flex; align-items: flex-start; gap: 12px; }
+        .suggestion-item.positive { background: rgba(46,204,113,0.1); border-left: 4px solid #27ae60; }
+        .suggestion-item.warning { background: rgba(243,156,18,0.1); border-left: 4px solid #f39c12; }
+        .suggestion-item.negative { background: rgba(231,76,60,0.1); border-left: 4px solid #e74c3c; }
+        .suggestion-item.info { background: rgba(52,152,219,0.1); border-left: 4px solid #3498db; }
+        .suggestion-icon { font-size: 1.2rem; }
+        .suggestion-text { flex: 1; }
+        .suggestion-title { font-weight: 600; margin-bottom: 4px; }
+        .suggestion-desc { font-size: 0.85rem; color: var(--text-secondary); }
+        .conversion-bar { width: 60px; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 8px; }
+        .conversion-bar-fill { height: 100%; border-radius: 4px; }
+        
+        /* Monthly chart */
+        .monthly-chart { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding: 10px 0; border-bottom: 2px solid var(--border-color); }
+        .monthly-bar { flex: 1; min-width: 30px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .monthly-bar-container { width: 100%; display: flex; flex-direction: column; align-items: center; height: 100px; justify-content: flex-end; }
+        .monthly-bar-fill { width: 80%; border-radius: 4px 4px 0 0; transition: height 0.3s; position: relative; }
+        .monthly-bar-fill:hover::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; }
+        .monthly-bar-label { font-size: 0.65rem; color: var(--text-secondary); text-align: center; }
+        .monthly-bar-value { font-size: 0.7rem; font-weight: 600; color: var(--text-primary); }
+        
+        /* Before/After comparison */
+        .before-after-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; }
+        .before-after-card { padding: 20px; border-radius: var(--radius-md); text-align: center; }
+        .before-after-card.before { background: rgba(231,76,60,0.1); border: 2px solid rgba(231,76,60,0.3); }
+        .before-after-card.after { background: rgba(46,204,113,0.1); border: 2px solid rgba(46,204,113,0.3); }
+        .before-after-card .period-label { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px; }
+        .before-after-card .period-value { font-size: 2rem; font-weight: 700; }
+        .before-after-card.before .period-value { color: #c0392b; }
+        .before-after-card.after .period-value { color: #27ae60; }
+        .before-after-card .period-detail { font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px; }
+        .before-after-arrow { font-size: 2rem; color: var(--text-secondary); }
+        .before-after-change { text-align: center; padding: 12px; margin-top: 16px; border-radius: var(--radius-md); font-weight: 600; }
+        .before-after-change.positive { background: rgba(46,204,113,0.15); color: #27ae60; }
+        .before-after-change.negative { background: rgba(231,76,60,0.15); color: #c0392b; }
+        .before-after-change.neutral { background: rgba(149,165,166,0.15); color: #7f8c8d; }
+        
+        /* Strategy changes list */
+        .strategy-changes-list { display: flex; flex-direction: column; gap: 8px; }
+        .strategy-change-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 3px solid var(--tradutema-blue); }
+        .strategy-change-date { font-family: 'Space Mono', monospace; font-size: 0.8rem; color: var(--tradutema-blue); font-weight: 600; min-width: 90px; }
+        .strategy-change-note { flex: 1; font-size: 0.85rem; color: var(--text-primary); }
+        .strategy-change-delete { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; font-size: 1rem; }
+        .strategy-change-delete:hover { color: #e74c3c; }
+        .strategy-change-use { background: none; border: none; color: var(--tradutema-blue); cursor: pointer; padding: 4px; font-size: 0.75rem; text-decoration: underline; }
+        
+        /* Trend indicators */
+        .trend-up { color: #27ae60; }
+        .trend-down { color: #e74c3c; }
+        .trend-stable { color: #7f8c8d; }
         .no-budgets { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
         .back-btn { background: none; border: none; color: var(--tradutema-blue); font-family: inherit; font-size: 0.9rem; cursor: pointer; padding: 8px 0; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
         .back-btn:hover { text-decoration: underline; }
@@ -562,6 +639,13 @@
                         <div class="home-btn-desc">Ver y editar tarifas de traductores</div>
                     </div>
                 </button>
+                <button class="home-btn" onclick="showAnalysis()">
+                    <span class="home-btn-icon">📊</span>
+                    <div class="home-btn-text">
+                        <div class="home-btn-title">Análisis de Conversiones</div>
+                        <div class="home-btn-desc">Estadísticas y sugerencias de mejora</div>
+                    </div>
+                </button>
             </div>
             
             <!-- Indicador de versiones y acceso rápido -->
@@ -663,6 +747,148 @@
             </div>
         </div>
 
+        <!-- ANALYSIS SCREEN -->
+        <div class="card hidden" id="analysisScreen">
+            <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
+            
+            <div class="card-title">📊 Análisis de Conversiones</div>
+            
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                Analiza la evolución de tu tasa de conversión y detecta el impacto de cambios en tus precios.
+            </p>
+            
+            <!-- Filtros de período -->
+            <div class="analysis-filters" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-md);">
+                <div class="form-group" style="margin: 0;">
+                    <label>📅 Período de análisis</label>
+                    <select id="analysisPeriod" onchange="performAnalysis()">
+                        <option value="3">Últimos 3 meses</option>
+                        <option value="6" selected>Últimos 6 meses</option>
+                        <option value="12">Último año</option>
+                        <option value="0">Todo el histórico</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label>🎯 Fecha cambio estrategia (opcional)</label>
+                    <input type="date" id="strategyChangeDate" onchange="performAnalysis()">
+                </div>
+            </div>
+            
+            <div id="analysisLoading" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                Cargando datos...
+            </div>
+            
+            <div id="analysisContent" class="hidden">
+                <!-- Resumen general -->
+                <div class="analysis-section">
+                    <h3 class="analysis-title">📈 Resumen del Período</h3>
+                    <div class="analysis-stats-grid" id="generalStats">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+                
+                <!-- Comparador antes/después (solo si hay fecha de cambio) -->
+                <div class="analysis-section hidden" id="beforeAfterSection">
+                    <h3 class="analysis-title">⚖️ Comparación Antes / Después del Cambio</h3>
+                    <div class="before-after-grid" id="beforeAfterStats">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+                
+                <!-- Evolución mensual -->
+                <div class="analysis-section">
+                    <h3 class="analysis-title">📆 Evolución Mensual</h3>
+                    <div class="monthly-chart" id="monthlyChart">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                    <div class="analysis-table-container" style="margin-top: 16px;">
+                        <table class="analysis-table">
+                            <thead>
+                                <tr>
+                                    <th>Mes</th>
+                                    <th>Enviados</th>
+                                    <th>Pedidos</th>
+                                    <th>Conversión</th>
+                                    <th>Facturado</th>
+                                    <th>Tendencia</th>
+                                </tr>
+                            </thead>
+                            <tbody id="monthlyAnalysisBody">
+                                <!-- Se llena dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Análisis por idioma con tendencia -->
+                <div class="analysis-section">
+                    <h3 class="analysis-title">🌐 Rendimiento por Idioma</h3>
+                    <div class="analysis-table-container">
+                        <table class="analysis-table" id="langAnalysisTable">
+                            <thead>
+                                <tr>
+                                    <th>Idiomas</th>
+                                    <th>Enviados</th>
+                                    <th>Pedidos</th>
+                                    <th>Conversión</th>
+                                    <th>Importe Medio</th>
+                                    <th>Tendencia 3M</th>
+                                </tr>
+                            </thead>
+                            <tbody id="langAnalysisBody">
+                                <!-- Se llena dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Análisis por rango de precio -->
+                <div class="analysis-section">
+                    <h3 class="analysis-title">💰 Sensibilidad al Precio</h3>
+                    <div class="analysis-table-container">
+                        <table class="analysis-table" id="priceAnalysisTable">
+                            <thead>
+                                <tr>
+                                    <th>Rango de Precio</th>
+                                    <th>Enviados</th>
+                                    <th>Pedidos</th>
+                                    <th>Conversión</th>
+                                    <th>Recomendación</th>
+                                </tr>
+                            </thead>
+                            <tbody id="priceAnalysisBody">
+                                <!-- Se llena dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Registro de cambios de estrategia -->
+                <div class="analysis-section">
+                    <h3 class="analysis-title">📝 Registro de Cambios de Estrategia</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
+                        Registra cuándo cambias precios o márgenes para hacer seguimiento del impacto.
+                    </p>
+                    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                        <input type="date" id="newStrategyDate" style="flex: 0 0 150px;">
+                        <input type="text" id="newStrategyNote" placeholder="Ej: Bajé margen FR→ES de 55% a 45%" style="flex: 1;">
+                        <button class="btn-secondary" onclick="addStrategyChange()" style="white-space: nowrap;">+ Añadir</button>
+                    </div>
+                    <div id="strategyChangesList" class="strategy-changes-list">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+                
+                <!-- Sugerencias de mejora -->
+                <div class="analysis-section">
+                    <h3 class="analysis-title">💡 Sugerencias Inteligentes</h3>
+                    <div class="suggestions-list" id="suggestionsList">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- BUDGET LIST SCREEN -->
         <div class="card hidden" id="budgetListScreen">
             <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
@@ -681,6 +907,7 @@
                         <option value="0-Pendiente">0-Pendiente</option>
                         <option value="1-Tasación Solicitada">1-Tasación Solicitada</option>
                         <option value="2-Presupuesto Enviado">2-Presupuesto Enviado</option>
+                        <option value="3-Pedido Realizado">3-Pedido Realizado</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1218,8 +1445,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.5.2';
-        const HTML_DATE = '20/01/2026 15:30';
+        const HTML_VERSION = '3.5.4';
+        const HTML_DATE = '20/01/2026 17:00';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1688,6 +1915,556 @@
             document.getElementById('editProviderModal').classList.add('visible');
         }
         
+        // ====== ANÁLISIS DE CONVERSIONES ======
+        
+        // Variable para guardar cambios de estrategia
+        let strategyChanges = JSON.parse(localStorage.getItem('tradutema_strategy_changes') || '[]');
+        
+        async function showAnalysis() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('budgetListScreen').classList.add('hidden');
+            document.getElementById('quickCountScreen').classList.add('hidden');
+            document.getElementById('providersConsultScreen').classList.add('hidden');
+            document.getElementById('analysisScreen').classList.remove('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('homeBtn').style.display = 'flex';
+            
+            document.getElementById('analysisLoading').classList.remove('hidden');
+            document.getElementById('analysisContent').classList.add('hidden');
+            
+            // Cargar presupuestos si no están cargados
+            if (allBudgets.length === 0) {
+                await loadBudgets();
+            }
+            
+            // Renderizar lista de cambios de estrategia
+            renderStrategyChanges();
+            
+            // Realizar análisis
+            performAnalysis();
+        }
+        
+        function performAnalysis() {
+            const budgets = allBudgets;
+            const periodMonths = parseInt(document.getElementById('analysisPeriod').value);
+            const strategyDate = document.getElementById('strategyChangeDate').value;
+            
+            // Filtrar por período
+            const now = new Date();
+            let filteredBudgets = budgets;
+            
+            if (periodMonths > 0) {
+                const cutoffDate = new Date(now);
+                cutoffDate.setMonth(cutoffDate.getMonth() - periodMonths);
+                filteredBudgets = budgets.filter(b => new Date(b.fecha) >= cutoffDate);
+            }
+            
+            // Clasificar presupuestos
+            const sentBudgets = filteredBudgets.filter(b => {
+                const estado = b.estado || '';
+                return estado.startsWith('2-') || estado.startsWith('3-') || 
+                       estado === 'Enviado' || estado === 'Pedido';
+            });
+            
+            const orders = filteredBudgets.filter(b => {
+                const estado = b.estado || '';
+                return estado.startsWith('3-') || estado === 'Pedido';
+            });
+            
+            // ====== ESTADÍSTICAS GENERALES ======
+            const totalBudgets = filteredBudgets.length;
+            const totalSent = sentBudgets.length;
+            const totalOrders = orders.length;
+            const conversionRate = totalSent > 0 ? (totalOrders / totalSent * 100) : 0;
+            const totalRevenue = orders.reduce((sum, b) => sum + (parseFloat(b.importe) || 0), 0);
+            const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+            
+            // Calcular tendencia (comparar con período anterior)
+            let trendHtml = '';
+            if (periodMonths > 0) {
+                const prevCutoff = new Date(now);
+                prevCutoff.setMonth(prevCutoff.getMonth() - periodMonths * 2);
+                const currentCutoff = new Date(now);
+                currentCutoff.setMonth(currentCutoff.getMonth() - periodMonths);
+                
+                const prevBudgets = budgets.filter(b => {
+                    const d = new Date(b.fecha);
+                    return d >= prevCutoff && d < currentCutoff;
+                });
+                const prevSent = prevBudgets.filter(b => {
+                    const estado = b.estado || '';
+                    return estado.startsWith('2-') || estado.startsWith('3-');
+                });
+                const prevOrders = prevBudgets.filter(b => {
+                    const estado = b.estado || '';
+                    return estado.startsWith('3-');
+                });
+                const prevRate = prevSent.length > 0 ? (prevOrders.length / prevSent.length * 100) : 0;
+                
+                if (prevSent.length >= 3) {
+                    const diff = conversionRate - prevRate;
+                    if (diff > 2) {
+                        trendHtml = `<span class="trend-up">↑ +${diff.toFixed(1)}% vs período anterior</span>`;
+                    } else if (diff < -2) {
+                        trendHtml = `<span class="trend-down">↓ ${diff.toFixed(1)}% vs período anterior</span>`;
+                    } else {
+                        trendHtml = `<span class="trend-stable">→ Estable vs período anterior</span>`;
+                    }
+                }
+            }
+            
+            document.getElementById('generalStats').innerHTML = `
+                <div class="analysis-stat-card">
+                    <div class="analysis-stat-value">${totalBudgets}</div>
+                    <div class="analysis-stat-label">Total Presupuestos</div>
+                </div>
+                <div class="analysis-stat-card">
+                    <div class="analysis-stat-value">${totalSent}</div>
+                    <div class="analysis-stat-label">Enviados</div>
+                </div>
+                <div class="analysis-stat-card">
+                    <div class="analysis-stat-value">${totalOrders}</div>
+                    <div class="analysis-stat-label">Pedidos</div>
+                </div>
+                <div class="analysis-stat-card">
+                    <div class="analysis-stat-value ${conversionRate >= 30 ? 'good' : conversionRate >= 15 ? 'warning' : 'bad'}">${conversionRate.toFixed(1)}%</div>
+                    <div class="analysis-stat-label">Conversión ${trendHtml}</div>
+                </div>
+                <div class="analysis-stat-card">
+                    <div class="analysis-stat-value">${totalRevenue.toFixed(0)}€</div>
+                    <div class="analysis-stat-label">Facturación</div>
+                </div>
+                <div class="analysis-stat-card">
+                    <div class="analysis-stat-value">${avgOrderValue.toFixed(0)}€</div>
+                    <div class="analysis-stat-label">Ticket Medio</div>
+                </div>
+            `;
+            
+            // ====== COMPARACIÓN ANTES/DESPUÉS ======
+            if (strategyDate) {
+                const changeDate = new Date(strategyDate);
+                
+                const beforeBudgets = sentBudgets.filter(b => new Date(b.fecha) < changeDate);
+                const afterBudgets = sentBudgets.filter(b => new Date(b.fecha) >= changeDate);
+                
+                const beforeOrders = beforeBudgets.filter(b => b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
+                const afterOrders = afterBudgets.filter(b => b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
+                
+                const beforeRate = beforeBudgets.length > 0 ? (beforeOrders.length / beforeBudgets.length * 100) : 0;
+                const afterRate = afterBudgets.length > 0 ? (afterOrders.length / afterBudgets.length * 100) : 0;
+                const rateDiff = afterRate - beforeRate;
+                
+                const beforeRevenue = beforeOrders.reduce((sum, b) => sum + (parseFloat(b.importe) || 0), 0);
+                const afterRevenue = afterOrders.reduce((sum, b) => sum + (parseFloat(b.importe) || 0), 0);
+                
+                let changeClass = 'neutral';
+                let changeText = 'Sin cambio significativo';
+                if (rateDiff > 5) {
+                    changeClass = 'positive';
+                    changeText = `📈 ¡Mejora del ${rateDiff.toFixed(1)}%! El cambio está funcionando.`;
+                } else if (rateDiff < -5) {
+                    changeClass = 'negative';
+                    changeText = `📉 Bajada del ${Math.abs(rateDiff).toFixed(1)}%. Considera revertir el cambio.`;
+                }
+                
+                document.getElementById('beforeAfterStats').innerHTML = `
+                    <div class="before-after-card before">
+                        <div class="period-label">ANTES del ${new Date(strategyDate).toLocaleDateString('es-ES')}</div>
+                        <div class="period-value">${beforeRate.toFixed(1)}%</div>
+                        <div class="period-detail">${beforeOrders.length}/${beforeBudgets.length} pedidos • ${beforeRevenue.toFixed(0)}€</div>
+                    </div>
+                    <div class="before-after-arrow">→</div>
+                    <div class="before-after-card after">
+                        <div class="period-label">DESPUÉS del ${new Date(strategyDate).toLocaleDateString('es-ES')}</div>
+                        <div class="period-value">${afterRate.toFixed(1)}%</div>
+                        <div class="period-detail">${afterOrders.length}/${afterBudgets.length} pedidos • ${afterRevenue.toFixed(0)}€</div>
+                    </div>
+                `;
+                
+                // Añadir resumen del cambio
+                if (beforeBudgets.length >= 2 && afterBudgets.length >= 2) {
+                    document.getElementById('beforeAfterStats').innerHTML += `
+                        <div class="before-after-change ${changeClass}" style="grid-column: span 3;">
+                            ${changeText}
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('beforeAfterStats').innerHTML += `
+                        <div class="before-after-change neutral" style="grid-column: span 3;">
+                            📊 Necesitas más datos para una comparación significativa (mín. 2 presupuestos en cada período)
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('beforeAfterSection').classList.remove('hidden');
+            } else {
+                document.getElementById('beforeAfterSection').classList.add('hidden');
+            }
+            
+            // ====== EVOLUCIÓN MENSUAL ======
+            const monthlyData = {};
+            const months = periodMonths > 0 ? periodMonths : 12;
+            
+            // Inicializar meses
+            for (let i = months - 1; i >= 0; i--) {
+                const d = new Date(now);
+                d.setMonth(d.getMonth() - i);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                monthlyData[key] = { sent: 0, orders: 0, revenue: 0 };
+            }
+            
+            // Rellenar datos
+            sentBudgets.forEach(b => {
+                const d = new Date(b.fecha);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                if (monthlyData[key]) {
+                    monthlyData[key].sent++;
+                    if (b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido')) {
+                        monthlyData[key].orders++;
+                        monthlyData[key].revenue += parseFloat(b.importe) || 0;
+                    }
+                }
+            });
+            
+            // Renderizar gráfico de barras
+            let chartHtml = '';
+            let tableHtml = '';
+            const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            let prevRate = null;
+            
+            Object.entries(monthlyData).forEach(([key, data]) => {
+                const [year, month] = key.split('-');
+                const monthName = monthNames[parseInt(month) - 1];
+                const rate = data.sent > 0 ? (data.orders / data.sent * 100) : 0;
+                const barHeight = Math.max(rate, 5); // Mínimo 5% para visibilidad
+                const barColor = rate >= 30 ? '#27ae60' : rate >= 15 ? '#f39c12' : '#e74c3c';
+                
+                // Determinar si este mes está después del cambio de estrategia
+                let isAfterChange = false;
+                if (strategyDate) {
+                    const changeD = new Date(strategyDate);
+                    const monthD = new Date(parseInt(year), parseInt(month) - 1, 1);
+                    isAfterChange = monthD >= new Date(changeD.getFullYear(), changeD.getMonth(), 1);
+                }
+                
+                chartHtml += `
+                    <div class="monthly-bar">
+                        <div class="monthly-bar-container">
+                            <div class="monthly-bar-value">${rate.toFixed(0)}%</div>
+                            <div class="monthly-bar-fill" style="height: ${barHeight}%; background: ${barColor}; ${isAfterChange ? 'border: 2px solid #3498db;' : ''}" data-tooltip="${data.orders}/${data.sent} pedidos"></div>
+                        </div>
+                        <div class="monthly-bar-label">${monthName}<br>${year.slice(2)}</div>
+                    </div>
+                `;
+                
+                // Tendencia
+                let trendIcon = '';
+                if (prevRate !== null) {
+                    if (rate > prevRate + 5) trendIcon = '<span class="trend-up">↑</span>';
+                    else if (rate < prevRate - 5) trendIcon = '<span class="trend-down">↓</span>';
+                    else trendIcon = '<span class="trend-stable">→</span>';
+                }
+                prevRate = rate;
+                
+                const rateClass = rate >= 30 ? 'good' : rate >= 15 ? 'warning' : 'bad';
+                tableHtml += `
+                    <tr>
+                        <td><strong>${monthName} ${year}</strong></td>
+                        <td>${data.sent}</td>
+                        <td>${data.orders}</td>
+                        <td class="${rateClass}">${rate.toFixed(1)}%</td>
+                        <td>${data.revenue.toFixed(0)}€</td>
+                        <td>${trendIcon}</td>
+                    </tr>
+                `;
+            });
+            
+            document.getElementById('monthlyChart').innerHTML = chartHtml;
+            document.getElementById('monthlyAnalysisBody').innerHTML = tableHtml || '<tr><td colspan="6">No hay datos</td></tr>';
+            
+            // ====== ANÁLISIS POR IDIOMA CON TENDENCIA ======
+            const langStats = {};
+            const threeMonthsAgo = new Date(now);
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            
+            sentBudgets.forEach(b => {
+                const key = `${b.origen} → ${b.destino}`;
+                if (!langStats[key]) {
+                    langStats[key] = { sent: 0, orders: 0, totalImporte: 0, recentSent: 0, recentOrders: 0 };
+                }
+                langStats[key].sent++;
+                
+                const isRecent = new Date(b.fecha) >= threeMonthsAgo;
+                if (isRecent) langStats[key].recentSent++;
+                
+                if (b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido')) {
+                    langStats[key].orders++;
+                    langStats[key].totalImporte += parseFloat(b.importe) || 0;
+                    if (isRecent) langStats[key].recentOrders++;
+                }
+            });
+            
+            let langHtml = '';
+            Object.entries(langStats)
+                .sort((a, b) => b[1].sent - a[1].sent)
+                .forEach(([lang, stats]) => {
+                    const conversion = stats.sent > 0 ? (stats.orders / stats.sent * 100) : 0;
+                    const recentConversion = stats.recentSent > 0 ? (stats.recentOrders / stats.recentSent * 100) : 0;
+                    const avgImporte = stats.orders > 0 ? stats.totalImporte / stats.orders : 0;
+                    const convClass = conversion >= 30 ? 'good' : conversion >= 15 ? 'warning' : 'bad';
+                    const barColor = conversion >= 30 ? '#27ae60' : conversion >= 15 ? '#f39c12' : '#e74c3c';
+                    
+                    // Tendencia últimos 3 meses
+                    let trendHtml = '<span class="trend-stable">→ Sin datos</span>';
+                    if (stats.recentSent >= 2 && stats.sent > stats.recentSent) {
+                        const oldSent = stats.sent - stats.recentSent;
+                        const oldOrders = stats.orders - stats.recentOrders;
+                        const oldConversion = oldSent > 0 ? (oldOrders / oldSent * 100) : 0;
+                        const diff = recentConversion - oldConversion;
+                        
+                        if (diff > 5) {
+                            trendHtml = `<span class="trend-up">↑ Mejorando (+${diff.toFixed(0)}%)</span>`;
+                        } else if (diff < -5) {
+                            trendHtml = `<span class="trend-down">↓ Empeorando (${diff.toFixed(0)}%)</span>`;
+                        } else {
+                            trendHtml = `<span class="trend-stable">→ Estable</span>`;
+                        }
+                    }
+                    
+                    langHtml += `
+                        <tr>
+                            <td><strong>${lang}</strong></td>
+                            <td>${stats.sent}</td>
+                            <td>${stats.orders}</td>
+                            <td class="${convClass}">
+                                ${conversion.toFixed(1)}%
+                                <div class="conversion-bar">
+                                    <div class="conversion-bar-fill" style="width: ${Math.min(conversion, 100)}%; background: ${barColor};"></div>
+                                </div>
+                            </td>
+                            <td>${avgImporte.toFixed(0)}€</td>
+                            <td>${trendHtml}</td>
+                        </tr>
+                    `;
+                });
+            
+            document.getElementById('langAnalysisBody').innerHTML = langHtml || '<tr><td colspan="6">No hay datos suficientes</td></tr>';
+            
+            // ====== ANÁLISIS POR RANGO DE PRECIO ======
+            const priceRanges = [
+                { min: 0, max: 50, label: '0 - 50€' },
+                { min: 50, max: 100, label: '50 - 100€' },
+                { min: 100, max: 200, label: '100 - 200€' },
+                { min: 200, max: 500, label: '200 - 500€' },
+                { min: 500, max: Infinity, label: '> 500€' }
+            ];
+            
+            let priceHtml = '';
+            priceRanges.forEach(range => {
+                const inRange = sentBudgets.filter(b => {
+                    const importe = parseFloat(b.importe) || 0;
+                    return importe >= range.min && importe < range.max;
+                });
+                const ordersInRange = inRange.filter(b => b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
+                const conversion = inRange.length > 0 ? (ordersInRange.length / inRange.length * 100) : 0;
+                const convClass = conversion >= 30 ? 'good' : conversion >= 15 ? 'warning' : 'bad';
+                
+                let suggestion = '-';
+                if (inRange.length >= 3) {
+                    if (conversion < 15) {
+                        suggestion = '⚠️ Reducir margen en este rango';
+                    } else if (conversion >= 40) {
+                        suggestion = '💡 Margen para subir precios';
+                    } else {
+                        suggestion = '✓ Precio adecuado';
+                    }
+                } else {
+                    suggestion = '📊 Pocos datos';
+                }
+                
+                priceHtml += `
+                    <tr>
+                        <td><strong>${range.label}</strong></td>
+                        <td>${inRange.length}</td>
+                        <td>${ordersInRange.length}</td>
+                        <td class="${convClass}">${conversion.toFixed(1)}%</td>
+                        <td>${suggestion}</td>
+                    </tr>
+                `;
+            });
+            
+            document.getElementById('priceAnalysisBody').innerHTML = priceHtml;
+            
+            // ====== SUGERENCIAS INTELIGENTES ======
+            const suggestions = [];
+            
+            // Sugerencia por tasa general
+            if (conversionRate < 15 && totalSent >= 5) {
+                suggestions.push({
+                    type: 'warning',
+                    icon: '⚠️',
+                    title: 'Tasa de conversión baja',
+                    desc: `Solo ${conversionRate.toFixed(1)}% de conversión. Considera revisar tus márgenes o mejorar el seguimiento de presupuestos.`
+                });
+            } else if (conversionRate >= 40 && totalSent >= 5) {
+                suggestions.push({
+                    type: 'positive',
+                    icon: '💰',
+                    title: 'Alta conversión - Oportunidad de mejora',
+                    desc: `Con ${conversionRate.toFixed(1)}% de conversión, podrías aumentar márgenes sin perder muchos clientes.`
+                });
+            }
+            
+            // Sugerencias por idioma
+            Object.entries(langStats).forEach(([lang, stats]) => {
+                const conversion = stats.sent > 0 ? (stats.orders / stats.sent * 100) : 0;
+                if (conversion < 10 && stats.sent >= 4) {
+                    suggestions.push({
+                        type: 'negative',
+                        icon: '🌐',
+                        title: `${lang}: Conversión muy baja`,
+                        desc: `Solo ${conversion.toFixed(0)}% con ${stats.sent} presupuestos. Prueba a reducir el margen un 10% y mide el impacto.`
+                    });
+                } else if (conversion >= 50 && stats.sent >= 3) {
+                    suggestions.push({
+                        type: 'positive',
+                        icon: '🎯',
+                        title: `${lang}: Excelente rendimiento`,
+                        desc: `${conversion.toFixed(0)}% de conversión. Puedes experimentar subiendo precios un 5-10%.`
+                    });
+                }
+            });
+            
+            // Sugerencia si hay cambio de estrategia con resultados
+            if (strategyDate) {
+                const changeDate = new Date(strategyDate);
+                const afterBudgets = sentBudgets.filter(b => new Date(b.fecha) >= changeDate);
+                const beforeBudgets = sentBudgets.filter(b => new Date(b.fecha) < changeDate);
+                
+                if (afterBudgets.length >= 3 && beforeBudgets.length >= 3) {
+                    const beforeOrders = beforeBudgets.filter(b => b.estado && b.estado.startsWith('3-'));
+                    const afterOrders = afterBudgets.filter(b => b.estado && b.estado.startsWith('3-'));
+                    const beforeRate = beforeOrders.length / beforeBudgets.length * 100;
+                    const afterRate = afterOrders.length / afterBudgets.length * 100;
+                    const diff = afterRate - beforeRate;
+                    
+                    if (diff > 10) {
+                        suggestions.push({
+                            type: 'positive',
+                            icon: '📈',
+                            title: 'Tu cambio de estrategia funciona',
+                            desc: `Desde el ${changeDate.toLocaleDateString('es-ES')}, la conversión subió ${diff.toFixed(1)}%. ¡Mantén el rumbo!`
+                        });
+                    } else if (diff < -10) {
+                        suggestions.push({
+                            type: 'negative',
+                            icon: '📉',
+                            title: 'El cambio no está funcionando',
+                            desc: `Desde el ${changeDate.toLocaleDateString('es-ES')}, la conversión bajó ${Math.abs(diff).toFixed(1)}%. Considera revertir.`
+                        });
+                    }
+                }
+            }
+            
+            // Sugerencia de datos insuficientes
+            if (totalSent < 5) {
+                suggestions.push({
+                    type: 'info',
+                    icon: '📊',
+                    title: 'Sigue registrando presupuestos',
+                    desc: 'Con más datos obtendrás análisis más precisos. Marca como "Pedido" cuando un cliente confirme.'
+                });
+            }
+            
+            // Renderizar sugerencias
+            let suggestionsHtml = '';
+            if (suggestions.length === 0) {
+                suggestionsHtml = `
+                    <div class="suggestion-item positive">
+                        <div class="suggestion-icon">✅</div>
+                        <div class="suggestion-text">
+                            <div class="suggestion-title">Todo en orden</div>
+                            <div class="suggestion-desc">No hay alertas ni sugerencias en este momento.</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                suggestions.forEach(s => {
+                    suggestionsHtml += `
+                        <div class="suggestion-item ${s.type}">
+                            <div class="suggestion-icon">${s.icon}</div>
+                            <div class="suggestion-text">
+                                <div class="suggestion-title">${s.title}</div>
+                                <div class="suggestion-desc">${s.desc}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('suggestionsList').innerHTML = suggestionsHtml;
+            
+            // Mostrar contenido
+            document.getElementById('analysisLoading').classList.add('hidden');
+            document.getElementById('analysisContent').classList.remove('hidden');
+        }
+        
+        // ====== REGISTRO DE CAMBIOS DE ESTRATEGIA ======
+        
+        function addStrategyChange() {
+            const date = document.getElementById('newStrategyDate').value;
+            const note = document.getElementById('newStrategyNote').value.trim();
+            
+            if (!date || !note) {
+                alert('Introduce fecha y descripción del cambio');
+                return;
+            }
+            
+            strategyChanges.push({ date, note });
+            strategyChanges.sort((a, b) => new Date(b.date) - new Date(a.date));
+            localStorage.setItem('tradutema_strategy_changes', JSON.stringify(strategyChanges));
+            
+            document.getElementById('newStrategyDate').value = '';
+            document.getElementById('newStrategyNote').value = '';
+            
+            renderStrategyChanges();
+        }
+        
+        function deleteStrategyChange(index) {
+            strategyChanges.splice(index, 1);
+            localStorage.setItem('tradutema_strategy_changes', JSON.stringify(strategyChanges));
+            renderStrategyChanges();
+        }
+        
+        function useStrategyDate(date) {
+            document.getElementById('strategyChangeDate').value = date;
+            performAnalysis();
+        }
+        
+        function renderStrategyChanges() {
+            const container = document.getElementById('strategyChangesList');
+            
+            if (strategyChanges.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.85rem; padding: 10px;">No hay cambios registrados. Añade uno cuando modifiques precios o márgenes.</div>';
+                return;
+            }
+            
+            let html = '';
+            strategyChanges.forEach((change, index) => {
+                const dateStr = new Date(change.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                html += `
+                    <div class="strategy-change-item">
+                        <span class="strategy-change-date">${dateStr}</span>
+                        <span class="strategy-change-note">${change.note}</span>
+                        <button class="strategy-change-use" onclick="useStrategyDate('${change.date}')" title="Usar esta fecha para comparar">Comparar</button>
+                        <button class="strategy-change-delete" onclick="deleteStrategyChange(${index})" title="Eliminar">×</button>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
         function handleQuickFiles(files) {
             let loadedCount = 0;
             const totalFiles = files.length;
@@ -2058,7 +2835,8 @@
                 const estado = b.estado || '';
                 const statusClass = estado.startsWith('0-') || estado === 'Pendiente' ? 'pendiente' : 
                                    estado.startsWith('1-') || estado === 'Tasación enviada' ? 'tasacion' : 
-                                   estado.startsWith('2-') || estado === 'Enviado' ? 'enviado' : 'pendiente';
+                                   estado.startsWith('2-') || estado === 'Enviado' ? 'enviado' : 
+                                   estado.startsWith('3-') || estado === 'Pedido' ? 'pedido' : 'pendiente';
                 const fecha = new Date(b.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
                 const canal = b.canal === 'W' ? '📱 WhatsApp' : b.canal === 'M' ? '📧 Mail' : '📝 Form';
                 
@@ -2069,6 +2847,12 @@
                 }
                 if (b.whatsappCliente) {
                     contactoHtml += `<span class="budget-item-detail">📞 ${b.whatsappCliente}</span>`;
+                }
+                
+                // Mostrar nº pedido si existe
+                let pedidoHtml = '';
+                if (b.numPedido) {
+                    pedidoHtml = `<span class="budget-item-detail" style="color: #7d3c98; font-weight: 600;">🛒 Pedido: ${b.numPedido}</span>`;
                 }
                 
                 // Mostrar traductores contactados y elegido
@@ -2094,6 +2878,17 @@
                     notasHtml = `<div class="budget-item-notes" title="${fullText.replace(/"/g, '&quot;')}">📝 ${truncated}</div>`;
                 }
                 
+                // Botones de acciones rápidas
+                const folderUrl = b.folderUrl || '';
+                const isPedido = estado.startsWith('3-') || estado === 'Pedido';
+                const actionsHtml = `
+                    <div class="budget-item-actions" onclick="event.stopPropagation()">
+                        ${folderUrl ? `<button class="budget-action-btn" onclick="window.open('${folderUrl}', '_blank')" title="Abrir carpeta">📁 Carpeta</button>` : ''}
+                        ${!isPedido ? `<button class="budget-action-btn success" onclick="showMarkAsOrderModal('${b.id}')" title="Marcar como pedido realizado">✅ Pedido</button>` : ''}
+                        <button class="budget-action-btn danger" onclick="confirmDeleteBudget('${b.id}')" title="Borrar tasación">🗑️</button>
+                    </div>
+                `;
+                
                 html += `
                     <div class="budget-item" onclick="loadBudget('${b.id}')">
                         <div class="budget-item-header">
@@ -2106,14 +2901,85 @@
                             <span class="budget-item-detail">🌐 ${b.origen} → ${b.destino}</span>
                             ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} ${parseInt(b.palabras) === 1 ? 'palabra' : 'palabras'}</span>` : ''}
                             ${contactoHtml}
+                            ${pedidoHtml}
                         </div>
                         ${notasHtml}
                         ${traductoresHtml}
+                        ${actionsHtml}
                     </div>
                 `;
             });
             
             container.innerHTML = html;
+        }
+
+        // ====== ACCIONES RÁPIDAS ======
+        
+        // Mostrar modal para marcar como pedido
+        function showMarkAsOrderModal(budgetId) {
+            const orderNum = prompt('Introduce el número de pedido:');
+            if (orderNum !== null && orderNum.trim()) {
+                markAsOrder(budgetId, orderNum.trim());
+            }
+        }
+        
+        // Marcar presupuesto como pedido realizado
+        async function markAsOrder(budgetId, orderNumber) {
+            showStatus('Actualizando estado...', 'loading');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'markAsOrder',
+                        budgetId: budgetId,
+                        orderNumber: orderNumber
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('✓ Marcado como pedido: ' + orderNumber, 'success');
+                    // Actualizar lista
+                    await loadBudgets();
+                    setTimeout(hideStatus, 2000);
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error de conexión', 'error');
+            }
+        }
+        
+        // Confirmar y borrar presupuesto
+        async function confirmDeleteBudget(budgetId) {
+            if (!confirm(`¿Seguro que quieres borrar el presupuesto ${budgetId}?\n\nEsta acción no se puede deshacer.`)) {
+                return;
+            }
+            
+            showStatus('Borrando presupuesto...', 'loading');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'deleteBudget',
+                        budgetId: budgetId
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('✓ Presupuesto borrado', 'success');
+                    // Actualizar lista
+                    await loadBudgets();
+                    setTimeout(hideStatus, 2000);
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error de conexión', 'error');
+            }
         }
 
         async function loadBudget(budgetId) {
@@ -4012,12 +4878,12 @@
             
             document.getElementById('suggestedMarginDisplay').textContent = suggestedMargin.toFixed(2) + ' €';
             document.getElementById('suggestedMarginPercent').textContent = `(${suggestedMarginPercent}%)`;
-            document.getElementById('suggestedPriceDisplay').textContent = suggestedClientWithVAT.toFixed(2) + ' €';
+            document.getElementById('suggestedPriceDisplay').textContent = Math.round(suggestedClientWithVAT) + ' €';
             
             // Pre-rellenar tarifa sugerida si está vacío
             const quoteInput = document.getElementById('quoteAmountWords');
             if (!quoteInput.value) {
-                quoteInput.value = suggestedClientWithVAT.toFixed(2);
+                quoteInput.value = Math.round(suggestedClientWithVAT);
             }
             
             // Actualizar visualización del margen actual
