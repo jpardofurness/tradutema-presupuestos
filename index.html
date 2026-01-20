@@ -1044,19 +1044,11 @@
                     <span>💰 Cálculo por palabras + margen</span>
                 </div>
                 
-                <!-- Selector de traductor -->
+                <!-- Tarifa por palabra según idiomas (de hoja Tarifas) -->
                 <div class="margin-calc-row">
-                    <span class="margin-label">Traductor:</span>
-                    <select id="providerSelector" onchange="onProviderSelectorChange()">
-                        <option value="">-- Seleccionar traductor --</option>
-                    </select>
-                </div>
-                
-                <!-- Datos del cálculo -->
-                <div class="margin-calc-row">
-                    <span class="margin-label">Tarifa traductor:</span>
-                    <span class="margin-value" id="providerRateDisplay">-</span>
-                    <span class="margin-hint">(€/palabra, sin IVA)</span>
+                    <span class="margin-label">Tarifa referencia:</span>
+                    <span class="margin-value" id="referenceRateDisplay">-</span>
+                    <span class="margin-hint" id="referenceRateHint">(€/palabra, de hoja Tarifas)</span>
                 </div>
                 
                 <div class="margin-calc-row">
@@ -1226,8 +1218,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.5.1';
-        const HTML_DATE = '20/01/2026 14:30';
+        const HTML_VERSION = '3.5.2';
+        const HTML_DATE = '20/01/2026 15:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1470,7 +1462,6 @@
             const quoteUrgency = document.getElementById('quoteUrgency');
             const clientMessagePreview = document.getElementById('clientMessagePreview');
             const quoteWordCount = document.getElementById('quoteWordCount');
-            const providerSelector = document.getElementById('providerSelector');
             
             // Reset form fields
             if (sourceLang) sourceLang.value = '';
@@ -1501,7 +1492,6 @@
             if (quoteAmountPages) quoteAmountPages.value = '';
             if (quoteAmountWords) quoteAmountWords.value = '';
             if (quoteWordCount) quoteWordCount.value = '0';
-            if (providerSelector) providerSelector.value = '';
             if (quoteDays) quoteDays.value = '';
             if (quoteUrgency) quoteUrgency.value = '';
             if (clientMessagePreview) clientMessagePreview.innerHTML = '';
@@ -1510,7 +1500,6 @@
             const calcMethodPages = document.querySelector('input[name="calcMethod"][value="pages"]');
             if (calcMethodPages) calcMethodPages.checked = true;
             currentCalcMethod = 'pages';
-            selectedProviderId = null;
             
             // Reset comentarios de proveedor (paso 4)
             const providerComments = document.getElementById('providerComments');
@@ -3912,10 +3901,8 @@
             // Actualizar UI
             renderContactedProviders();
             
-            // Actualizar selector de proveedor si está visible
-            const select = document.getElementById('providerSelector');
-            if (select && currentCalcMethod === 'words') {
-                populateProviderSelector();
+            // Recalcular si estamos en método por palabras
+            if (currentCalcMethod === 'words') {
                 recalculateFromWords();
             }
             
@@ -3939,7 +3926,6 @@
         // ====== CÁLCULO DE MARGEN ======
         const IVA_RATE = 0.21;
         let currentCalcMethod = 'pages'; // 'pages' o 'words'
-        let selectedProviderId = null;
         
         // Cambiar método de cálculo
         function onCalcMethodChange() {
@@ -3955,88 +3941,17 @@
             } else {
                 pagesBox.classList.add('hidden');
                 wordsBox.classList.remove('hidden');
-                populateProviderSelector();
+                // Pre-rellenar palabras si hay análisis
+                if (budgetData.wordCount > 0) {
+                    document.getElementById('quoteWordCount').value = budgetData.wordCount;
+                }
                 recalculateFromWords();
             }
             
             updateClientMessage();
         }
         
-        // Poblar selector de traductores
-        function populateProviderSelector() {
-            const select = document.getElementById('providerSelector');
-            const sourceLang = budgetData.sourceLang;
-            const targetLang = budgetData.targetLang;
-            
-            // Filtrar proveedores por combinación de idiomas
-            const filteredProviders = allProviders.filter(p => 
-                p.idiomaOrigen === sourceLang && p.idiomaDestino === targetLang
-            );
-            
-            let html = '<option value="">-- Seleccionar traductor --</option>';
-            filteredProviders.forEach((p, idx) => {
-                const tarifaInfo = p.tarifaPalabra ? ` (${p.tarifaPalabra} €/pal)` : '';
-                html += `<option value="${idx}" data-tarifa="${p.tarifaPalabra || ''}">${p.nombre}${tarifaInfo}</option>`;
-            });
-            
-            select.innerHTML = html;
-            
-            // Si hay un proveedor elegido previamente, seleccionarlo
-            if (budgetData.chosenProvider) {
-                const idx = filteredProviders.findIndex(p => p.nombre === budgetData.chosenProvider);
-                if (idx >= 0) {
-                    select.value = idx;
-                    onProviderSelectorChange();
-                }
-            }
-        }
         
-        // Cuando se selecciona un proveedor en el dropdown
-        function onProviderSelectorChange() {
-            const select = document.getElementById('providerSelector');
-            const idx = parseInt(select.value);
-            
-            if (isNaN(idx) || idx < 0) {
-                selectedProviderId = null;
-                document.getElementById('providerRateDisplay').textContent = '-';
-                recalculateFromWords();
-                return;
-            }
-            
-            const sourceLang = budgetData.sourceLang;
-            const targetLang = budgetData.targetLang;
-            const filteredProviders = allProviders.filter(p => 
-                p.idiomaOrigen === sourceLang && p.idiomaDestino === targetLang
-            );
-            
-            const provider = filteredProviders[idx];
-            if (provider) {
-                selectedProviderId = idx;
-                budgetData.chosenProvider = provider.nombre;
-                
-                // Mostrar tarifa por palabra
-                const tarifa = parseFloat(provider.tarifaPalabra) || 0;
-                document.getElementById('providerRateDisplay').textContent = tarifa > 0 ? tarifa.toFixed(4) + ' €' : '-';
-                
-                recalculateFromWords();
-            }
-        }
-        
-        // Obtener tarifa por palabra del proveedor seleccionado
-        function getSelectedProviderRate() {
-            if (selectedProviderId === null) return 0;
-            
-            const sourceLang = budgetData.sourceLang;
-            const targetLang = budgetData.targetLang;
-            const filteredProviders = allProviders.filter(p => 
-                p.idiomaOrigen === sourceLang && p.idiomaDestino === targetLang
-            );
-            
-            const provider = filteredProviders[selectedProviderId];
-            if (!provider) return 0;
-            
-            return parseFloat(provider.tarifaPalabra) || 0;
-        }
         
         // Calcular margen sugerido según tramos de la hoja Excel
         function calculateSuggestedMargin(providerCost) {
@@ -4058,7 +3973,20 @@
         // Recalcular desde palabras
         function recalculateFromWords() {
             const wordCount = parseInt(document.getElementById('quoteWordCount').value) || 0;
-            const rate = getSelectedProviderRate();
+            // Usar tarifa de la hoja Tarifas según combinación de idiomas
+            const rate = budgetData.tariffPerWord || 0;
+            
+            // Mostrar tarifa de referencia
+            const rateDisplay = document.getElementById('referenceRateDisplay');
+            if (rate > 0) {
+                rateDisplay.textContent = rate.toFixed(3) + ' €';
+                document.getElementById('referenceRateHint').textContent = 
+                    `(${budgetData.sourceLang} → ${budgetData.targetLang})`;
+            } else {
+                rateDisplay.textContent = 'No definida';
+                document.getElementById('referenceRateHint').textContent = 
+                    '(Añadir en hoja Tarifas)';
+            }
             
             // Coste proveedor = tarifa × palabras
             const providerCost = rate * wordCount;
@@ -4098,7 +4026,7 @@
         
         // Actualizar visualización cuando cambia la tarifa
         function onWordsAmountChange() {
-            const rate = getSelectedProviderRate();
+            const rate = budgetData.tariffPerWord || 0;
             const wordCount = parseInt(document.getElementById('quoteWordCount').value) || 0;
             const providerCost = rate * wordCount;
             const suggestedMargin = calculateSuggestedMargin(providerCost);
@@ -4247,9 +4175,6 @@
             if (quoteAmountPages && !budgetData.savedAmount) {
                 quoteAmountPages.value = priceByPages.toFixed(2);
             }
-            
-            // Poblar selector de traductores
-            populateProviderSelector();
             
             // Determinar método de cálculo por defecto
             // Si hay proveedor contactado con cotización, usar "words"
