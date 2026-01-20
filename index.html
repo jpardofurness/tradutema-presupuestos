@@ -446,7 +446,19 @@
         .margin-status.optimal { background: rgba(39, 174, 96, 0.1); color: #27ae60; }
         .margin-status.low { background: rgba(241, 196, 15, 0.15); color: #d4a106; }
         .margin-status.high { background: rgba(231, 76, 60, 0.1); color: #c0392b; }
-        @media (max-width: 600px) { .margin-label { min-width: 100%; } .margin-calc-row input { width: 100%; } }
+        .margin-hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
+        .calc-method-selector { background: #f8f9fa; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; }
+        .calc-method-title { font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
+        .calc-method-options { display: flex; gap: 16px; flex-wrap: wrap; }
+        .calc-method-option { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border-radius: var(--radius-sm); transition: background 0.2s; }
+        .calc-method-option:hover { background: rgba(52, 152, 219, 0.1); }
+        .calc-method-option input[type="radio"] { width: 18px; height: 18px; accent-color: var(--primary-blue); }
+        .calc-method-label { font-size: 0.95rem; }
+        .tariff-calc-result-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-color); }
+        .tariff-calc-result-row span { font-weight: 500; }
+        .tariff-calc-result-row input { font-size: 1.1rem; text-align: right; }
+        #providerSelector { flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.95rem; max-width: 300px; }
+        @media (max-width: 600px) { .margin-label { min-width: 100%; } .margin-calc-row input { width: 100%; } .calc-method-options { flex-direction: column; gap: 8px; } }
         .quote-row .form-group { flex: 1; }
         
         /* LINK TO FOLDER */
@@ -992,8 +1004,23 @@
                 <button onclick="setMessageLang('en')">English</button>
             </div>
             
-            <!-- Cálculo de tarifa por páginas -->
-            <div class="tariff-calc-box" id="step5TariffCalc">
+            <!-- Selector de método de cálculo -->
+            <div class="calc-method-selector">
+                <div class="calc-method-title">Método de cálculo de tarifa:</div>
+                <div class="calc-method-options">
+                    <label class="calc-method-option">
+                        <input type="radio" name="calcMethod" value="pages" checked onchange="onCalcMethodChange()">
+                        <span class="calc-method-label">📄 Por páginas (tarifa web)</span>
+                    </label>
+                    <label class="calc-method-option">
+                        <input type="radio" name="calcMethod" value="words" onchange="onCalcMethodChange()">
+                        <span class="calc-method-label">💰 Por palabras + margen</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- OPCIÓN 1: Cálculo por páginas (tarifa web) -->
+            <div class="tariff-calc-box" id="step5TariffCalcPages">
                 <div class="tariff-calc-header">
                     <span>📄 Cálculo por páginas (<span id="step5LangPair">-</span>)</span>
                 </div>
@@ -1005,18 +1032,45 @@
                 <div class="tariff-calc-detail" id="step5TariffDetail">
                     <!-- Se rellena con JS -->
                 </div>
+                <div class="tariff-calc-result-row">
+                    <span>Tarifa cliente (IVA inc.):</span>
+                    <input type="number" id="quoteAmountPages" step="0.01" min="0" onchange="onPagesAmountChange()" style="width: 120px; font-weight: 600;">
+                </div>
             </div>
             
-            <!-- Cálculo de margen (solo visible si hay proveedor con tarifa) -->
-            <div class="margin-calc-box hidden" id="marginCalcBox">
+            <!-- OPCIÓN 2: Cálculo por palabras + margen -->
+            <div class="margin-calc-box hidden" id="step5TariffCalcWords">
                 <div class="margin-calc-header">
-                    <span>💰 Cálculo de margen</span>
+                    <span>💰 Cálculo por palabras + margen</span>
+                </div>
+                
+                <!-- Selector de traductor -->
+                <div class="margin-calc-row">
+                    <span class="margin-label">Traductor:</span>
+                    <select id="providerSelector" onchange="onProviderSelectorChange()">
+                        <option value="">-- Seleccionar traductor --</option>
+                    </select>
+                </div>
+                
+                <!-- Datos del cálculo -->
+                <div class="margin-calc-row">
+                    <span class="margin-label">Tarifa traductor:</span>
+                    <span class="margin-value" id="providerRateDisplay">-</span>
+                    <span class="margin-hint">(€/palabra, sin IVA)</span>
+                </div>
+                
+                <div class="margin-calc-row">
+                    <span class="margin-label">Nº palabras:</span>
+                    <input type="number" id="quoteWordCount" min="0" value="0" onchange="recalculateFromWords()" style="width: 100px;">
+                    <span class="margin-hint" id="wordCountHint">(del análisis o manual)</span>
                 </div>
                 
                 <div class="margin-calc-row">
                     <span class="margin-label">Coste proveedor (sin IVA):</span>
                     <span class="margin-value" id="providerCostDisplay">-</span>
                 </div>
+                
+                <div class="margin-divider"></div>
                 
                 <div class="margin-calc-row">
                     <span class="margin-label">Margen sugerido:</span>
@@ -1033,7 +1087,7 @@
                 
                 <div class="margin-calc-row input-row">
                     <span class="margin-label">Tu tarifa (IVA inc.):</span>
-                    <input type="number" id="quoteAmount" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onAmountChange()">
+                    <input type="number" id="quoteAmountWords" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onWordsAmountChange()">
                 </div>
                 
                 <div class="margin-calc-row">
@@ -1056,37 +1110,16 @@
                 </div>
                 
                 <div class="margin-status" id="marginStatus">
-                    <!-- Se rellena con JS: ✓ Margen óptimo / ⚠ Margen bajo / etc. -->
+                    <!-- Se rellena con JS -->
                 </div>
             </div>
             
-            <!-- Campos de importe y plazo (cuando NO hay proveedor) -->
-            <div class="quote-row" id="simpleAmountRow">
-                <div class="form-group">
-                    <label>Importe (€, IVA incluido)</label>
-                    <input type="number" id="quoteAmountSimple" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onSimpleAmountChange()">
-                </div>
-                <div class="form-group">
-                    <label>Plazo (días laborables)</label>
-                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
-                </div>
-            </div>
-            
-            <!-- Plazo (cuando hay proveedor - el importe está arriba) -->
-            <div class="quote-row hidden" id="providerDaysRow">
-                <div class="form-group" style="flex: 1;">
-                    <label>Plazo (días laborables)</label>
-                    <input type="number" id="quoteDaysProvider" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
-                </div>
-            </div>
-                </div>
-                <div class="form-group">
-                    <label>Plazo (días laborables)</label>
-                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
-                </div>
-            </div>
-            
+            <!-- Plazo común para ambos métodos -->
             <div class="quote-row">
+                <div class="form-group">
+                    <label>Plazo (días laborables)</label>
+                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
+                </div>
                 <div class="form-group">
                     <label>Recargo urgencia (€, opcional)</label>
                     <input type="number" id="quoteUrgency" step="0.01" min="0" placeholder="" onchange="updateClientMessage()">
@@ -1193,8 +1226,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.5.0';
-        const HTML_DATE = '20/01/2026 13:00';
+        const HTML_VERSION = '3.5.1';
+        const HTML_DATE = '20/01/2026 14:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1431,10 +1464,13 @@
             const contactedSection = document.getElementById('contactedProvidersSection');
             
             // Reset paso 5 fields
-            const quoteAmount = document.getElementById('quoteAmount');
+            const quoteAmountPages = document.getElementById('quoteAmountPages');
+            const quoteAmountWords = document.getElementById('quoteAmountWords');
             const quoteDays = document.getElementById('quoteDays');
             const quoteUrgency = document.getElementById('quoteUrgency');
             const clientMessagePreview = document.getElementById('clientMessagePreview');
+            const quoteWordCount = document.getElementById('quoteWordCount');
+            const providerSelector = document.getElementById('providerSelector');
             
             // Reset form fields
             if (sourceLang) sourceLang.value = '';
@@ -1462,10 +1498,19 @@
             if (wordCountResults) wordCountResults.classList.add('hidden');
             
             // Reset paso 5 fields
-            if (quoteAmount) quoteAmount.value = '';
+            if (quoteAmountPages) quoteAmountPages.value = '';
+            if (quoteAmountWords) quoteAmountWords.value = '';
+            if (quoteWordCount) quoteWordCount.value = '0';
+            if (providerSelector) providerSelector.value = '';
             if (quoteDays) quoteDays.value = '';
             if (quoteUrgency) quoteUrgency.value = '';
             if (clientMessagePreview) clientMessagePreview.innerHTML = '';
+            
+            // Reset método de cálculo a "páginas"
+            const calcMethodPages = document.querySelector('input[name="calcMethod"][value="pages"]');
+            if (calcMethodPages) calcMethodPages.checked = true;
+            currentCalcMethod = 'pages';
+            selectedProviderId = null;
             
             // Reset comentarios de proveedor (paso 4)
             const providerComments = document.getElementById('providerComments');
@@ -2194,7 +2239,8 @@
                     // Restaurar campos del paso 5 (Cliente) - solo si tienen valor
                     const clientEmail = document.getElementById('clientEmail');
                     const clientWhatsApp = document.getElementById('clientWhatsApp');
-                    const quoteAmount = document.getElementById('quoteAmount');
+                    const quoteAmountPages = document.getElementById('quoteAmountPages');
+                    const quoteAmountWords = document.getElementById('quoteAmountWords');
                     const quoteDays = document.getElementById('quoteDays');
                     
                     if (clientEmail && budgetData.clientEmail) {
@@ -2203,8 +2249,10 @@
                     if (clientWhatsApp && budgetData.clientWhatsApp) {
                         clientWhatsApp.value = budgetData.clientWhatsApp;
                     }
-                    if (quoteAmount && budgetData.savedAmount) {
-                        quoteAmount.value = budgetData.savedAmount;
+                    // Restaurar importe en ambos campos
+                    if (budgetData.savedAmount) {
+                        if (quoteAmountPages) quoteAmountPages.value = budgetData.savedAmount;
+                        if (quoteAmountWords) quoteAmountWords.value = budgetData.savedAmount;
                     }
                     if (quoteDays && budgetData.savedQuoteDays) {
                         quoteDays.value = budgetData.savedQuoteDays;
@@ -3828,7 +3876,9 @@
             
             // Si es el proveedor elegido y cambió la tarifa, actualizar margen
             if (field === 'tarifa' && budgetData.chosenProvider === providerName) {
-                updateMarginCalc();
+                if (currentCalcMethod === 'words') {
+                    recalculateFromWords();
+                }
             }
             
             // Guardar automáticamente (con debounce implícito por el onchange)
@@ -3862,8 +3912,12 @@
             // Actualizar UI
             renderContactedProviders();
             
-            // Actualizar cálculo de margen
-            updateMarginCalc();
+            // Actualizar selector de proveedor si está visible
+            const select = document.getElementById('providerSelector');
+            if (select && currentCalcMethod === 'words') {
+                populateProviderSelector();
+                recalculateFromWords();
+            }
             
             // Guardar en backend
             try {
@@ -3884,17 +3938,104 @@
         
         // ====== CÁLCULO DE MARGEN ======
         const IVA_RATE = 0.21;
+        let currentCalcMethod = 'pages'; // 'pages' o 'words'
+        let selectedProviderId = null;
         
-        function getChosenProviderCost() {
-            if (!budgetData.chosenProvider || !budgetData.providerQuotes) return 0;
-            const quote = budgetData.providerQuotes[budgetData.chosenProvider];
-            if (!quote || !quote.tarifa) return 0;
-            // Extraer número de la tarifa (puede ser "270", "270€", "0.08€/pal", etc.)
-            const match = quote.tarifa.match(/[\d.,]+/);
-            if (match) {
-                return parseFloat(match[0].replace(',', '.')) || 0;
+        // Cambiar método de cálculo
+        function onCalcMethodChange() {
+            const method = document.querySelector('input[name="calcMethod"]:checked').value;
+            currentCalcMethod = method;
+            
+            const pagesBox = document.getElementById('step5TariffCalcPages');
+            const wordsBox = document.getElementById('step5TariffCalcWords');
+            
+            if (method === 'pages') {
+                pagesBox.classList.remove('hidden');
+                wordsBox.classList.add('hidden');
+            } else {
+                pagesBox.classList.add('hidden');
+                wordsBox.classList.remove('hidden');
+                populateProviderSelector();
+                recalculateFromWords();
             }
-            return 0;
+            
+            updateClientMessage();
+        }
+        
+        // Poblar selector de traductores
+        function populateProviderSelector() {
+            const select = document.getElementById('providerSelector');
+            const sourceLang = budgetData.sourceLang;
+            const targetLang = budgetData.targetLang;
+            
+            // Filtrar proveedores por combinación de idiomas
+            const filteredProviders = allProviders.filter(p => 
+                p.idiomaOrigen === sourceLang && p.idiomaDestino === targetLang
+            );
+            
+            let html = '<option value="">-- Seleccionar traductor --</option>';
+            filteredProviders.forEach((p, idx) => {
+                const tarifaInfo = p.tarifaPalabra ? ` (${p.tarifaPalabra} €/pal)` : '';
+                html += `<option value="${idx}" data-tarifa="${p.tarifaPalabra || ''}">${p.nombre}${tarifaInfo}</option>`;
+            });
+            
+            select.innerHTML = html;
+            
+            // Si hay un proveedor elegido previamente, seleccionarlo
+            if (budgetData.chosenProvider) {
+                const idx = filteredProviders.findIndex(p => p.nombre === budgetData.chosenProvider);
+                if (idx >= 0) {
+                    select.value = idx;
+                    onProviderSelectorChange();
+                }
+            }
+        }
+        
+        // Cuando se selecciona un proveedor en el dropdown
+        function onProviderSelectorChange() {
+            const select = document.getElementById('providerSelector');
+            const idx = parseInt(select.value);
+            
+            if (isNaN(idx) || idx < 0) {
+                selectedProviderId = null;
+                document.getElementById('providerRateDisplay').textContent = '-';
+                recalculateFromWords();
+                return;
+            }
+            
+            const sourceLang = budgetData.sourceLang;
+            const targetLang = budgetData.targetLang;
+            const filteredProviders = allProviders.filter(p => 
+                p.idiomaOrigen === sourceLang && p.idiomaDestino === targetLang
+            );
+            
+            const provider = filteredProviders[idx];
+            if (provider) {
+                selectedProviderId = idx;
+                budgetData.chosenProvider = provider.nombre;
+                
+                // Mostrar tarifa por palabra
+                const tarifa = parseFloat(provider.tarifaPalabra) || 0;
+                document.getElementById('providerRateDisplay').textContent = tarifa > 0 ? tarifa.toFixed(4) + ' €' : '-';
+                
+                recalculateFromWords();
+            }
+        }
+        
+        // Obtener tarifa por palabra del proveedor seleccionado
+        function getSelectedProviderRate() {
+            if (selectedProviderId === null) return 0;
+            
+            const sourceLang = budgetData.sourceLang;
+            const targetLang = budgetData.targetLang;
+            const filteredProviders = allProviders.filter(p => 
+                p.idiomaOrigen === sourceLang && p.idiomaDestino === targetLang
+            );
+            
+            const provider = filteredProviders[selectedProviderId];
+            if (!provider) return 0;
+            
+            return parseFloat(provider.tarifaPalabra) || 0;
         }
         
         // Calcular margen sugerido según tramos de la hoja Excel
@@ -3902,7 +4043,7 @@
             if (providerCost <= 0) return 0;
             
             // Buscar el tramo correspondiente
-            let porcentaje = marginParams.tramos[marginParams.tramos.length - 1].porcentaje; // Por defecto el último
+            let porcentaje = marginParams.tramos[marginParams.tramos.length - 1].porcentaje;
             for (const tramo of marginParams.tramos) {
                 if (providerCost <= tramo.hasta) {
                     porcentaje = tramo.porcentaje;
@@ -3910,75 +4051,87 @@
                 }
             }
             
-            // Calcular margen
             const margenCalculado = providerCost * (porcentaje / 100);
-            
-            // Aplicar mínimo
             return Math.max(margenCalculado, marginParams.margenMinimo);
         }
         
-        // Actualizar toda la UI de margen
-        function updateMarginCalc() {
-            const providerCost = getChosenProviderCost();
-            const marginBox = document.getElementById('marginCalcBox');
-            const simpleAmountRow = document.getElementById('simpleAmountRow');
-            const providerDaysRow = document.getElementById('providerDaysRow');
+        // Recalcular desde palabras
+        function recalculateFromWords() {
+            const wordCount = parseInt(document.getElementById('quoteWordCount').value) || 0;
+            const rate = getSelectedProviderRate();
             
-            // Si no hay proveedor con tarifa, ocultar caja de margen
+            // Coste proveedor = tarifa × palabras
+            const providerCost = rate * wordCount;
+            document.getElementById('providerCostDisplay').textContent = providerCost > 0 ? providerCost.toFixed(2) + ' €' : '-';
+            
             if (providerCost <= 0) {
-                marginBox.classList.add('hidden');
-                simpleAmountRow.classList.remove('hidden');
-                providerDaysRow.classList.add('hidden');
+                document.getElementById('suggestedMarginDisplay').textContent = '-';
+                document.getElementById('suggestedMarginPercent').textContent = '(-)';
+                document.getElementById('suggestedPriceDisplay').textContent = '-';
+                document.getElementById('actualMarginDisplay').textContent = '-';
+                document.getElementById('marginDeviationPercent').textContent = '-';
+                document.getElementById('marginDeviationPercent').className = 'margin-deviation';
+                document.getElementById('marginStatus').textContent = '';
+                document.getElementById('marginStatus').className = 'margin-status';
                 return;
             }
             
-            // Mostrar caja de margen, ocultar campos simples
-            marginBox.classList.remove('hidden');
-            simpleAmountRow.classList.add('hidden');
-            providerDaysRow.classList.remove('hidden');
-            
-            // Calcular margen sugerido
+            // Margen sugerido
             const suggestedMargin = calculateSuggestedMargin(providerCost);
             const suggestedClientWithoutVAT = providerCost + suggestedMargin;
             const suggestedClientWithVAT = suggestedClientWithoutVAT * (1 + IVA_RATE);
-            
-            // Calcular porcentaje del margen sugerido
             const suggestedMarginPercent = (suggestedMargin / providerCost * 100).toFixed(0);
             
-            // Obtener importe actual del cliente
-            const clientAmount = parseFloat(document.getElementById('quoteAmount').value) || 0;
-            const clientWithoutVAT = clientAmount / (1 + IVA_RATE);
-            const actualMargin = clientWithoutVAT - providerCost;
-            
-            // Calcular desviación respecto al sugerido
-            const deviationPercent = suggestedMargin > 0 ? ((actualMargin - suggestedMargin) / suggestedMargin * 100) : 0;
-            
-            // Actualizar displays
-            document.getElementById('providerCostDisplay').textContent = providerCost.toFixed(2) + ' €';
             document.getElementById('suggestedMarginDisplay').textContent = suggestedMargin.toFixed(2) + ' €';
             document.getElementById('suggestedMarginPercent').textContent = `(${suggestedMarginPercent}%)`;
             document.getElementById('suggestedPriceDisplay').textContent = suggestedClientWithVAT.toFixed(2) + ' €';
+            
+            // Pre-rellenar tarifa sugerida si está vacío
+            const quoteInput = document.getElementById('quoteAmountWords');
+            if (!quoteInput.value) {
+                quoteInput.value = suggestedClientWithVAT.toFixed(2);
+            }
+            
+            // Actualizar visualización del margen actual
+            updateMarginVisualization(providerCost, suggestedMargin);
+        }
+        
+        // Actualizar visualización cuando cambia la tarifa
+        function onWordsAmountChange() {
+            const rate = getSelectedProviderRate();
+            const wordCount = parseInt(document.getElementById('quoteWordCount').value) || 0;
+            const providerCost = rate * wordCount;
+            const suggestedMargin = calculateSuggestedMargin(providerCost);
+            
+            updateMarginVisualization(providerCost, suggestedMargin);
+            updateClientMessage();
+        }
+        
+        // Actualizar barra y estado de margen
+        function updateMarginVisualization(providerCost, suggestedMargin) {
+            const clientAmount = parseFloat(document.getElementById('quoteAmountWords').value) || 0;
+            const clientWithoutVAT = clientAmount / (1 + IVA_RATE);
+            const actualMargin = clientWithoutVAT - providerCost;
+            
             document.getElementById('actualMarginDisplay').textContent = actualMargin.toFixed(2) + ' €';
             
-            // Actualizar desviación con color
-            const deviationSpan = document.getElementById('marginDeviationPercent');
+            // Desviación
+            const deviationPercent = suggestedMargin > 0 ? ((actualMargin - suggestedMargin) / suggestedMargin * 100) : 0;
             const sign = deviationPercent >= 0 ? '+' : '';
+            const deviationSpan = document.getElementById('marginDeviationPercent');
             deviationSpan.textContent = `${sign}${deviationPercent.toFixed(0)}%`;
             
-            // Determinar clase de color
+            // Color según desviación
             let deviationClass = 'optimal';
             if (deviationPercent < -10) deviationClass = 'low';
             else if (deviationPercent > 30) deviationClass = 'high';
-            else if (deviationPercent < 0 || deviationPercent > 15) deviationClass = 'optimal'; // Amarillo suave
-            
             deviationSpan.className = 'margin-deviation ' + deviationClass;
             
-            // Actualizar barra visual
-            // La barra va de -30% a +30%, con 50% siendo el punto central (sugerido)
+            // Barra visual
             const barPosition = Math.max(0, Math.min(100, 50 + (deviationPercent / 30 * 50)));
             document.getElementById('marginBarFill').style.left = barPosition + '%';
             
-            // Actualizar mensaje de estado
+            // Mensaje de estado
             const statusDiv = document.getElementById('marginStatus');
             if (deviationPercent < -20) {
                 statusDiv.textContent = '⚠️ Margen muy bajo - considera subir el precio';
@@ -3998,41 +4151,23 @@
             }
         }
         
-        function onAmountChange() {
-            updateMarginCalc();
-            syncAmountFields();
+        // Cuando cambia la tarifa por páginas
+        function onPagesAmountChange() {
             updateClientMessage();
         }
         
-        function onSimpleAmountChange() {
-            // Sincronizar el valor al campo principal
-            const simpleValue = document.getElementById('quoteAmountSimple').value;
-            document.getElementById('quoteAmount').value = simpleValue;
-            updateClientMessage();
-        }
-        
-        function syncAmountFields() {
-            // Sincronizar ambos campos de importe
-            const mainValue = document.getElementById('quoteAmount').value;
-            document.getElementById('quoteAmountSimple').value = mainValue;
-        }
-        
-        // Obtener el valor de importe desde cualquiera de los campos
+        // Obtener el importe según el método activo
         function getQuoteAmount() {
-            const providerCost = getChosenProviderCost();
-            if (providerCost > 0) {
-                return document.getElementById('quoteAmount').value;
+            if (currentCalcMethod === 'pages') {
+                return document.getElementById('quoteAmountPages').value || '';
+            } else {
+                return document.getElementById('quoteAmountWords').value || '';
             }
-            return document.getElementById('quoteAmountSimple').value;
         }
         
         // Obtener plazo
         function getQuoteDays() {
-            const providerCost = getChosenProviderCost();
-            if (providerCost > 0) {
-                return document.getElementById('quoteDaysProvider').value;
-            }
-            return document.getElementById('quoteDays').value;
+            return document.getElementById('quoteDays').value || '';
         }
 
         // ====== CLIENT MESSAGE ======
@@ -4066,8 +4201,8 @@
         // ====== CÁLCULO DE TARIFA EN PASO 5 ======
         function initStep5TariffCalc() {
             const quotePagesCount = document.getElementById('quotePagesCount');
-            const quoteAmount = document.getElementById('quoteAmount');
-            const quoteAmountSimple = document.getElementById('quoteAmountSimple');
+            const quoteAmountPages = document.getElementById('quoteAmountPages');
+            const quoteWordCount = document.getElementById('quoteWordCount');
             const langPairSpan = document.getElementById('step5LangPair');
             const detailDiv = document.getElementById('step5TariffDetail');
             
@@ -4080,6 +4215,17 @@
             const pages = budgetData.pageCount || 1;
             if (quotePagesCount) {
                 quotePagesCount.value = pages;
+            }
+            
+            // Pre-rellenar número de palabras (del análisis si existe)
+            const words = budgetData.wordCount || 0;
+            if (quoteWordCount) {
+                quoteWordCount.value = words;
+                if (words > 0) {
+                    document.getElementById('wordCountHint').textContent = '(del análisis)';
+                } else {
+                    document.getElementById('wordCountHint').textContent = '(introducir manualmente)';
+                }
             }
             
             // Obtener tarifas por página
@@ -4097,42 +4243,32 @@
                 `;
             }
             
-            // Obtener coste del proveedor (si hay)
-            const providerCost = getChosenProviderCost();
-            
-            // Determinar qué tarifa pre-rellenar
-            let defaultAmount = priceByPages;
-            
-            if (providerCost > 0) {
-                // Si hay proveedor, calcular tarifa sugerida con margen
-                const suggestedMargin = calculateSuggestedMargin(providerCost);
-                const suggestedClientWithoutVAT = providerCost + suggestedMargin;
-                const suggestedClientWithVAT = suggestedClientWithoutVAT * (1 + IVA_RATE);
-                defaultAmount = suggestedClientWithVAT;
+            // Pre-rellenar tarifa por páginas
+            if (quoteAmountPages && !budgetData.savedAmount) {
+                quoteAmountPages.value = priceByPages.toFixed(2);
             }
             
-            // Pre-rellenar importe (solo si no hay valor guardado)
-            if (!budgetData.savedAmount) {
-                if (quoteAmount && !quoteAmount.value) {
-                    quoteAmount.value = defaultAmount.toFixed(2);
-                }
-                if (quoteAmountSimple && !quoteAmountSimple.value) {
-                    quoteAmountSimple.value = defaultAmount.toFixed(2);
-                }
-                console.log('Importe pre-rellenado:', defaultAmount.toFixed(2), '€');
+            // Poblar selector de traductores
+            populateProviderSelector();
+            
+            // Determinar método de cálculo por defecto
+            // Si hay proveedor contactado con cotización, usar "words"
+            // Si no, usar "pages"
+            if (budgetData.chosenProvider || (budgetData.contactedProviders && budgetData.contactedProviders.length > 0)) {
+                document.querySelector('input[name="calcMethod"][value="words"]').checked = true;
+                currentCalcMethod = 'words';
+            } else {
+                document.querySelector('input[name="calcMethod"][value="pages"]').checked = true;
+                currentCalcMethod = 'pages';
             }
             
-            // Sincronizar campos
-            syncAmountFields();
-            
-            // Actualizar cálculo de margen (esto también muestra/oculta la caja)
-            updateMarginCalc();
+            // Actualizar UI según método
+            onCalcMethodChange();
         }
         
         function recalculateQuoteFromPages() {
             const quotePagesCount = document.getElementById('quotePagesCount');
-            const quoteAmount = document.getElementById('quoteAmount');
-            const quoteAmountSimple = document.getElementById('quoteAmountSimple');
+            const quoteAmountPages = document.getElementById('quoteAmountPages');
             const detailDiv = document.getElementById('step5TariffDetail');
             
             const pages = parseInt(quotePagesCount.value) || 1;
@@ -4150,19 +4286,13 @@
                 `;
             }
             
-            // Solo actualizar importe si NO hay proveedor con tarifa
-            // (si hay proveedor, el usuario usa la caja de margen)
-            const providerCost = getChosenProviderCost();
-            if (providerCost <= 0) {
-                if (quoteAmount) quoteAmount.value = priceByPages.toFixed(2);
-                if (quoteAmountSimple) quoteAmountSimple.value = priceByPages.toFixed(2);
+            // Actualizar campo de tarifa por páginas
+            if (quoteAmountPages) {
+                quoteAmountPages.value = priceByPages.toFixed(2);
             }
             
             // Guardar páginas editadas
             budgetData.quotePagesCount = pages;
-            
-            // Actualizar margen
-            updateMarginCalc();
             
             // Actualizar mensaje
             updateClientMessage();
@@ -4339,8 +4469,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         function validateClientFields() {
-            const amount = document.getElementById('quoteAmount').value;
-            const days = document.getElementById('quoteDays').value;
+            const amount = getQuoteAmount();
+            const days = getQuoteDays();
             
             if (!amount) {
                 showStatus('Introduce el importe del presupuesto', 'warning');
@@ -4379,9 +4509,9 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const emailRaw = document.getElementById('clientEmail').value.trim();
             const email = extractEmail(emailRaw);
             const whatsapp = document.getElementById('clientWhatsApp').value.trim();
-            const amount = document.getElementById('quoteAmount').value;
+            const amount = getQuoteAmount();
             const clientMessage = document.getElementById('clientMessageEdit').value;
-            const quoteDays = document.getElementById('quoteDays').value;
+            const quoteDaysValue = getQuoteDays();
             
             if (!budgetData.id) return;
             
@@ -4395,10 +4525,10 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         clientWhatsApp: whatsapp,
                         amount: amount,
                         clientMessage: clientMessage,
-                        quoteDays: quoteDays
+                        quoteDays: quoteDaysValue
                     })
                 });
-                console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDays);
+                console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue);
             } catch (error) {
                 console.log('Error guardando datos cliente:', error);
             }
@@ -4595,7 +4725,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 showStatus('Enviando presupuesto al cliente...', 'loading');
                 
                 const customMessage = document.getElementById('clientMessageEdit').value;
-                const quoteDays = document.getElementById('quoteDays').value;
+                const quoteDaysValue = getQuoteDays();
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -4604,11 +4734,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         clientEmail: email,
                         clientWhatsApp: whatsapp,
                         budgetId: budgetData.id,
-                        amount: document.getElementById('quoteAmount').value,
+                        amount: getQuoteAmount(),
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
-                        customMessage: customMessage,  // Mensaje editado por el usuario
-                        quoteDays: quoteDays  // Plazo en días
+                        customMessage: customMessage,
+                        quoteDays: quoteDaysValue
                     })
                 });
                 
