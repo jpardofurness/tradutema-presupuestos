@@ -422,6 +422,31 @@
         .tariff-calc-hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
         .tariff-calc-detail { font-size: 0.85rem; color: var(--text-secondary); padding: 8px 0; border-top: 1px dashed var(--border-color); margin-top: 8px; }
         .tariff-calc-result { font-weight: 600; color: var(--primary-blue); font-size: 1rem; }
+        .margin-calc-box { background: rgba(39, 174, 96, 0.08); border: 1px solid rgba(39, 174, 96, 0.3); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 16px; }
+        .margin-calc-header { font-weight: 600; color: #27ae60; margin-bottom: 12px; font-size: 1rem; }
+        .margin-calc-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+        .margin-calc-row.suggested-row { background: rgba(39, 174, 96, 0.1); padding: 8px 10px; border-radius: var(--radius-sm); margin: 8px 0; }
+        .margin-calc-row.input-row { margin-top: 12px; }
+        .margin-label { font-size: 0.85rem; color: var(--text-secondary); min-width: 180px; }
+        .margin-value { font-weight: 600; color: var(--text-primary); }
+        .margin-value.suggested { color: #27ae60; font-size: 1.1rem; }
+        .margin-percent { font-size: 0.8rem; color: var(--text-secondary); }
+        .margin-deviation { font-size: 0.85rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+        .margin-deviation.optimal { background: rgba(39, 174, 96, 0.15); color: #27ae60; }
+        .margin-deviation.low { background: rgba(241, 196, 15, 0.2); color: #d4a106; }
+        .margin-deviation.high { background: rgba(231, 76, 60, 0.15); color: #c0392b; }
+        .margin-divider { height: 1px; background: rgba(39, 174, 96, 0.2); margin: 12px 0; }
+        .margin-calc-row input { width: 120px; padding: 8px 10px; border: 2px solid #27ae60; border-radius: var(--radius-sm); font-size: 1rem; font-weight: 600; text-align: right; }
+        .margin-bar-container { margin: 16px 0 8px; }
+        .margin-bar-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .margin-bar { position: relative; height: 12px; background: linear-gradient(to right, #e74c3c 0%, #f1c40f 25%, #27ae60 40%, #27ae60 60%, #f1c40f 75%, #e74c3c 100%); border-radius: 6px; }
+        .margin-bar-fill { position: absolute; width: 8px; height: 20px; background: var(--text-primary); border-radius: 4px; top: -4px; transform: translateX(-50%); transition: left 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .margin-bar-center { position: absolute; left: 50%; width: 2px; height: 16px; background: white; top: -2px; transform: translateX(-50%); }
+        .margin-status { text-align: center; font-size: 0.85rem; font-weight: 500; padding: 6px; border-radius: var(--radius-sm); margin-top: 8px; }
+        .margin-status.optimal { background: rgba(39, 174, 96, 0.1); color: #27ae60; }
+        .margin-status.low { background: rgba(241, 196, 15, 0.15); color: #d4a106; }
+        .margin-status.high { background: rgba(231, 76, 60, 0.1); color: #c0392b; }
+        @media (max-width: 600px) { .margin-label { min-width: 100%; } .margin-calc-row input { width: 100%; } }
         .quote-row .form-group { flex: 1; }
         
         /* LINK TO FOLDER */
@@ -982,10 +1007,78 @@
                 </div>
             </div>
             
-            <div class="quote-row">
+            <!-- Cálculo de margen (solo visible si hay proveedor con tarifa) -->
+            <div class="margin-calc-box hidden" id="marginCalcBox">
+                <div class="margin-calc-header">
+                    <span>💰 Cálculo de margen</span>
+                </div>
+                
+                <div class="margin-calc-row">
+                    <span class="margin-label">Coste proveedor (sin IVA):</span>
+                    <span class="margin-value" id="providerCostDisplay">-</span>
+                </div>
+                
+                <div class="margin-calc-row">
+                    <span class="margin-label">Margen sugerido:</span>
+                    <span class="margin-value" id="suggestedMarginDisplay">-</span>
+                    <span class="margin-percent" id="suggestedMarginPercent">(-)</span>
+                </div>
+                
+                <div class="margin-calc-row suggested-row">
+                    <span class="margin-label">→ Tarifa sugerida (IVA inc.):</span>
+                    <span class="margin-value suggested" id="suggestedPriceDisplay">-</span>
+                </div>
+                
+                <div class="margin-divider"></div>
+                
+                <div class="margin-calc-row input-row">
+                    <span class="margin-label">Tu tarifa (IVA inc.):</span>
+                    <input type="number" id="quoteAmount" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onAmountChange()">
+                </div>
+                
+                <div class="margin-calc-row">
+                    <span class="margin-label">Tu margen:</span>
+                    <span class="margin-value" id="actualMarginDisplay">-</span>
+                    <span class="margin-deviation" id="marginDeviationPercent">-</span>
+                </div>
+                
+                <!-- Barra visual de desviación -->
+                <div class="margin-bar-container">
+                    <div class="margin-bar-labels">
+                        <span>-30%</span>
+                        <span>Sugerido</span>
+                        <span>+30%</span>
+                    </div>
+                    <div class="margin-bar">
+                        <div class="margin-bar-fill" id="marginBarFill"></div>
+                        <div class="margin-bar-center"></div>
+                    </div>
+                </div>
+                
+                <div class="margin-status" id="marginStatus">
+                    <!-- Se rellena con JS: ✓ Margen óptimo / ⚠ Margen bajo / etc. -->
+                </div>
+            </div>
+            
+            <!-- Campos de importe y plazo (cuando NO hay proveedor) -->
+            <div class="quote-row" id="simpleAmountRow">
                 <div class="form-group">
                     <label>Importe (€, IVA incluido)</label>
-                    <input type="number" id="quoteAmount" step="0.01" min="0" placeholder="Ej: 85.00" onchange="updateClientMessage()">
+                    <input type="number" id="quoteAmountSimple" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onSimpleAmountChange()">
+                </div>
+                <div class="form-group">
+                    <label>Plazo (días laborables)</label>
+                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
+                </div>
+            </div>
+            
+            <!-- Plazo (cuando hay proveedor - el importe está arriba) -->
+            <div class="quote-row hidden" id="providerDaysRow">
+                <div class="form-group" style="flex: 1;">
+                    <label>Plazo (días laborables)</label>
+                    <input type="number" id="quoteDaysProvider" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
+                </div>
+            </div>
                 </div>
                 <div class="form-group">
                     <label>Plazo (días laborables)</label>
@@ -1100,8 +1193,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.4.0';
-        const HTML_DATE = '16/01/2026 13:00';
+        const HTML_VERSION = '3.5.0';
+        const HTML_DATE = '20/01/2026 13:00';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1110,6 +1203,16 @@
         let apiDate = '';
         let allProviders = [];
         let allTariffs = [];
+        let marginParams = {
+            margenMinimo: 20,
+            tramos: [
+                { hasta: 50, porcentaje: 75 },
+                { hasta: 100, porcentaje: 55 },
+                { hasta: 200, porcentaje: 45 },
+                { hasta: 400, porcentaje: 35 },
+                { hasta: Infinity, porcentaje: 27 }
+            ]
+        };
         let allBudgets = [];
         let filteredBudgets = [];
         let filteredProviders = [];
@@ -2160,6 +2263,7 @@
                 if (data.success) {
                     allProviders = data.providers || [];
                     allTariffs = data.tariffs || [];
+                    if (data.marginParams) marginParams = data.marginParams;
                     apiVersion = data.version || '?';
                     apiDate = data.versionDate || '';
                     
@@ -3722,6 +3826,11 @@
             budgetData.providerQuotes[providerName][field] = value;
             console.log('Cotización actualizada:', providerName, field, value);
             
+            // Si es el proveedor elegido y cambió la tarifa, actualizar margen
+            if (field === 'tarifa' && budgetData.chosenProvider === providerName) {
+                updateMarginCalc();
+            }
+            
             // Guardar automáticamente (con debounce implícito por el onchange)
             saveProviderQuotes();
         }
@@ -3753,6 +3862,9 @@
             // Actualizar UI
             renderContactedProviders();
             
+            // Actualizar cálculo de margen
+            updateMarginCalc();
+            
             // Guardar en backend
             try {
                 await fetch(apiUrl, {
@@ -3768,6 +3880,159 @@
             } catch (error) {
                 console.log('Error guardando traductor elegido:', error);
             }
+        }
+        
+        // ====== CÁLCULO DE MARGEN ======
+        const IVA_RATE = 0.21;
+        
+        function getChosenProviderCost() {
+            if (!budgetData.chosenProvider || !budgetData.providerQuotes) return 0;
+            const quote = budgetData.providerQuotes[budgetData.chosenProvider];
+            if (!quote || !quote.tarifa) return 0;
+            // Extraer número de la tarifa (puede ser "270", "270€", "0.08€/pal", etc.)
+            const match = quote.tarifa.match(/[\d.,]+/);
+            if (match) {
+                return parseFloat(match[0].replace(',', '.')) || 0;
+            }
+            return 0;
+        }
+        
+        // Calcular margen sugerido según tramos de la hoja Excel
+        function calculateSuggestedMargin(providerCost) {
+            if (providerCost <= 0) return 0;
+            
+            // Buscar el tramo correspondiente
+            let porcentaje = marginParams.tramos[marginParams.tramos.length - 1].porcentaje; // Por defecto el último
+            for (const tramo of marginParams.tramos) {
+                if (providerCost <= tramo.hasta) {
+                    porcentaje = tramo.porcentaje;
+                    break;
+                }
+            }
+            
+            // Calcular margen
+            const margenCalculado = providerCost * (porcentaje / 100);
+            
+            // Aplicar mínimo
+            return Math.max(margenCalculado, marginParams.margenMinimo);
+        }
+        
+        // Actualizar toda la UI de margen
+        function updateMarginCalc() {
+            const providerCost = getChosenProviderCost();
+            const marginBox = document.getElementById('marginCalcBox');
+            const simpleAmountRow = document.getElementById('simpleAmountRow');
+            const providerDaysRow = document.getElementById('providerDaysRow');
+            
+            // Si no hay proveedor con tarifa, ocultar caja de margen
+            if (providerCost <= 0) {
+                marginBox.classList.add('hidden');
+                simpleAmountRow.classList.remove('hidden');
+                providerDaysRow.classList.add('hidden');
+                return;
+            }
+            
+            // Mostrar caja de margen, ocultar campos simples
+            marginBox.classList.remove('hidden');
+            simpleAmountRow.classList.add('hidden');
+            providerDaysRow.classList.remove('hidden');
+            
+            // Calcular margen sugerido
+            const suggestedMargin = calculateSuggestedMargin(providerCost);
+            const suggestedClientWithoutVAT = providerCost + suggestedMargin;
+            const suggestedClientWithVAT = suggestedClientWithoutVAT * (1 + IVA_RATE);
+            
+            // Calcular porcentaje del margen sugerido
+            const suggestedMarginPercent = (suggestedMargin / providerCost * 100).toFixed(0);
+            
+            // Obtener importe actual del cliente
+            const clientAmount = parseFloat(document.getElementById('quoteAmount').value) || 0;
+            const clientWithoutVAT = clientAmount / (1 + IVA_RATE);
+            const actualMargin = clientWithoutVAT - providerCost;
+            
+            // Calcular desviación respecto al sugerido
+            const deviationPercent = suggestedMargin > 0 ? ((actualMargin - suggestedMargin) / suggestedMargin * 100) : 0;
+            
+            // Actualizar displays
+            document.getElementById('providerCostDisplay').textContent = providerCost.toFixed(2) + ' €';
+            document.getElementById('suggestedMarginDisplay').textContent = suggestedMargin.toFixed(2) + ' €';
+            document.getElementById('suggestedMarginPercent').textContent = `(${suggestedMarginPercent}%)`;
+            document.getElementById('suggestedPriceDisplay').textContent = suggestedClientWithVAT.toFixed(2) + ' €';
+            document.getElementById('actualMarginDisplay').textContent = actualMargin.toFixed(2) + ' €';
+            
+            // Actualizar desviación con color
+            const deviationSpan = document.getElementById('marginDeviationPercent');
+            const sign = deviationPercent >= 0 ? '+' : '';
+            deviationSpan.textContent = `${sign}${deviationPercent.toFixed(0)}%`;
+            
+            // Determinar clase de color
+            let deviationClass = 'optimal';
+            if (deviationPercent < -10) deviationClass = 'low';
+            else if (deviationPercent > 30) deviationClass = 'high';
+            else if (deviationPercent < 0 || deviationPercent > 15) deviationClass = 'optimal'; // Amarillo suave
+            
+            deviationSpan.className = 'margin-deviation ' + deviationClass;
+            
+            // Actualizar barra visual
+            // La barra va de -30% a +30%, con 50% siendo el punto central (sugerido)
+            const barPosition = Math.max(0, Math.min(100, 50 + (deviationPercent / 30 * 50)));
+            document.getElementById('marginBarFill').style.left = barPosition + '%';
+            
+            // Actualizar mensaje de estado
+            const statusDiv = document.getElementById('marginStatus');
+            if (deviationPercent < -20) {
+                statusDiv.textContent = '⚠️ Margen muy bajo - considera subir el precio';
+                statusDiv.className = 'margin-status low';
+            } else if (deviationPercent < -10) {
+                statusDiv.textContent = '⚠️ Margen bajo';
+                statusDiv.className = 'margin-status low';
+            } else if (deviationPercent <= 15) {
+                statusDiv.textContent = '✓ Margen óptimo';
+                statusDiv.className = 'margin-status optimal';
+            } else if (deviationPercent <= 30) {
+                statusDiv.textContent = '↗ Margen por encima del sugerido';
+                statusDiv.className = 'margin-status optimal';
+            } else {
+                statusDiv.textContent = '⚠️ Margen muy alto - el cliente podría rechazar';
+                statusDiv.className = 'margin-status high';
+            }
+        }
+        
+        function onAmountChange() {
+            updateMarginCalc();
+            syncAmountFields();
+            updateClientMessage();
+        }
+        
+        function onSimpleAmountChange() {
+            // Sincronizar el valor al campo principal
+            const simpleValue = document.getElementById('quoteAmountSimple').value;
+            document.getElementById('quoteAmount').value = simpleValue;
+            updateClientMessage();
+        }
+        
+        function syncAmountFields() {
+            // Sincronizar ambos campos de importe
+            const mainValue = document.getElementById('quoteAmount').value;
+            document.getElementById('quoteAmountSimple').value = mainValue;
+        }
+        
+        // Obtener el valor de importe desde cualquiera de los campos
+        function getQuoteAmount() {
+            const providerCost = getChosenProviderCost();
+            if (providerCost > 0) {
+                return document.getElementById('quoteAmount').value;
+            }
+            return document.getElementById('quoteAmountSimple').value;
+        }
+        
+        // Obtener plazo
+        function getQuoteDays() {
+            const providerCost = getChosenProviderCost();
+            if (providerCost > 0) {
+                return document.getElementById('quoteDaysProvider').value;
+            }
+            return document.getElementById('quoteDays').value;
         }
 
         // ====== CLIENT MESSAGE ======
@@ -3802,6 +4067,7 @@
         function initStep5TariffCalc() {
             const quotePagesCount = document.getElementById('quotePagesCount');
             const quoteAmount = document.getElementById('quoteAmount');
+            const quoteAmountSimple = document.getElementById('quoteAmountSimple');
             const langPairSpan = document.getElementById('step5LangPair');
             const detailDiv = document.getElementById('step5TariffDetail');
             
@@ -3816,14 +4082,14 @@
                 quotePagesCount.value = pages;
             }
             
-            // Obtener tarifas
+            // Obtener tarifas por página
             const page1 = budgetData.tariffPage1 || 0;
             const page2 = budgetData.tariffPage2 || 0;
             
-            // Calcular precio
+            // Calcular precio por páginas (tarifa web)
             const priceByPages = page1 + Math.max(0, pages - 1) * page2;
             
-            // Mostrar detalle del cálculo
+            // Mostrar detalle del cálculo por páginas
             if (detailDiv) {
                 detailDiv.innerHTML = `
                     Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pages - 1)} págs resto) = 
@@ -3831,23 +4097,49 @@
                 `;
             }
             
-            // Pre-rellenar importe (solo si no hay valor guardado)
-            if (quoteAmount && !quoteAmount.value && !budgetData.savedAmount) {
-                quoteAmount.value = priceByPages.toFixed(2);
-                console.log('Importe pre-rellenado:', priceByPages, '€ (', pages, 'páginas)');
+            // Obtener coste del proveedor (si hay)
+            const providerCost = getChosenProviderCost();
+            
+            // Determinar qué tarifa pre-rellenar
+            let defaultAmount = priceByPages;
+            
+            if (providerCost > 0) {
+                // Si hay proveedor, calcular tarifa sugerida con margen
+                const suggestedMargin = calculateSuggestedMargin(providerCost);
+                const suggestedClientWithoutVAT = providerCost + suggestedMargin;
+                const suggestedClientWithVAT = suggestedClientWithoutVAT * (1 + IVA_RATE);
+                defaultAmount = suggestedClientWithVAT;
             }
+            
+            // Pre-rellenar importe (solo si no hay valor guardado)
+            if (!budgetData.savedAmount) {
+                if (quoteAmount && !quoteAmount.value) {
+                    quoteAmount.value = defaultAmount.toFixed(2);
+                }
+                if (quoteAmountSimple && !quoteAmountSimple.value) {
+                    quoteAmountSimple.value = defaultAmount.toFixed(2);
+                }
+                console.log('Importe pre-rellenado:', defaultAmount.toFixed(2), '€');
+            }
+            
+            // Sincronizar campos
+            syncAmountFields();
+            
+            // Actualizar cálculo de margen (esto también muestra/oculta la caja)
+            updateMarginCalc();
         }
         
         function recalculateQuoteFromPages() {
             const quotePagesCount = document.getElementById('quotePagesCount');
             const quoteAmount = document.getElementById('quoteAmount');
+            const quoteAmountSimple = document.getElementById('quoteAmountSimple');
             const detailDiv = document.getElementById('step5TariffDetail');
             
             const pages = parseInt(quotePagesCount.value) || 1;
             const page1 = budgetData.tariffPage1 || 0;
             const page2 = budgetData.tariffPage2 || 0;
             
-            // Calcular nuevo precio
+            // Calcular nuevo precio por páginas
             const priceByPages = page1 + Math.max(0, pages - 1) * page2;
             
             // Actualizar detalle del cálculo
@@ -3858,13 +4150,19 @@
                 `;
             }
             
-            // Actualizar importe
-            if (quoteAmount) {
-                quoteAmount.value = priceByPages.toFixed(2);
+            // Solo actualizar importe si NO hay proveedor con tarifa
+            // (si hay proveedor, el usuario usa la caja de margen)
+            const providerCost = getChosenProviderCost();
+            if (providerCost <= 0) {
+                if (quoteAmount) quoteAmount.value = priceByPages.toFixed(2);
+                if (quoteAmountSimple) quoteAmountSimple.value = priceByPages.toFixed(2);
             }
             
             // Guardar páginas editadas
             budgetData.quotePagesCount = pages;
+            
+            // Actualizar margen
+            updateMarginCalc();
             
             // Actualizar mensaje
             updateClientMessage();
@@ -3874,8 +4172,8 @@
             // Si el usuario ya editó el mensaje, no sobrescribir
             if (clientMessageEdited) return;
             
-            const amount = document.getElementById('quoteAmount').value || 'XXX';
-            const days = document.getElementById('quoteDays').value || 'X';
+            const amount = getQuoteAmount() || 'XXX';
+            const days = getQuoteDays() || 'X';
             const urgency = document.getElementById('quoteUrgency').value || '';
             const refId = budgetData.id || 'REFERENCIA';
             const srcLang = budgetData.sourceLang || 'origen';
