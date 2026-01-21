@@ -119,6 +119,7 @@
         .send-history-item.latest { color: #27ae60; font-weight: 500; }
         .send-history-icon { font-size: 0.85rem; }
         .send-history-date { font-family: 'Space Mono', monospace; min-width: 140px; }
+        .send-history-label { font-weight: 500; min-width: 110px; }
         .send-history-email { color: var(--text-secondary); font-size: 0.7rem; }
         .client-send-history { margin-top: 12px; padding: 12px; background: rgba(39, 174, 96, 0.08); border-radius: var(--radius-md); border: 1px solid rgba(39, 174, 96, 0.2); }
         .client-send-history-item { font-size: 0.85rem; color: #27ae60; margin-bottom: 6px; }
@@ -261,6 +262,7 @@
         .budget-item-notes { margin-top: 10px; padding: 8px 10px; background: rgba(230, 126, 34, 0.08); border-left: 3px solid #e67e22; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.8rem; color: #a04000; font-style: italic; cursor: help; }
         .provider-tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; background: rgba(52,152,219,0.1); color: var(--tradutema-blue); font-weight: 500; }
         .provider-tag.chosen { background: var(--accent-green); color: white; }
+        .provider-send-info { font-size: 0.7rem; color: #27ae60; margin-left: 2px; cursor: help; }
         
         /* DEADLINE */
         .deadline-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -495,6 +497,8 @@
         .lang-toggle button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
         .lang-toggle button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
         .lang-toggle button.active { background: var(--tradutema-blue); color: white; border-color: var(--tradutema-blue); }
+        .lang-toggle .btn-regenerate { margin-left: 12px; border-radius: var(--radius-sm); background: #f8f9fa; color: var(--text-secondary); font-size: 0.75rem; }
+        .lang-toggle .btn-regenerate:hover { background: #e9ecef; color: var(--text-primary); }
         
         /* QUOTE FORM */
         .quote-row { display: flex; gap: 12px; }
@@ -1107,7 +1111,7 @@
             
             <!-- Botón para análisis profundo de palabras -->
             <button class="btn btn-primary btn-orange action-btn" id="countWordsBtn" onclick="countWords()">
-                🔢 Analizar Páginas y Palabras
+                🔢 Analizar Palabras
             </button>
             
             <div class="btn-row" style="margin-top: 16px;">
@@ -1236,6 +1240,7 @@
             <div class="lang-toggle">
                 <button class="active" onclick="setMessageLang('es')">Español</button>
                 <button onclick="setMessageLang('en')">English</button>
+                <button class="btn-regenerate" onclick="regenerateMessage()" title="Regenerar mensaje con valores actuales">🔄 Regenerar</button>
             </div>
             
             <!-- Selector de método de cálculo -->
@@ -1452,8 +1457,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.5.6';
-        const HTML_DATE = '21/01/2026 10:30';
+        const HTML_VERSION = '3.5.11';
+        const HTML_DATE = '21/01/2026 12:00';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2862,15 +2867,27 @@
                     pedidoHtml = `<span class="budget-item-detail" style="color: #7d3c98; font-weight: 600;">🛒 Pedido: ${b.numPedido}</span>`;
                 }
                 
-                // Mostrar traductores contactados y elegido
+                // Mostrar traductores contactados y elegido CON HISTORIAL DE ENVÍOS
                 let traductoresHtml = '';
                 if (b.traductoresContactados) {
                     const traductores = b.traductoresContactados.split(',').map(t => t.trim()).filter(t => t);
                     if (traductores.length > 0) {
                         traductoresHtml = '<div class="budget-item-providers">';
                         traductores.forEach(t => {
-                            const isChosen = b.traductorElegido && t === b.traductorElegido;
-                            traductoresHtml += `<span class="provider-tag ${isChosen ? 'chosen' : ''}">${t}${isChosen ? ' ✓' : ''}</span>`;
+                            const isChosen = b.traductorElegido && t.trim() === b.traductorElegido.trim();
+                            
+                            // Buscar historial de envíos para este traductor
+                            let envioInfo = '';
+                            if (b.historialTraductores) {
+                                const envios = b.historialTraductores[t] || b.historialTraductores[t.trim()];
+                                if (envios && envios.length > 0) {
+                                    const ultimoEnvio = envios[envios.length - 1];
+                                    const numEnvios = envios.length;
+                                    envioInfo = ` <span class="provider-send-info" title="${numEnvios} envío(s), último: ${ultimoEnvio.fecha}">📤${numEnvios > 1 ? numEnvios : ''}</span>`;
+                                }
+                            }
+                            
+                            traductoresHtml += `<span class="provider-tag ${isChosen ? 'chosen' : ''}">${t}${envioInfo}${isChosen ? ' ✓' : ''}</span>`;
                         });
                         traductoresHtml += '</div>';
                     }
@@ -3017,6 +3034,7 @@
                     budgetData.savedClientMessage = b.mensajeCliente || '';
                     budgetData.savedAmount = b.importe || '';
                     budgetData.savedQuoteDays = b.plazo || '';
+                    budgetData.savedUrgency = b.recargoUrgencia || '';
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
                     
                     // Restaurar traductores contactados
@@ -3133,6 +3151,11 @@
                     if (quoteDays && budgetData.savedQuoteDays) {
                         quoteDays.value = budgetData.savedQuoteDays;
                     }
+                    // Restaurar recargo de urgencia
+                    const quoteUrgency = document.getElementById('quoteUrgency');
+                    if (quoteUrgency && budgetData.savedUrgency) {
+                        quoteUrgency.value = budgetData.savedUrgency;
+                    }
                     
                     // Show folder link
                     if (budgetData.folderUrl) {
@@ -3165,6 +3188,8 @@
                     // Cargar mensaje guardado o generar nuevo
                     if (budgetData.savedClientMessage) {
                         document.getElementById('clientMessageEdit').value = budgetData.savedClientMessage;
+                        // Marcar como "editado" para no sobrescribirlo automáticamente
+                        clientMessageEdited = true;
                     } else {
                         updateClientMessage();
                     }
@@ -3506,8 +3531,11 @@
             if (loading) loading.classList.add('hidden');
             // Ocultar resultados
             if (results) results.classList.add('hidden');
-            // Mostrar botón de análisis
-            if (countWordsBtn) countWordsBtn.classList.remove('hidden');
+            // Mostrar botón de análisis y resetear texto
+            if (countWordsBtn) {
+                countWordsBtn.classList.remove('hidden');
+                countWordsBtn.innerHTML = '🔢 Analizar Palabras';
+            }
             // Ocultar editor de tarifa
             if (editor) editor.classList.add('hidden');
             
@@ -3618,7 +3646,11 @@
                 if (editor) editor.classList.remove('hidden');
             }
             
-            if (countWordsBtn) countWordsBtn.classList.remove('hidden');
+            if (countWordsBtn) {
+                countWordsBtn.classList.remove('hidden');
+                // Mostrar que hay datos guardados, pero permite re-analizar
+                countWordsBtn.innerHTML = '🔢 Reanalizar <span class="btn-hint">(hay datos guardados)</span>';
+            }
         }
         
         function updatePageTariffDisplay() {
@@ -4070,7 +4102,7 @@
             }
             
             btn.disabled = false;
-            btn.innerHTML = '🔢 Analizar Palabras <span class="btn-hint">(completado)</span>';
+            btn.innerHTML = '🔢 Reanalizar <span class="btn-hint">(análisis completado ✓)</span>';
         }
 
         function displayWordCountResults(data) {
@@ -4704,9 +4736,9 @@
                         const isLast = i === envios.length - 1;
                         sendHistoryHtml += `
                             <div class="send-history-item ${isLast ? 'latest' : ''}">
-                                <span class="send-history-icon">${isLast ? '📤' : '📨'}</span>
+                                <span class="send-history-icon">📤</span>
+                                <span class="send-history-label">Solicitado</span>
                                 <span class="send-history-date">${envio.fecha}</span>
-                                <span class="send-history-email">→ ${envio.email}</span>
                             </div>
                         `;
                     });
@@ -5015,6 +5047,14 @@
 
         function onClientMessageEdit() {
             clientMessageEdited = true;
+        }
+        
+        // Forzar regeneración del mensaje (resetea clientMessageEdited)
+        function regenerateMessage() {
+            clientMessageEdited = false;
+            updateClientMessage();
+            showStatus('Mensaje regenerado', 'success');
+            setTimeout(hideStatus, 1500);
         }
         
         // ====== FUNCIONES HELPER PARA SINGULAR/PLURAL ======
@@ -5343,6 +5383,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const amount = getQuoteAmount();
             const clientMessage = document.getElementById('clientMessageEdit').value;
             const quoteDaysValue = getQuoteDays();
+            const urgency = document.getElementById('quoteUrgency').value || '';
             
             if (!budgetData.id) return;
             
@@ -5356,10 +5397,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         clientWhatsApp: whatsapp,
                         amount: amount,
                         clientMessage: clientMessage,
-                        quoteDays: quoteDaysValue
+                        quoteDays: quoteDaysValue,
+                        urgency: urgency
                     })
                 });
-                console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue);
+                console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue + ', urgencia: ' + urgency);
             } catch (error) {
                 console.log('Error guardando datos cliente:', error);
             }
@@ -5478,25 +5520,70 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 return;
             }
             
-            let html = '<div class="client-send-history-title">📤 Historial de envíos:</div>';
+            let html = '<div class="client-send-history-title">📤 Historial de envíos al cliente:</div>';
+            html += '<div class="send-history-list">';
+            
+            // Recopilar todos los envíos con su tipo
+            const allSends = [];
             
             // WhatsApp
-            if (budgetData.historialCliente.whatsapp && budgetData.historialCliente.whatsapp.length > 0) {
-                const ultimo = budgetData.historialCliente.whatsapp[budgetData.historialCliente.whatsapp.length - 1];
-                html += `<div class="client-send-history-item">✓ Presupuesto copiado para WhatsApp el ${ultimo.fecha}</div>`;
+            if (budgetData.historialCliente.whatsapp) {
+                budgetData.historialCliente.whatsapp.forEach(envio => {
+                    allSends.push({ tipo: 'whatsapp', ...envio });
+                });
             }
             
             // Email copiado
-            if (budgetData.historialCliente.email_copiado && budgetData.historialCliente.email_copiado.length > 0) {
-                const ultimo = budgetData.historialCliente.email_copiado[budgetData.historialCliente.email_copiado.length - 1];
-                html += `<div class="client-send-history-item">✓ Presupuesto copiado para Email el ${ultimo.fecha}</div>`;
+            if (budgetData.historialCliente.email_copiado) {
+                budgetData.historialCliente.email_copiado.forEach(envio => {
+                    allSends.push({ tipo: 'email_copiado', ...envio });
+                });
             }
             
             // Email enviado
-            if (budgetData.historialCliente.email && budgetData.historialCliente.email.length > 0) {
-                const ultimo = budgetData.historialCliente.email[budgetData.historialCliente.email.length - 1];
-                html += `<div class="client-send-history-item">✓ Presupuesto enviado por Email el ${ultimo.fecha} a ${ultimo.destinatario}</div>`;
+            if (budgetData.historialCliente.email) {
+                budgetData.historialCliente.email.forEach(envio => {
+                    allSends.push({ tipo: 'email', ...envio });
+                });
             }
+            
+            // Ordenar por fecha (más antiguo primero)
+            allSends.sort((a, b) => {
+                const dateA = a.fecha ? new Date(a.fecha.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1')) : new Date(0);
+                const dateB = b.fecha ? new Date(b.fecha.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1')) : new Date(0);
+                return dateA - dateB;
+            });
+            
+            // Renderizar cada envío
+            allSends.forEach((envio, i) => {
+                const isLast = i === allSends.length - 1;
+                let icon, label;
+                
+                switch (envio.tipo) {
+                    case 'whatsapp':
+                        icon = '📱';
+                        label = 'Copiado WhatsApp';
+                        break;
+                    case 'email_copiado':
+                        icon = '📋';
+                        label = 'Copiado Email';
+                        break;
+                    case 'email':
+                        icon = '📧';
+                        label = 'Enviado Email';
+                        break;
+                }
+                
+                html += `
+                    <div class="send-history-item ${isLast ? 'latest' : ''}">
+                        <span class="send-history-icon">${icon}</span>
+                        <span class="send-history-label">${label}</span>
+                        <span class="send-history-date">${envio.fecha}</span>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
             
             container.innerHTML = html;
             container.classList.remove('hidden');
