@@ -113,6 +113,13 @@
         .folder-files-note { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px; font-style: italic; }
         .send-history-note { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; background: rgba(52, 152, 219, 0.08); padding: 6px 10px; border-radius: var(--radius-sm); }
         .send-history-note.success { color: #27ae60; background: rgba(39, 174, 96, 0.1); }
+        .send-history-list { margin-top: 8px; padding: 8px; background: rgba(52, 152, 219, 0.05); border-radius: var(--radius-sm); border-left: 3px solid var(--tradutema-blue); }
+        .send-history-item { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); padding: 4px 0; }
+        .send-history-item:not(:last-child) { border-bottom: 1px dashed rgba(0,0,0,0.1); }
+        .send-history-item.latest { color: #27ae60; font-weight: 500; }
+        .send-history-icon { font-size: 0.85rem; }
+        .send-history-date { font-family: 'Space Mono', monospace; min-width: 140px; }
+        .send-history-email { color: var(--text-secondary); font-size: 0.7rem; }
         .client-send-history { margin-top: 12px; padding: 12px; background: rgba(39, 174, 96, 0.08); border-radius: var(--radius-md); border: 1px solid rgba(39, 174, 96, 0.2); }
         .client-send-history-item { font-size: 0.85rem; color: #27ae60; margin-bottom: 6px; }
         .client-send-history-item:last-child { margin-bottom: 0; }
@@ -1445,8 +1452,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.5.4';
-        const HTML_DATE = '20/01/2026 17:00';
+        const HTML_VERSION = '3.5.6';
+        const HTML_DATE = '21/01/2026 10:30';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -3013,15 +3020,30 @@
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
                     
                     // Restaurar traductores contactados
+                    // Primero obtenemos el historial para enriquecer con emails
+                    budgetData.historialTraductores = b.historialTraductores || {};
+                    
                     if (b.traductoresContactados) {
-                        budgetData.contactedProviders = b.traductoresContactados.split(',').map(t => ({
-                            nombre: t.trim(),
-                            email: ''
-                        })).filter(p => p.nombre);
+                        // Crear mapa de emails desde el historial (normalizando nombres)
+                        const emailMap = {};
+                        Object.entries(budgetData.historialTraductores).forEach(([nombre, envios]) => {
+                            const nombreNorm = nombre.trim();
+                            if (envios && envios.length > 0) {
+                                emailMap[nombreNorm] = envios[0].email || '';
+                            }
+                        });
+                        
+                        budgetData.contactedProviders = b.traductoresContactados.split(',').map(t => {
+                            const nombreNorm = t.trim();
+                            return {
+                                nombre: nombreNorm,
+                                email: emailMap[nombreNorm] || ''
+                            };
+                        }).filter(p => p.nombre);
                     } else {
                         budgetData.contactedProviders = [];
                     }
-                    budgetData.chosenProvider = b.traductorElegido || null;
+                    budgetData.chosenProvider = b.traductorElegido ? b.traductorElegido.trim() : null;
                     
                     // Restaurar cotizaciones de proveedores (JSON)
                     if (b.cotizacionesProveedores) {
@@ -3055,8 +3077,7 @@
                     // Restaurar archivos de la carpeta de Drive
                     budgetData.folderFiles = b.archivosEnCarpeta || [];
                     
-                    // Restaurar historial de envíos a traductores
-                    budgetData.historialTraductores = b.historialTraductores || {};
+                    // Nota: historialTraductores ya se cargó arriba para enriquecer contactedProviders
                     
                     // Restaurar historial de envíos a cliente
                     budgetData.historialCliente = b.historialCliente || {};
@@ -4660,17 +4681,36 @@
                 budgetData.providerQuotes = {};
             }
             
+            // Crear mapa del historial normalizado (nombres sin espacios extra)
+            const historialNormalizado = {};
+            if (budgetData.historialTraductores) {
+                Object.entries(budgetData.historialTraductores).forEach(([nombre, envios]) => {
+                    historialNormalizado[nombre.trim()] = envios;
+                });
+            }
+            
             let html = '';
             budgetData.contactedProviders.forEach((p, idx) => {
-                const isChosen = budgetData.chosenProvider === p.nombre;
-                const quote = budgetData.providerQuotes[p.nombre] || {};
+                const nombreNorm = p.nombre.trim();
+                const isChosen = budgetData.chosenProvider && budgetData.chosenProvider.trim() === nombreNorm;
+                const quote = budgetData.providerQuotes[nombreNorm] || budgetData.providerQuotes[p.nombre] || {};
                 
-                // Obtener historial de envíos para este proveedor
+                // Obtener historial COMPLETO de envíos para este proveedor
                 let sendHistoryHtml = '';
-                if (budgetData.historialTraductores && budgetData.historialTraductores[p.nombre]) {
-                    const envios = budgetData.historialTraductores[p.nombre];
-                    const ultimoEnvio = envios[envios.length - 1];
-                    sendHistoryHtml = `<div class="send-history-note success">📤 Tasación enviada el ${ultimoEnvio.fecha}</div>`;
+                const envios = historialNormalizado[nombreNorm];
+                if (envios && envios.length > 0) {
+                    sendHistoryHtml = '<div class="send-history-list">';
+                    envios.forEach((envio, i) => {
+                        const isLast = i === envios.length - 1;
+                        sendHistoryHtml += `
+                            <div class="send-history-item ${isLast ? 'latest' : ''}">
+                                <span class="send-history-icon">${isLast ? '📤' : '📨'}</span>
+                                <span class="send-history-date">${envio.fecha}</span>
+                                <span class="send-history-email">→ ${envio.email}</span>
+                            </div>
+                        `;
+                    });
+                    sendHistoryHtml += '</div>';
                 }
                 
                 html += `
