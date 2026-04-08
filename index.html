@@ -661,12 +661,9 @@
                             <div style="font-weight:600;font-size:0.9rem;color:#6b21a8;">🛒 Sincronización WooCommerce</div>
                             <div style="font-size:0.75rem;color:#888;margin-top:2px;" id="wooSyncStatus">Sin sincronizar</div>
                         </div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                            <select id="wooSyncDays" style="padding:5px 8px;border-radius:6px;border:1px solid #d5b8ff;font-size:0.8rem;background:white;">
-                                <option value="7">Última semana</option>
-                                <option value="14">2 semanas</option>
-                                <option value="30">Último mes</option>
-                            </select>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            <input type="number" id="wooSyncDays" min="1" max="365" value="7" style="width:60px;padding:5px 8px;border-radius:6px;border:1px solid #d5b8ff;font-size:0.8rem;text-align:center;">
+                            <span style="font-size:0.8rem;color:#666;">días</span>
                             <button onclick="syncWooCommerce()" style="padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">
                                 🔄 Sincronizar
                             </button>
@@ -3151,19 +3148,6 @@
         // Marcar presupuesto como pedido realizado (alias legacy)
         async function markAsOrder(budgetId, orderNumber) {
             return saveOrderNumberForBudget(budgetId, orderNumber);
-        }
-                
-                if (data.success) {
-                    showStatus('✓ Marcado como pedido: ' + orderNumber, 'success');
-                    // Actualizar lista
-                    await loadBudgets();
-                    setTimeout(hideStatus, 2000);
-                } else {
-                    showStatus('Error: ' + data.error, 'error');
-                }
-            } catch (error) {
-                showStatus('Error de conexión', 'error');
-            }
         }
         
         // Confirmar y borrar presupuesto
