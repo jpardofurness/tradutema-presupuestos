@@ -2832,14 +2832,9 @@
                         totalPages += f.pages || 0;
                         if (f.breakdown && f.breakdown.length > 0) hasBreakdown = true;
                         const fname = f.fileName || f.name || '';
-                        const extractedText = f.extractedText || f.text || '';
-                        if (extractedText) window.quickExtractedTexts[idx] = { name: fname, text: extractedText };
-                        const txtBtn = extractedText
-                            ? `<button class="btn-preview-local" onclick="openTxtPreviewFromIndex(${idx}, 'quick')" title="Ver texto extraído">📝</button>`
-                            : '';
                         html += `
                             <tr>
-                                <td>${txtBtn} ${fname}</td>
+                                <td>${fname}</td>
                                 <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
                                 <td style="text-align:right">${f.pages || 0}</td>
                             </tr>
@@ -3701,6 +3696,13 @@
             // Si es paso 4 (Tasación), mostrar historial de envíos a traductores y resumen palabras
             if (step === 4) {
                 renderProviderSendHistory();
+                
+                // Pre-rellenar comentarios de proveedor con notas internas si está vacío
+                const providerCommentsField = document.getElementById('providerComments');
+                if (providerCommentsField && !providerCommentsField.value && budgetData.internalComments) {
+                    providerCommentsField.value = budgetData.internalComments;
+                    budgetData.providerComments = budgetData.internalComments;
+                }
                 // Mostrar resumen de palabras si hay datos
                 const summaryBox = document.getElementById('wordCountSummaryBox');
                 const summaryTable = document.getElementById('wordCountSummaryTable');
@@ -3711,11 +3713,7 @@
                     budgetData.fileAnalysis.forEach((f, idx) => {
                         const fname = f.fileName || f.name || '';
                         const extractedText = f.extractedText || f.text || '';
-                        if (extractedText) window.wordCountExtractedTexts[idx] = { name: fname, text: extractedText };
-                        const txtBtn = extractedText
-                            ? `<button class="btn-preview-local" onclick="openTxtPreviewFromIndex(${idx}, 'wordcount')" title="Ver texto extraído" style="font-size:0.9rem;">📝</button>`
-                            : '';
-                        rows += `<tr><td style="padding:2px 8px 2px 0;">${txtBtn} ${fname}</td><td style="text-align:right;font-weight:600;">${(f.words||0).toLocaleString('es-ES')}</td></tr>`;
+                        rows += `<tr><td style="padding:2px 8px 2px 0;">${fname}</td><td style="text-align:right;font-weight:600;">${(f.words||0).toLocaleString('es-ES')}</td></tr>`;
                     });
                     summaryTable.innerHTML = rows;
                     summaryTotal.textContent = budgetData.wordCount.toLocaleString('es-ES');
@@ -3816,14 +3814,7 @@
                         : '';
                     
                     // Botón para ver el TXT extraído (si existe en el análisis)
-                    const extractedText = file.extractedText || file.text || '';
-                    if (extractedText) {
-                        if (!window.wordCountExtractedTexts) window.wordCountExtractedTexts = {};
-                        window.wordCountExtractedTexts[index] = { name: fileName, text: extractedText };
-                    }
-                    const txtBtn = extractedText
-                        ? `<button class="btn-preview-local" onclick="openTxtPreviewFromIndex(${index}, 'wordcount')" title="Ver texto extraído">📝</button>`
-                        : '';
+
                     
                     const breakdownBtn = hasBreakdown 
                         ? `<button class="btn-mini-breakdown" onclick="showBreakdownModal(${index})" title="Ver desglose por página">📄</button>`
@@ -3831,7 +3822,7 @@
                     
                     html += `
                         <tr data-file-index="${index}">
-                            <td>${previewBtn}${txtBtn} ${fileName}</td>
+                            <td>${previewBtn} ${fileName}</td>
                             <td class="number">${file.words ? file.words.toLocaleString('es-ES') : '-'} ${breakdownBtn}</td>
                             <td class="number">${file.pages || '-'}</td>
                         </tr>
