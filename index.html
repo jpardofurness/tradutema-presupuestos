@@ -587,23 +587,19 @@
         <div class="progress-steps">
             <div class="progress-step active" data-step="1" onclick="goToStep(1)">
                 <span class="step-num">1</span>
-                Idiomas
+                <span>Idiomas</span>
             </div>
             <div class="progress-step locked" data-step="2" onclick="goToStep(2)">
                 <span class="step-num">2</span>
-                Archivos
-            </div>
-            <div class="progress-step locked" data-step="3" onclick="goToStep(3)">
-                <span class="step-num">3</span>
-                Palabras
+                <span>Archivos</span>
             </div>
             <div class="progress-step locked" data-step="4" onclick="goToStep(4)">
-                <span class="step-num">4</span>
-                Tasación
+                <span class="step-num">3</span>
+                <span>Tasación</span>
             </div>
             <div class="progress-step locked" data-step="5" onclick="goToStep(5)">
-                <span class="step-num">5</span>
-                Cliente
+                <span class="step-num">4</span>
+                <span>Cliente</span>
             </div>
         </div>
     </div>
@@ -657,6 +653,26 @@
                         <div class="home-btn-desc">Estadísticas y sugerencias de mejora</div>
                     </div>
                 </button>
+
+                <!-- Bloque de sincronización WooCommerce -->
+                <div style="background:#f8f4ff;border:1px solid #d5b8ff;border-radius:12px;padding:14px 16px;margin-top:4px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-weight:600;font-size:0.9rem;color:#6b21a8;">🛒 Sincronización WooCommerce</div>
+                            <div style="font-size:0.75rem;color:#888;margin-top:2px;" id="wooSyncStatus">Sin sincronizar</div>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <select id="wooSyncDays" style="padding:5px 8px;border-radius:6px;border:1px solid #d5b8ff;font-size:0.8rem;background:white;">
+                                <option value="7">Última semana</option>
+                                <option value="14">2 semanas</option>
+                                <option value="30">Último mes</option>
+                            </select>
+                            <button onclick="syncWooCommerce()" style="padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">
+                                🔄 Sincronizar
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Indicador de versiones y acceso rápido -->
@@ -691,9 +707,21 @@
                 <div class="file-upload-icon">📄</div>
                 <div class="file-upload-text">
                     <strong>Arrastra archivos aquí o toca para seleccionar</strong><br>
-                    <small>PDF, imágenes, Word (max 20MB total)</small>
+                    <small>PDF, imágenes (max 20MB total)</small>
                 </div>
-                <input type="file" id="quickFileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.tiff,.bmp" onchange="handleQuickFiles(this.files)">
+                <input type="file" id="quickFileInput" class="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.tiff,.bmp,.heic,.heif" onchange="handleQuickFiles(this.files)">
+            </div>
+            
+            <div class="form-group" style="margin-top:12px;">
+                <label>Idioma origen del documento</label>
+                <select id="quickSourceLang" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;">
+                    <option value="">Seleccionar idioma...</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-top:8px;">
+                <label>Instrucciones especiales (opcional)</label>
+                <textarea id="quickInternalComments" placeholder="Ej: Solo página 2, Documento bilingüe contar solo columna izquierda..." style="width:100%;min-height:50px;padding:8px;border-radius:6px;border:1px solid #ddd;font-size:0.85rem;resize:vertical;box-sizing:border-box;"></textarea>
             </div>
             
             <div class="file-list" id="quickFileList"></div>
@@ -1147,7 +1175,14 @@
         <div class="card hidden" id="step4Card">
             <div class="card-title">
                 Solicitar tasación a proveedores
-                <span class="step-badge">PASO 4 - Opcional</span>
+                <span class="step-badge">PASO 3 - Opcional</span>
+            </div>
+            
+            <!-- Resumen de recuento de palabras (si está disponible) -->
+            <div id="wordCountSummaryBox" class="hidden" style="background:#f0f9ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+                <div style="font-weight:600;color:#2b6cb0;margin-bottom:8px;">📊 Recuento de palabras</div>
+                <table style="width:100%;font-size:0.85rem;border-collapse:collapse;" id="wordCountSummaryTable"></table>
+                <div style="margin-top:8px;font-weight:700;color:#2b6cb0;">Total: <span id="wordCountSummaryTotal">0</span> palabras</div>
             </div>
             
             <!-- Opciones de la tasación -->
@@ -1225,7 +1260,7 @@
         <div class="card hidden" id="step5Card">
             <div class="card-title">
                 Enviar presupuesto al cliente
-                <span class="step-badge">PASO 5</span>
+                <span class="step-badge">PASO 4</span>
             </div>
             
             <!-- Traductores contactados (se muestra si hay proveedores) -->
@@ -1250,6 +1285,10 @@
                     <label class="calc-method-option">
                         <input type="radio" name="calcMethod" value="pages" checked onchange="onCalcMethodChange()">
                         <span class="calc-method-label">📄 Por páginas (tarifa web)</span>
+                    </label>
+                    <label class="calc-method-option">
+                        <input type="radio" name="calcMethod" value="direct" onchange="onCalcMethodChange()">
+                        <span class="calc-method-label">🔤 Por tarifa por palabra (IVA inc.)</span>
                     </label>
                     <label class="calc-method-option">
                         <input type="radio" name="calcMethod" value="words" onchange="onCalcMethodChange()">
@@ -1281,7 +1320,29 @@
                 </div>
             </div>
             
-            <!-- OPCIÓN 2: Cálculo por palabras + margen -->
+            <!-- OPCIÓN 2: Cálculo directo por tarifa por palabra (IVA inc.) -->
+            <div class="margin-calc-box hidden" id="step5TariffCalcDirect">
+                <div class="margin-calc-header">
+                    <span>🔤 Cálculo por tarifa por palabra (IVA inc.)</span>
+                </div>
+                <div class="margin-calc-row">
+                    <span class="margin-label">Tarifa por palabra (IVA inc.):</span>
+                    <input type="number" id="directTariffPerWord" step="0.001" min="0" style="width:90px;" onchange="recalculateFromDirect()">
+                    <span class="margin-hint" id="directTariffHint">(de hoja Tarifas, editable)</span>
+                </div>
+                <div class="margin-calc-row">
+                    <span class="margin-label">Nº palabras:</span>
+                    <input type="number" id="directWordCount" min="0" value="0" style="width:100px;" onchange="recalculateFromDirect()">
+                    <span class="margin-hint" id="directWordCountHint">(del análisis o manual)</span>
+                </div>
+                <div class="margin-divider"></div>
+                <div class="margin-calc-row suggested-row">
+                    <span class="margin-label">→ Total cliente (IVA inc.):</span>
+                    <input type="number" id="quoteAmountDirect" step="0.01" min="0" placeholder="0.00" onchange="updateClientMessage()" style="width:120px;font-weight:600;">
+                </div>
+            </div>
+            
+            <!-- OPCIÓN 3: Cálculo por palabras + margen -->
             <div class="margin-calc-box hidden" id="step5TariffCalcWords">
                 <div class="margin-calc-header">
                     <span>💰 Cálculo por palabras + margen</span>
@@ -1838,6 +1899,48 @@
             document.getElementById('step1Card').classList.remove('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
             updateProgressSteps();
+        }
+
+        // ====== SINCRONIZACIÓN WOOCOMMERCE ======
+        async function syncWooCommerce(silent = false) {
+            const days = parseInt(document.getElementById('wooSyncDays')?.value || '7');
+            const statusEl = document.getElementById('wooSyncStatus');
+            
+            if (!silent) showStatus('Sincronizando con WooCommerce...', 'loading');
+            if (statusEl) statusEl.textContent = 'Sincronizando...';
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'syncWooOrders', days: days })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                    const msg = data.linked > 0
+                        ? `✅ ${data.linked} cotización(es) vinculada(s) · ${now}`
+                        : `✓ Sin coincidencias nuevas · ${now}`;
+                    if (statusEl) statusEl.textContent = msg;
+                    if (!silent) {
+                        showStatus(data.linked > 0
+                            ? `✓ ${data.linked} cotización(es) vinculada(s) con pedidos WooCommerce`
+                            : '✓ Sincronización completada — sin coincidencias nuevas', 'success');
+                        setTimeout(hideStatus, 3000);
+                        // Recargar lista si estamos en la pantalla de presupuestos
+                        if (document.getElementById('budgetListScreen') &&
+                            !document.getElementById('budgetListScreen').classList.contains('hidden')) {
+                            await loadBudgets();
+                        }
+                    }
+                } else {
+                    if (statusEl) statusEl.textContent = '⚠️ Error al sincronizar';
+                    if (!silent) showStatus('Error WooCommerce: ' + data.error, 'error');
+                }
+            } catch (error) {
+                if (statusEl) statusEl.textContent = '⚠️ Error de conexión';
+                if (!silent) showStatus('Error: ' + error.message, 'error');
+            }
         }
 
         async function showBudgetList() {
@@ -2682,7 +2785,9 @@
                     method: 'POST',
                     body: JSON.stringify({
                         action: 'quickCount',
-                        files: quickFiles
+                        files: quickFiles,
+                        sourceLang: document.getElementById('quickSourceLang').value || '',
+                        internalComments: document.getElementById('quickInternalComments').value.trim() || ''
                     })
                 });
                 
@@ -2932,8 +3037,9 @@
                 
                 // Mostrar nº pedido si existe
                 let pedidoHtml = '';
-                if (b.numPedido) {
-                    pedidoHtml = `<span class="budget-item-detail" style="color: #7d3c98; font-weight: 600;">🛒 Pedido: ${b.numPedido}</span>`;
+                if (b.numeroPedido) {
+                    const wooUrl = `https://tradutema.com/wp-admin/post.php?post=${b.numeroPedido}&action=edit`;
+                    pedidoHtml = `<span class="budget-item-detail" style="color:#7d3c98;font-weight:600;">🛒 <a href="${wooUrl}" target="_blank" onclick="event.stopPropagation()" style="color:#7d3c98;">Pedido #${b.numeroPedido}</a></span>`;
                 }
                 
                 // Mostrar traductores contactados y elegido CON HISTORIAL DE ENVÍOS
@@ -2977,7 +3083,7 @@
                 const actionsHtml = `
                     <div class="budget-item-actions" onclick="event.stopPropagation()">
                         ${folderUrl ? `<button class="budget-action-btn" onclick="window.open('${folderUrl}', '_blank')" title="Abrir carpeta">📁 Carpeta</button>` : ''}
-                        ${!isPedido ? `<button class="budget-action-btn success" onclick="showMarkAsOrderModal('${b.id}')" title="Marcar como pedido realizado">✅ Pedido</button>` : ''}
+                        <button class="budget-action-btn success" onclick="showMarkAsOrderModal('${b.id}', '${b.numeroPedido || ''}')" title="${b.numeroPedido ? 'Pedido #' + b.numeroPedido + ' (editar)' : 'Vincular número de pedido'}">✅ Pedido${b.numeroPedido ? ' #' + b.numeroPedido : ''}</button>
                         <button class="budget-action-btn danger" onclick="confirmDeleteBudget('${b.id}')" title="Borrar tasación">🗑️</button>
                     </div>
                 `;
@@ -3008,28 +3114,44 @@
 
         // ====== ACCIONES RÁPIDAS ======
         
-        // Mostrar modal para marcar como pedido
-        function showMarkAsOrderModal(budgetId) {
-            const orderNum = prompt('Introduce el número de pedido:');
-            if (orderNum !== null && orderNum.trim()) {
-                markAsOrder(budgetId, orderNum.trim());
+        function showMarkAsOrderModal(budgetId, currentOrderNum) {
+            const msg = currentOrderNum
+                ? `Pedido actual: #${currentOrderNum}\nIntroduce el nuevo número de pedido (o deja vacío para borrar):`
+                : 'Introduce el número de pedido:';
+            const orderNum = prompt(msg, currentOrderNum || '');
+            if (orderNum !== null) {
+                saveOrderNumberForBudget(budgetId, orderNum.trim());
             }
         }
         
-        // Marcar presupuesto como pedido realizado
-        async function markAsOrder(budgetId, orderNumber) {
-            showStatus('Actualizando estado...', 'loading');
-            
+        async function saveOrderNumberForBudget(budgetId, orderNumber) {
+            showStatus('Guardando número de pedido...', 'loading');
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     body: JSON.stringify({
-                        action: 'markAsOrder',
+                        action: 'saveOrderNumber',
                         budgetId: budgetId,
                         orderNumber: orderNumber
                     })
                 });
                 const data = await response.json();
+                if (data.success) {
+                    showStatus('✓ Pedido #' + orderNumber + ' vinculado', 'success');
+                    await loadBudgets();
+                    setTimeout(hideStatus, 2000);
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        // Marcar presupuesto como pedido realizado (alias legacy)
+        async function markAsOrder(budgetId, orderNumber) {
+            return saveOrderNumberForBudget(budgetId, orderNumber);
+        }
                 
                 if (data.success) {
                     showStatus('✓ Marcado como pedido: ' + orderNumber, 'success');
@@ -3098,6 +3220,14 @@
                     budgetData.wordCount = b.palabras ? parseInt(b.palabras) : null;
                     budgetData.pageCount = b.paginas ? parseInt(b.paginas) : null;
                     budgetData.tariffPerWord = b.tarifa ? parseFloat(b.tarifa) : 0;
+                    // Buscar tarifa cliente IVA inc. (col E) para la combinación de idiomas
+                    if (b.origen && b.destino && allTariffs) {
+                        const t = allTariffs.find(x => x.idiomaOrigen === b.origen && x.idiomaDestino === b.destino);
+                        if (t) {
+                            budgetData.tariffPerWordClient = parseFloat(String(t.tarifaPorPalabraClienteIVA || 0).replace(',', '.')) || 0;
+                            if (!budgetData.tariffPerWord) budgetData.tariffPerWord = parseFloat(String(t.tarifaPorPalabraProveedor || 0).replace(',', '.')) || 0;
+                        }
+                    }
                     budgetData.clientEmail = b.emailCliente || '';
                     budgetData.clientWhatsApp = b.whatsappCliente || '';
                     budgetData.savedClientMessage = b.mensajeCliente || '';
@@ -3292,6 +3422,9 @@
                     
                     populateLanguages();
                     hideStatus();
+                    
+                    // Auto-sync silencioso WooCommerce (última semana, en background)
+                    setTimeout(() => syncWooCommerce(true), 2000);
                 } else {
                     throw new Error(data.error || 'Error desconocido');
                 }
@@ -3335,12 +3468,15 @@
             
             const sourceSelect = document.getElementById('sourceLang');
             const targetSelect = document.getElementById('targetLang');
+            const quickSourceSelect = document.getElementById('quickSourceLang');
             
             sourceSelect.innerHTML = '<option value="">Seleccionar...</option>';
             targetSelect.innerHTML = '<option value="">Seleccionar...</option>';
+            if (quickSourceSelect) quickSourceSelect.innerHTML = '<option value="">Seleccionar idioma...</option>';
             
             [...sourceSet].sort().forEach(lang => {
                 sourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
+                if (quickSourceSelect) quickSourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
             });
             
             [...targetSet].sort().forEach(lang => {
@@ -3355,17 +3491,18 @@
             budgetData.sourceLang = src;
             budgetData.targetLang = tgt;
             
-            // Find tariff for this combination
             if (src && tgt) {
                 const tariff = allTariffs.find(t => t.idiomaOrigen === src && t.idiomaDestino === tgt);
                 if (tariff) {
-                    budgetData.tariffPerWord = parseFloat(String(tariff.tarifaPorPalabra).replace(',', '.')) || 0;
+                    // Col F: tarifa proveedor sin IVA (usada en "Por palabras + margen")
+                    budgetData.tariffPerWord = parseFloat(String(tariff.tarifaPorPalabraProveedor || tariff.tarifaPorPalabra || 0).replace(',', '.')) || 0;
+                    // Col E: tarifa cliente IVA inc. (usada en "Por tarifa por palabra")
+                    budgetData.tariffPerWordClient = parseFloat(String(tariff.tarifaPorPalabraClienteIVA || 0).replace(',', '.')) || 0;
                     budgetData.tariffPage1 = parseFloat(String(tariff.tarifaPagina1).replace(',', '.')) || 0;
                     budgetData.tariffPage2 = parseFloat(String(tariff.tarifaPagina2).replace(',', '.')) || 0;
                 }
             }
             
-            // Filter providers
             filterProviders();
             checkStep1Complete();
         }
@@ -3550,9 +3687,24 @@
                 }
             }
             
-            // Si es paso 4 (Tasación), mostrar historial de envíos a traductores
+            // Si es paso 4 (Tasación), mostrar historial de envíos a traductores y resumen palabras
             if (step === 4) {
                 renderProviderSendHistory();
+                // Mostrar resumen de palabras si hay datos
+                const summaryBox = document.getElementById('wordCountSummaryBox');
+                const summaryTable = document.getElementById('wordCountSummaryTable');
+                const summaryTotal = document.getElementById('wordCountSummaryTotal');
+                if (summaryBox && budgetData.wordCount > 0 && budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) {
+                    let rows = '';
+                    budgetData.fileAnalysis.forEach(f => {
+                        rows += `<tr><td style="padding:2px 8px 2px 0;">${f.fileName || f.name}</td><td style="text-align:right;font-weight:600;">${(f.words||0).toLocaleString('es-ES')}</td></tr>`;
+                    });
+                    summaryTable.innerHTML = rows;
+                    summaryTotal.textContent = budgetData.wordCount.toLocaleString('es-ES');
+                    summaryBox.classList.remove('hidden');
+                } else if (summaryBox) {
+                    summaryBox.classList.add('hidden');
+                }
             }
             
             // Si es paso 5 (Cliente), pre-llenar email/whatsapp con datos del paso 1
@@ -3756,26 +3908,26 @@
         }
 
         function updateProgressSteps() {
+            // Pasos visibles en la barra: 1, 2, 4, 5
+            // El paso 3 (Palabras) ya no existe en la barra
+            // Para la lógica de locked/completed, el orden visual es: 1→2→4→5
+            const visibleOrder = [1, 2, 4, 5];
+
             document.querySelectorAll('.progress-step').forEach(el => {
                 const step = parseInt(el.dataset.step);
-                
-                // First, remove all state classes
                 el.classList.remove('completed', 'active', 'locked');
-                
-                // PRIORIDAD: El paso actual siempre tiene clase "active"
+
                 if (step === currentStep) {
                     el.classList.add('active');
                 } else if (completedSteps.has(step)) {
-                    // Pasos completados que NO son el actual
                     el.classList.add('completed');
-                } else if (step > currentStep && !completedSteps.has(step - 1)) {
-                    el.classList.add('locked');
-                }
-                
-                // Unlock step if previous is completed or current
-                const maxCompleted = Math.max(...completedSteps, 0);
-                if (step <= maxCompleted + 1) {
-                    el.classList.remove('locked');
+                } else {
+                    // Bloquear si el paso visual anterior no está completado
+                    const idx = visibleOrder.indexOf(step);
+                    const prevStep = idx > 0 ? visibleOrder[idx - 1] : null;
+                    if (prevStep !== null && !completedSteps.has(prevStep) && prevStep !== currentStep) {
+                        el.classList.add('locked');
+                    }
                 }
             });
         }
@@ -3978,65 +4130,99 @@
             
             const btn = document.getElementById('step2Btn');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Creando carpeta...';
+            btn.innerHTML = '<span class="spinner"></span> Creando carpeta y analizando documentos...';
             
-            // Capturar notas internas del paso 1
             const internalComments = document.getElementById('internalComments').value.trim();
             budgetData.internalComments = internalComments;
-            
-            // Calcular total de páginas
             const totalPages = uploadedFiles.reduce((sum, f) => sum + (f.pages || 1), 0);
             budgetData.pageCount = totalPages;
             
             try {
-                showStatus('Creando carpeta y subiendo archivos...', 'loading');
+                showStatus('Creando carpeta y analizando palabras en paralelo...', 'loading');
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'createBudgetFolder',
-                        channel: budgetData.channel,
-                        sourceLang: budgetData.sourceLang,
-                        targetLang: budgetData.targetLang,
-                        clientEmail: budgetData.clientEmail,
-                        clientWhatsApp: budgetData.clientWhatsApp,
-                        internalComments: internalComments,
-                        totalPages: totalPages,
-                        files: uploadedFiles
-                    })
-                });
+                // ── Lanzar ambas operaciones en paralelo ──
+                const [folderResult, claudeResult] = await Promise.all([
+                    // 1. Crear carpeta en Drive
+                    fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'createBudgetFolder',
+                            channel: budgetData.channel,
+                            sourceLang: budgetData.sourceLang,
+                            targetLang: budgetData.targetLang,
+                            clientEmail: budgetData.clientEmail,
+                            clientWhatsApp: budgetData.clientWhatsApp,
+                            internalComments: internalComments,
+                            totalPages: totalPages,
+                            files: uploadedFiles
+                        })
+                    }).then(r => r.json()),
+                    // 2. Contar palabras con Claude (archivos ya en memoria)
+                    fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'countWordsFromBase64',
+                            files: uploadedFiles,
+                            sourceLang: budgetData.sourceLang,
+                            internalComments: internalComments
+                        })
+                    }).then(r => r.json())
+                ]);
                 
-                const data = await response.json();
+                if (!folderResult.success) throw new Error(folderResult.error);
                 
-                if (data.success) {
-                    budgetData.id = data.budgetId;
-                    budgetData.folderId = data.folderId;
-                    budgetData.folderUrl = data.folderUrl;
-                    budgetData.numArchivos = uploadedFiles.length;
+                budgetData.id = folderResult.budgetId;
+                budgetData.folderId = folderResult.folderId;
+                budgetData.folderUrl = folderResult.folderUrl;
+                budgetData.numArchivos = uploadedFiles.length;
+                
+                // Guardar resultados de palabras si Claude tuvo éxito
+                if (claudeResult.success) {
+                    budgetData.fileAnalysis = claudeResult.analysis || [];
+                    budgetData.wordCount = claudeResult.totalWords || 0;
                     
-                    // Update UI
-                    document.getElementById('budgetIdDisplay').textContent = budgetData.id;
-                    document.getElementById('budgetIdDisplay').classList.add('active');
-                    document.getElementById('deleteBudgetBtn').style.display = 'inline-block';
-                    
-                    // Show folder link
-                    const folderLink = document.getElementById('folderLink');
-                    folderLink.href = budgetData.folderUrl;
-                    folderLink.classList.remove('hidden');
-                    
-                    completedSteps.add(2);
-                    updateProgressSteps();
-                    
-                    hideStatus();
-                    showSuccess('Carpeta creada', budgetData.id);
-                    
-                    setTimeout(() => {
-                        hideSuccess();
-                        showCard(3);  // Ir al paso 3 (Palabras)
-                    }, 1500);
+                    // Guardar en hoja + TXTs en Drive (operación rápida)
+                    fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'saveWordCountResults',
+                            budgetId: budgetData.id,
+                            folderId: budgetData.folderId,
+                            analysis: claudeResult.analysis,
+                            totalWords: claudeResult.totalWords,
+                            totalPages: claudeResult.totalPages,
+                            sourceLang: budgetData.sourceLang
+                        })
+                    }); // fire-and-forget: no esperamos
                 } else {
-                    throw new Error(data.error);
+                    console.warn('Claude no pudo analizar palabras:', claudeResult.error);
+                    budgetData.wordCount = 0;
+                    budgetData.fileAnalysis = [];
                 }
+                
+                // Update UI
+                document.getElementById('budgetIdDisplay').textContent = budgetData.id;
+                document.getElementById('budgetIdDisplay').classList.add('active');
+                document.getElementById('deleteBudgetBtn').style.display = 'inline-block';
+                
+                const folderLink = document.getElementById('folderLink');
+                folderLink.href = budgetData.folderUrl;
+                folderLink.classList.remove('hidden');
+                
+                completedSteps.add(2);
+                updateProgressSteps();
+                hideStatus();
+                
+                const wordMsg = claudeResult.success
+                    ? ` · ${budgetData.wordCount} palabras`
+                    : ' · recuento pendiente';
+                showSuccess('Carpeta creada' + wordMsg, budgetData.id);
+                
+                setTimeout(() => {
+                    hideSuccess();
+                    showCard(4);  // Ir directamente a Tasación
+                }, 1800);
+                
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
             }
@@ -4147,7 +4333,8 @@
                         action: 'countWords',
                         folderId: budgetData.folderId,
                         budgetId: budgetData.id,
-                        sourceLang: budgetData.sourceLang  // Para OCR de imágenes
+                        sourceLang: budgetData.sourceLang,
+                        internalComments: budgetData.internalComments || ''
                     })
                 });
                 
@@ -4947,19 +5134,22 @@
             currentCalcMethod = method;
             
             const pagesBox = document.getElementById('step5TariffCalcPages');
+            const directBox = document.getElementById('step5TariffCalcDirect');
             const wordsBox = document.getElementById('step5TariffCalcWords');
             const providerBox = document.getElementById('step5TariffCalcProvider');
             
-            // Ocultar todos
             pagesBox.classList.add('hidden');
+            directBox.classList.add('hidden');
             wordsBox.classList.add('hidden');
             providerBox.classList.add('hidden');
             
             if (method === 'pages') {
                 pagesBox.classList.remove('hidden');
+            } else if (method === 'direct') {
+                directBox.classList.remove('hidden');
+                recalculateFromDirect();
             } else if (method === 'words') {
                 wordsBox.classList.remove('hidden');
-                // Pre-rellenar palabras si hay análisis
                 if (budgetData.wordCount > 0) {
                     document.getElementById('quoteWordCount').value = budgetData.wordCount;
                 }
@@ -5213,6 +5403,8 @@
         function getQuoteAmount() {
             if (currentCalcMethod === 'pages') {
                 return document.getElementById('quoteAmountPages').value || '';
+            } else if (currentCalcMethod === 'direct') {
+                return document.getElementById('quoteAmountDirect').value || '';
             } else if (currentCalcMethod === 'words') {
                 return document.getElementById('quoteAmountWords').value || '';
             } else if (currentCalcMethod === 'provider') {
@@ -5292,6 +5484,21 @@
                 }
             }
             
+            // Pre-rellenar método directo (col E)
+            const directTariff = document.getElementById('directTariffPerWord');
+            const directWords = document.getElementById('directWordCount');
+            const directHint = document.getElementById('directWordCountHint');
+            if (directTariff) {
+                const clientRate = budgetData.tariffPerWordClient || 0;
+                directTariff.value = clientRate > 0 ? clientRate.toFixed(3) : '';
+                document.getElementById('directTariffHint').textContent =
+                    clientRate > 0 ? `(${budgetData.sourceLang} → ${budgetData.targetLang}, editable)` : '(Añadir en hoja Tarifas col E)';
+            }
+            if (directWords) {
+                directWords.value = words;
+                if (directHint) directHint.textContent = words > 0 ? '(del análisis)' : '(introducir manualmente)';
+            }
+            
             // Obtener tarifas por página
             const page1 = budgetData.tariffPage1 || 0;
             const page2 = budgetData.tariffPage2 || 0;
@@ -5325,6 +5532,18 @@
             
             // Actualizar UI según método
             onCalcMethodChange();
+        }
+        
+        // Recalcular desde tarifa directa por palabra (col E, IVA inc.)
+        function recalculateFromDirect() {
+            const rate = parseFloat(document.getElementById('directTariffPerWord').value) || 0;
+            const wordCount = parseInt(document.getElementById('directWordCount').value) || 0;
+            const total = rate * wordCount;
+            const amountInput = document.getElementById('quoteAmountDirect');
+            if (rate > 0 && wordCount > 0) {
+                amountInput.value = total.toFixed(2);
+            }
+            updateClientMessage();
         }
         
         function recalculateQuoteFromPages() {
