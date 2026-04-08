@@ -2824,13 +2824,18 @@
                     let totalPages = 0;
                     let hasBreakdown = false;
                     
-                    (data.analysis || []).forEach(f => {
+                    // Guardar textos extraídos para acceso por índice
+                    window.quickExtractedTexts = {};
+                    
+                    (data.analysis || []).forEach((f, idx) => {
                         totalWords += f.words || 0;
                         totalPages += f.pages || 0;
                         if (f.breakdown && f.breakdown.length > 0) hasBreakdown = true;
                         const fname = f.fileName || f.name || '';
-                        const txtBtn = (f.extractedText || f.text)
-                            ? `<button class="btn-preview-local" onclick="openTxtPreviewModal('${fname.replace(/'/g,"\\'")}', ${JSON.stringify(f.extractedText || f.text || '')})" title="Ver texto extraído">📝</button>`
+                        const extractedText = f.extractedText || f.text || '';
+                        if (extractedText) window.quickExtractedTexts[idx] = { name: fname, text: extractedText };
+                        const txtBtn = extractedText
+                            ? `<button class="btn-preview-local" onclick="openTxtPreviewFromIndex(${idx}, 'quick')" title="Ver texto extraído">📝</button>`
                             : '';
                         html += `
                             <tr>
@@ -3807,8 +3812,13 @@
                         : '';
                     
                     // Botón para ver el TXT extraído (si existe en el análisis)
-                    const txtBtn = (file.extractedText || file.text)
-                        ? `<button class="btn-preview-local" onclick="openTxtPreviewModal('${fileName.replace(/'/g,"\\'")}', ${JSON.stringify(file.extractedText || file.text || '')})" title="Ver texto extraído">📝</button>`
+                    const extractedText = file.extractedText || file.text || '';
+                    if (extractedText) {
+                        if (!window.wordCountExtractedTexts) window.wordCountExtractedTexts = {};
+                        window.wordCountExtractedTexts[index] = { name: fileName, text: extractedText };
+                    }
+                    const txtBtn = extractedText
+                        ? `<button class="btn-preview-local" onclick="openTxtPreviewFromIndex(${index}, 'wordcount')" title="Ver texto extraído">📝</button>`
                         : '';
                     
                     const breakdownBtn = hasBreakdown 
@@ -4437,6 +4447,12 @@
         // ====== MODAL VER TXT EXTRAÍDO ======
         let currentTxtFilename = '';
         
+        function openTxtPreviewFromIndex(idx, source) {
+            const store = source === 'quick' ? window.quickExtractedTexts : window.wordCountExtractedTexts;
+            if (!store || !store[idx]) return;
+            openTxtPreviewModal(store[idx].name, store[idx].text);
+        }
+
         function openTxtPreviewModal(filename, text) {
             currentTxtFilename = filename;
             document.getElementById('txtPreviewTitle').textContent = '📄 ' + filename + '.txt';
