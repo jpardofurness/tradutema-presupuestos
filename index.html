@@ -662,7 +662,7 @@
                             <div style="font-size:0.75rem;color:#888;margin-top:2px;" id="wooSyncStatus">Sin sincronizar</div>
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                            <input type="number" id="wooSyncDays" min="1" max="365" value="7" style="width:60px;padding:5px 8px;border-radius:6px;border:1px solid #d5b8ff;font-size:0.8rem;text-align:center;">
+                            <input type="number" id="wooSyncDays" min="1" max="365" value="3" style="width:60px;padding:5px 8px;border-radius:6px;border:1px solid #d5b8ff;font-size:0.8rem;text-align:center;">
                             <span style="font-size:0.8rem;color:#666;">días</span>
                             <button onclick="syncWooCommerce()" style="padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">
                                 🔄 Sincronizar
@@ -1918,7 +1918,7 @@
 
         // ====== SINCRONIZACIÓN WOOCOMMERCE ======
         async function syncWooCommerce(silent = false) {
-            const days = parseInt(document.getElementById('wooSyncDays')?.value || '7');
+            const days = parseInt(document.getElementById('wooSyncDays')?.value || '3');
             const statusEl = document.getElementById('wooSyncStatus');
             
             if (!silent) showStatus('Sincronizando con WooCommerce...', 'loading');
@@ -2873,10 +2873,7 @@
             }
             
             btn.disabled = false;
-            btn.innerHTML = '🔢 Contar Palabras';
-        }
-        
-        function showQuickBreakdownModal() {
+            btn.style.display = 'none';
             const data = window.quickAnalysisData;
             if (!data || !data.analysis || data.analysis.length === 0) {
                 showStatus('No hay datos de análisis', 'error');
@@ -3709,9 +3706,16 @@
                 const summaryTable = document.getElementById('wordCountSummaryTable');
                 const summaryTotal = document.getElementById('wordCountSummaryTotal');
                 if (summaryBox && budgetData.wordCount > 0 && budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) {
+                    window.wordCountExtractedTexts = {};
                     let rows = '';
-                    budgetData.fileAnalysis.forEach(f => {
-                        rows += `<tr><td style="padding:2px 8px 2px 0;">${f.fileName || f.name}</td><td style="text-align:right;font-weight:600;">${(f.words||0).toLocaleString('es-ES')}</td></tr>`;
+                    budgetData.fileAnalysis.forEach((f, idx) => {
+                        const fname = f.fileName || f.name || '';
+                        const extractedText = f.extractedText || f.text || '';
+                        if (extractedText) window.wordCountExtractedTexts[idx] = { name: fname, text: extractedText };
+                        const txtBtn = extractedText
+                            ? `<button class="btn-preview-local" onclick="openTxtPreviewFromIndex(${idx}, 'wordcount')" title="Ver texto extraído" style="font-size:0.9rem;">📝</button>`
+                            : '';
+                        rows += `<tr><td style="padding:2px 8px 2px 0;">${txtBtn} ${fname}</td><td style="text-align:right;font-weight:600;">${(f.words||0).toLocaleString('es-ES')}</td></tr>`;
                     });
                     summaryTable.innerHTML = rows;
                     summaryTotal.textContent = budgetData.wordCount.toLocaleString('es-ES');
