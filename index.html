@@ -595,11 +595,11 @@
             </div>
             <div class="progress-step locked" data-step="4" onclick="goToStep(4)">
                 <span class="step-num">3</span>
-                <span>Tasación</span>
+                <span>Solic. Tasación</span>
             </div>
             <div class="progress-step locked" data-step="5" onclick="goToStep(5)">
                 <span class="step-num">4</span>
-                <span>Cliente</span>
+                <span>Envío Cliente</span>
             </div>
         </div>
     </div>
@@ -1142,6 +1142,24 @@
             <div class="btn-row" style="margin-top: 16px;">
                 <button class="btn btn-secondary" onclick="skipToStep(4)">Saltar</button>
                 <button class="btn btn-primary" onclick="completeStep3()">Continuar →</button>
+            </div>
+        </div>
+
+        <!-- MODAL VER TXT EXTRAÍDO -->
+        <div class="modal-overlay" id="txtPreviewModal" onclick="closeTxtPreviewModal()">
+            <div class="modal-content" style="max-width:700px;max-height:80vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h3 id="txtPreviewTitle">📄 Texto extraído</h3>
+                    <button class="modal-close" onclick="closeTxtPreviewModal()">✕</button>
+                </div>
+                <div class="modal-body" style="flex:1;overflow-y:auto;">
+                    <textarea id="txtPreviewContent" readonly style="width:100%;min-height:300px;font-family:monospace;font-size:0.8rem;border:1px solid #ddd;border-radius:6px;padding:10px;resize:vertical;background:#f9f9f9;box-sizing:border-box;"></textarea>
+                </div>
+                <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button class="btn btn-secondary" onclick="copyTxtContent()">📋 Copiar</button>
+                    <button class="btn btn-secondary" onclick="downloadTxtContent()">⬇️ Descargar</button>
+                    <button class="btn btn-primary" onclick="closeTxtPreviewModal()">Cerrar</button>
+                </div>
             </div>
         </div>
 
@@ -2101,6 +2119,12 @@
         // Variable para guardar cambios de estrategia
         let strategyChanges = JSON.parse(localStorage.getItem('tradutema_strategy_changes') || '[]');
         
+        // Un presupuesto cuenta como pedido si tiene estado 3- O tiene número de pedido WooCommerce
+        function isOrder(b) {
+            return (b.numeroPedido && String(b.numeroPedido).trim() !== '') ||
+                   (b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
+        }
+
         async function showAnalysis() {
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
@@ -2149,7 +2173,7 @@
             
             const orders = filteredBudgets.filter(b => {
                 const estado = b.estado || '';
-                return estado.startsWith('3-') || estado === 'Pedido';
+                return isOrder(b);
             });
             
             // ====== ESTADÍSTICAS GENERALES ======
@@ -2174,12 +2198,9 @@
                 });
                 const prevSent = prevBudgets.filter(b => {
                     const estado = b.estado || '';
-                    return estado.startsWith('2-') || estado.startsWith('3-');
+                    return estado.startsWith('2-') || estado.startsWith('3-') || estado === 'Enviado';
                 });
-                const prevOrders = prevBudgets.filter(b => {
-                    const estado = b.estado || '';
-                    return estado.startsWith('3-');
-                });
+                const prevOrders = prevBudgets.filter(b => isOrder(b));
                 const prevRate = prevSent.length > 0 ? (prevOrders.length / prevSent.length * 100) : 0;
                 
                 if (prevSent.length >= 3) {
@@ -2228,8 +2249,8 @@
                 const beforeBudgets = sentBudgets.filter(b => new Date(b.fecha) < changeDate);
                 const afterBudgets = sentBudgets.filter(b => new Date(b.fecha) >= changeDate);
                 
-                const beforeOrders = beforeBudgets.filter(b => b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
-                const afterOrders = afterBudgets.filter(b => b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
+                const beforeOrders = beforeBudgets.filter(b => isOrder(b));
+                const afterOrders = afterBudgets.filter(b => isOrder(b));
                 
                 const beforeRate = beforeBudgets.length > 0 ? (beforeOrders.length / beforeBudgets.length * 100) : 0;
                 const afterRate = afterBudgets.length > 0 ? (afterOrders.length / afterBudgets.length * 100) : 0;
@@ -2300,7 +2321,7 @@
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 if (monthlyData[key]) {
                     monthlyData[key].sent++;
-                    if (b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido')) {
+                    if (isOrder(b)) {
                         monthlyData[key].orders++;
                         monthlyData[key].revenue += parseFloat(b.importe) || 0;
                     }
@@ -2378,7 +2399,7 @@
                 const isRecent = new Date(b.fecha) >= threeMonthsAgo;
                 if (isRecent) langStats[key].recentSent++;
                 
-                if (b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido')) {
+                if (isOrder(b)) {
                     langStats[key].orders++;
                     langStats[key].totalImporte += parseFloat(b.importe) || 0;
                     if (isRecent) langStats[key].recentOrders++;
@@ -2446,7 +2467,7 @@
                     const importe = parseFloat(b.importe) || 0;
                     return importe >= range.min && importe < range.max;
                 });
-                const ordersInRange = inRange.filter(b => b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
+                const ordersInRange = inRange.filter(b => isOrder(b));
                 const conversion = inRange.length > 0 ? (ordersInRange.length / inRange.length * 100) : 0;
                 const convClass = conversion >= 30 ? 'good' : conversion >= 15 ? 'warning' : 'bad';
                 
@@ -2523,8 +2544,8 @@
                 const beforeBudgets = sentBudgets.filter(b => new Date(b.fecha) < changeDate);
                 
                 if (afterBudgets.length >= 3 && beforeBudgets.length >= 3) {
-                    const beforeOrders = beforeBudgets.filter(b => b.estado && b.estado.startsWith('3-'));
-                    const afterOrders = afterBudgets.filter(b => b.estado && b.estado.startsWith('3-'));
+                    const beforeOrders = beforeBudgets.filter(b => isOrder(b));
+                    const afterOrders = afterBudgets.filter(b => isOrder(b));
                     const beforeRate = beforeOrders.length / beforeBudgets.length * 100;
                     const afterRate = afterOrders.length / afterBudgets.length * 100;
                     const diff = afterRate - beforeRate;
@@ -2807,9 +2828,13 @@
                         totalWords += f.words || 0;
                         totalPages += f.pages || 0;
                         if (f.breakdown && f.breakdown.length > 0) hasBreakdown = true;
+                        const fname = f.fileName || f.name || '';
+                        const txtBtn = (f.extractedText || f.text)
+                            ? `<button class="btn-preview-local" onclick="openTxtPreviewModal('${fname.replace(/'/g,"\\'")}', ${JSON.stringify(f.extractedText || f.text || '')})" title="Ver texto extraído">📝</button>`
+                            : '';
                         html += `
                             <tr>
-                                <td>${f.fileName || f.name}</td>
+                                <td>${txtBtn} ${fname}</td>
                                 <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
                                 <td style="text-align:right">${f.pages || 0}</td>
                             </tr>
@@ -3778,7 +3803,12 @@
                     
                     // Icono de ojo para previsualizar en Google Drive
                     const previewBtn = file.fileId 
-                        ? `<a href="https://drive.google.com/file/d/${file.fileId}/view" target="_blank" class="btn-preview" title="Ver archivo">👁️</a>`
+                        ? `<a href="https://drive.google.com/file/d/${file.fileId}/view" target="_blank" class="btn-preview" title="Ver archivo en Drive">👁️</a>`
+                        : '';
+                    
+                    // Botón para ver el TXT extraído (si existe en el análisis)
+                    const txtBtn = (file.extractedText || file.text)
+                        ? `<button class="btn-preview-local" onclick="openTxtPreviewModal('${fileName.replace(/'/g,"\\'")}', ${JSON.stringify(file.extractedText || file.text || '')})" title="Ver texto extraído">📝</button>`
                         : '';
                     
                     const breakdownBtn = hasBreakdown 
@@ -3787,7 +3817,7 @@
                     
                     html += `
                         <tr data-file-index="${index}">
-                            <td>${previewBtn} ${fileName}</td>
+                            <td>${previewBtn}${txtBtn} ${fileName}</td>
                             <td class="number">${file.words ? file.words.toLocaleString('es-ES') : '-'} ${breakdownBtn}</td>
                             <td class="number">${file.pages || '-'}</td>
                         </tr>
@@ -4194,6 +4224,7 @@
                 folderLink.classList.remove('hidden');
                 
                 completedSteps.add(2);
+                completedSteps.add(4); // Tasación opcional — se marca verde al avanzar
                 updateProgressSteps();
                 hideStatus();
                 
@@ -4403,6 +4434,39 @@
         let currentBreakdown = [];
         let currentFileIndex = 0;
         
+        // ====== MODAL VER TXT EXTRAÍDO ======
+        let currentTxtFilename = '';
+        
+        function openTxtPreviewModal(filename, text) {
+            currentTxtFilename = filename;
+            document.getElementById('txtPreviewTitle').textContent = '📄 ' + filename + '.txt';
+            document.getElementById('txtPreviewContent').value = text || '(Sin texto extraído)';
+            document.getElementById('txtPreviewModal').classList.add('active');
+        }
+        
+        function closeTxtPreviewModal() {
+            document.getElementById('txtPreviewModal').classList.remove('active');
+        }
+        
+        function copyTxtContent() {
+            const content = document.getElementById('txtPreviewContent').value;
+            navigator.clipboard.writeText(content).then(() => {
+                showStatus('Texto copiado al portapapeles', 'success');
+                setTimeout(hideStatus, 1500);
+            });
+        }
+        
+        function downloadTxtContent() {
+            const content = document.getElementById('txtPreviewContent').value;
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = currentTxtFilename + '.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         function showBreakdownModal(fileIndex) {
             const modal = document.getElementById('breakdownModal');
             const data = window.analysisData;
