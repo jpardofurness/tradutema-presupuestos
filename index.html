@@ -1064,9 +1064,14 @@
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
             
-            <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue()" disabled>
-                📁 Crear Carpeta y Continuar →
-            </button>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+                <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false)" disabled style="flex:1;">
+                    📁 Crear Carpeta
+                </button>
+                <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue(true)" disabled style="flex:2;">
+                    📁+🔢 Crear y Analizar →
+                </button>
+            </div>
             
             <a href="#" class="folder-link hidden" id="folderLink" target="_blank">
                 <span class="folder-link-icon">📂</span>
@@ -1896,6 +1901,8 @@
             // Reset buttons
             if (step1Btn) step1Btn.disabled = true;
             if (step2Btn) step2Btn.disabled = true;
+            const step2BtnOnly = document.getElementById('step2BtnOnly');
+            if (step2BtnOnly) step2BtnOnly.disabled = true;
             
             // Reset budget ID display
             document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
@@ -4009,17 +4016,20 @@
             const total = document.getElementById('fileTotal');
             const area = document.getElementById('fileUploadArea');
             const btn = document.getElementById('step2Btn');
+            const btnOnly = document.getElementById('step2BtnOnly');
             
             if (uploadedFiles.length === 0) {
                 list.innerHTML = '';
                 total.style.display = 'none';
                 area.classList.remove('has-files');
                 btn.disabled = true;
+                if (btnOnly) btnOnly.disabled = true;
                 return;
             }
             
             area.classList.add('has-files');
             btn.disabled = false;
+            if (btnOnly) btnOnly.disabled = false;
             
             let html = '';
             let totalSize = 0;
@@ -4141,15 +4151,22 @@
             // No hay previewBudgetId en el nuevo flujo
         }
 
-        async function createFolderAndContinue() {
+        async function createFolderAndContinue(withAnalysis = true) {
             if (uploadedFiles.length === 0) {
                 showStatus('Adjunta al menos un archivo', 'warning');
                 return;
             }
             
             const btn = document.getElementById('step2Btn');
+            const btnOnly = document.getElementById('step2BtnOnly');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Creando carpeta y analizando documentos...';
+            btnOnly.disabled = true;
+            btn.innerHTML = withAnalysis
+                ? '<span class="spinner"></span> Creando y analizando...'
+                : '📁 Crear Carpeta';
+            btnOnly.innerHTML = withAnalysis
+                ? '📁 Crear Carpeta'
+                : '<span class="spinner"></span> Creando...';
             
             const internalComments = document.getElementById('internalComments').value.trim();
             budgetData.internalComments = internalComments;
@@ -4157,12 +4174,43 @@
             budgetData.pageCount = totalPages;
             
             try {
-                showStatus('Creando carpeta y analizando palabras en paralelo...', 'loading');
+                showStatus(withAnalysis
+                    ? 'Creando carpeta y analizando palabras en paralelo...'
+                    : 'Creando carpeta...', 'loading');
                 
-                // ── Lanzar ambas operaciones en paralelo ──
-                const [folderResult, claudeResult] = await Promise.all([
-                    // 1. Crear carpeta en Drive
-                    fetch(apiUrl, {
+                // ── Lanzar operaciones ──
+                let folderResult, claudeResult;
+                
+                if (withAnalysis) {
+                    // Paralelo: crear carpeta + analizar palabras
+                    [folderResult, claudeResult] = await Promise.all([
+                        fetch(apiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'createBudgetFolder',
+                                channel: budgetData.channel,
+                                sourceLang: budgetData.sourceLang,
+                                targetLang: budgetData.targetLang,
+                                clientEmail: budgetData.clientEmail,
+                                clientWhatsApp: budgetData.clientWhatsApp,
+                                internalComments: internalComments,
+                                totalPages: totalPages,
+                                files: uploadedFiles
+                            })
+                        }).then(r => r.json()),
+                        fetch(apiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'countWordsFromBase64',
+                                files: uploadedFiles,
+                                sourceLang: budgetData.sourceLang,
+                                internalComments: internalComments
+                            })
+                        }).then(r => r.json())
+                    ]);
+                } else {
+                    // Solo crear carpeta
+                    folderResult = await fetch(apiUrl, {
                         method: 'POST',
                         body: JSON.stringify({
                             action: 'createBudgetFolder',
@@ -4175,18 +4223,9 @@
                             totalPages: totalPages,
                             files: uploadedFiles
                         })
-                    }).then(r => r.json()),
-                    // 2. Contar palabras con Claude (archivos ya en memoria)
-                    fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'countWordsFromBase64',
-                            files: uploadedFiles,
-                            sourceLang: budgetData.sourceLang,
-                            internalComments: internalComments
-                        })
-                    }).then(r => r.json())
-                ]);
+                    }).then(r => r.json());
+                    claudeResult = { success: false };
+                }
                 
                 if (!folderResult.success) throw new Error(folderResult.error);
                 
@@ -4248,12 +4287,14 @@
             }
             
             btn.disabled = false;
-            btn.innerHTML = '📁 Crear Carpeta y Continuar →';
+            btnOnly.disabled = false;
+            btn.innerHTML = '📁+🔢 Crear y Analizar →';
+            btnOnly.innerHTML = '📁 Crear Carpeta';
         }
 
         // Mantener createFolder como alias para compatibilidad
         async function createFolder() {
-            return createFolderAndContinue();
+            return createFolderAndContinue(true);
         }
 
         // ====== WORD COUNT ======
