@@ -1900,9 +1900,12 @@
             
             // Reset buttons
             if (step1Btn) step1Btn.disabled = true;
-            if (step2Btn) step2Btn.disabled = true;
+            if (step2Btn) { step2Btn.disabled = true; step2Btn.style.display = ''; }
             const step2BtnOnly = document.getElementById('step2BtnOnly');
-            if (step2BtnOnly) step2BtnOnly.disabled = true;
+            if (step2BtnOnly) { step2BtnOnly.disabled = true; step2BtnOnly.style.display = ''; }
+            // Eliminar botón de reanalizar si existe
+            const reanalyzeBtn = document.getElementById('reanalyzeBtn');
+            if (reanalyzeBtn) reanalyzeBtn.remove();
             
             // Reset budget ID display
             document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
@@ -4106,40 +4109,141 @@
             const total = document.getElementById('fileTotal');
             const area = document.getElementById('fileUploadArea');
             const btn = document.getElementById('step2Btn');
-            
+            const btnOnly = document.getElementById('step2BtnOnly');
+
             if (!budgetData.folderFiles || budgetData.folderFiles.length === 0) return;
-            
+
             area.classList.add('has-files');
-            btn.disabled = true;  // Ya está creada la carpeta
-            btn.innerHTML = '✓ Carpeta ya creada';
-            btn.style.background = '#27ae60';
-            
-            let html = '<div class="folder-files-note">📁 Archivos ya subidos a Drive:</div>';
+
+            // Ocultar botones de crear carpeta — ya existe
+            btn.style.display = 'none';
+            btnOnly.style.display = 'none';
+
+            // Filtrar TXTs del sistema para mostrar solo archivos fuente
+            const sourceFiles = budgetData.folderFiles.filter(f =>
+                f.mimeType !== 'text/plain' && f.name !== 'desktop.ini'
+            );
+            const hasRecuento = budgetData.folderFiles.some(f => f.name === '_RECUENTO.txt');
+
+            let html = '<div class="folder-files-note">📁 Archivos en Drive (puedes eliminar o añadir):</div>';
             let totalSize = 0;
-            
-            budgetData.folderFiles.forEach((f, i) => {
+
+            sourceFiles.forEach((f, i) => {
                 totalSize += f.size || 0;
-                
-                // Icono de previsualización en Drive
-                const previewBtn = f.id 
-                    ? `<a href="https://drive.google.com/file/d/${f.id}/view" target="_blank" class="btn-preview" title="Ver archivo">👁️</a>`
+                const previewBtn = f.id
+                    ? `<a href="https://drive.google.com/file/d/${f.id}/view" target="_blank" class="btn-preview" title="Ver en Drive">👁️</a>`
                     : '';
-                
                 html += `
-                    <div class="file-item file-item-readonly">
+                    <div class="file-item" id="driveFile_${i}">
                         <div class="file-item-info">
                             <span class="file-item-name">${previewBtn} ${f.name}</span>
                             <span class="file-item-size">${formatFileSize(f.size || 0)}</span>
                         </div>
+                        <div class="file-item-actions">
+                            <button class="file-item-remove" onclick="removeDriveFile('${f.id}', ${i})" title="Eliminar de Drive">✕</button>
+                        </div>
                     </div>
                 `;
             });
-            
+
             list.innerHTML = html;
-            
-            const totalPages = budgetData.pageCount || budgetData.folderFiles.length;
-            total.innerHTML = `<strong>${budgetData.folderFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${totalPages}</strong> página(s)`;
+
+            const totalPages = budgetData.pageCount || sourceFiles.length;
+            total.innerHTML = `<strong>${sourceFiles.length}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${totalPages}</strong> página(s)`;
             total.style.display = 'block';
+
+            // Mostrar botón de análisis
+            const existingAnalyzeBtn = document.getElementById('reanalyzeBtn');
+            if (!existingAnalyzeBtn) {
+                const analyzeBtn = document.createElement('button');
+                analyzeBtn.id = 'reanalyzeBtn';
+                analyzeBtn.className = 'btn btn-primary btn-orange action-btn';
+                analyzeBtn.style.marginTop = '12px';
+                analyzeBtn.innerHTML = hasRecuento ? '🔄 Reanalizar documentos' : '🔢 Analizar documentos';
+                analyzeBtn.onclick = () => reanalyzeFromFolder();
+                list.parentNode.insertBefore(analyzeBtn, list.nextSibling);
+            } else {
+                existingAnalyzeBtn.innerHTML = hasRecuento ? '🔄 Reanalizar documentos' : '🔢 Analizar documentos';
+            }
+        }
+
+        async function removeDriveFile(fileId, index) {
+            if (!confirm('¿Eliminar este archivo de la carpeta de Drive?')) return;
+            showStatus('Eliminando archivo...', 'loading');
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'removeFileFromFolder', fileId: fileId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    budgetData.folderFiles = budgetData.folderFiles.filter(f => f.id !== fileId);
+                    renderFolderFiles();
+                    hideStatus();
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch(e) {
+                showStatus('Error: ' + e.message, 'error');
+            }
+        }
+
+        async function reanalyzeFromFolder() {
+            const btn = document.getElementById('reanalyzeBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analizando...'; }
+            showStatus('Analizando documentos con Claude...', 'loading');
+
+            // Si hay archivos nuevos pendientes de subir, subirlos primero
+            if (uploadedFiles.length > 0) {
+                showStatus('Subiendo archivos nuevos...', 'loading');
+                try {
+                    const uploadResp = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'uploadFilesToFolder',
+                            folderId: budgetData.folderId,
+                            files: uploadedFiles
+                        })
+                    });
+                    const uploadData = await uploadResp.json();
+                    if (uploadData.success) {
+                        uploadData.uploaded.forEach(f => budgetData.folderFiles.push(f));
+                        uploadedFiles = [];
+                        renderFileList();
+                    }
+                } catch(e) {
+                    showStatus('Error subiendo archivos: ' + e.message, 'error');
+                }
+            }
+
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'reanalyzeFolder',
+                        folderId: budgetData.folderId,
+                        budgetId: budgetData.id,
+                        sourceLang: budgetData.sourceLang,
+                        internalComments: budgetData.internalComments || ''
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    budgetData.fileAnalysis = data.analysis || [];
+                    budgetData.wordCount = data.totalWords || 0;
+                    completedSteps.add(4);
+                    updateProgressSteps();
+                    hideStatus();
+                    showSuccess(`Análisis completado · ${data.totalWords} palabras`, budgetData.id);
+                    setTimeout(() => { hideSuccess(); showCard(4); }, 1800);
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                    if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Reanalizar documentos'; }
+                }
+            } catch(e) {
+                showStatus('Error: ' + e.message, 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Reanalizar documentos'; }
+            }
         }
 
         // ====== FOLDER CREATION ======
