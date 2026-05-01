@@ -1064,13 +1064,23 @@
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
             
-            <div style="display:flex;gap:10px;margin-top:8px;">
-                <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false)" disabled style="flex:1;">
+            <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false, false)" disabled style="flex:1;min-width:130px;">
                     📁 Crear Carpeta
                 </button>
-                <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue(true)" disabled style="flex:2;">
+                <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue(true, false)" disabled style="flex:2;min-width:200px;">
                     📁+🔢 Crear y Analizar →
                 </button>
+                <button class="btn btn-secondary action-btn" id="step2BtnExtract" onclick="extractTexts()" disabled style="flex:1;min-width:130px;background:#7c3aed;color:white;">
+                    📄 Extraer
+                </button>
+            </div>
+            
+            <!-- Banner de estado de operaciones en background -->
+            <div id="bgStatusBanner" class="hidden" style="margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;">
+                <span id="bgStatusIcon"></span>
+                <span id="bgStatusText" style="flex:1;"></span>
+                <button id="bgStatusRetry" class="hidden" onclick="retryBackgroundCreate()" style="padding:4px 10px;border-radius:4px;border:none;background:#dc3545;color:white;cursor:pointer;font-size:0.8rem;">🔄 Reintentar</button>
             </div>
             
             <a href="#" class="folder-link hidden" id="folderLink" target="_blank">
@@ -1605,8 +1615,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.6.9';
-        const HTML_DATE = '10/04/2026 13:06';
+        const HTML_VERSION = '3.7.0';
+        const HTML_DATE = '18/04/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1903,6 +1913,10 @@
             if (step2Btn) { step2Btn.disabled = true; step2Btn.style.display = ''; }
             const step2BtnOnly = document.getElementById('step2BtnOnly');
             if (step2BtnOnly) { step2BtnOnly.disabled = true; step2BtnOnly.style.display = ''; }
+            const step2BtnExtract = document.getElementById('step2BtnExtract');
+            if (step2BtnExtract) { step2BtnExtract.disabled = true; step2BtnExtract.style.display = ''; }
+            // Ocultar banner de background si visible
+            if (typeof hideBgBanner === 'function') hideBgBanner();
             // Eliminar botón de reanalizar si existe
             const reanalyzeBtn = document.getElementById('reanalyzeBtn');
             if (reanalyzeBtn) reanalyzeBtn.remove();
@@ -4110,6 +4124,7 @@
             const area = document.getElementById('fileUploadArea');
             const btn = document.getElementById('step2Btn');
             const btnOnly = document.getElementById('step2BtnOnly');
+            const btnExtract = document.getElementById('step2BtnExtract');
 
             if (!budgetData.folderFiles || budgetData.folderFiles.length === 0) return;
 
@@ -4118,6 +4133,12 @@
             // Ocultar botones de crear carpeta — ya existe
             btn.style.display = 'none';
             btnOnly.style.display = 'none';
+            
+            // Activar botón Extraer (la carpeta existe)
+            if (btnExtract) {
+                btnExtract.disabled = false;
+                btnExtract.style.display = '';
+            }
 
             // Filtrar TXTs del sistema para mostrar solo archivos fuente
             const sourceFiles = budgetData.folderFiles.filter(f =>
@@ -4255,66 +4276,59 @@
             // No hay previewBudgetId en el nuevo flujo
         }
 
-        async function createFolderAndContinue(withAnalysis = true) {
-            if (uploadedFiles.length === 0) {
-                showStatus('Adjunta al menos un archivo', 'warning');
-                return;
-            }
+        // ====== ESTADO DE OPERACIONES EN BACKGROUND ======
+        let bgState = {
+            folderCreated: false,
+            folderError: null,
+            analysisDone: false,
+            analysisError: null,
+            pendingFiles: null,        // archivos pendientes de subir si falla la creación
+            pendingWithAnalysis: false,
+            pendingInternalComments: ''
+        };
+
+        function showBgBanner(state, text, retry) {
+            const banner = document.getElementById('bgStatusBanner');
+            const icon = document.getElementById('bgStatusIcon');
+            const txt = document.getElementById('bgStatusText');
+            const retryBtn = document.getElementById('bgStatusRetry');
+            if (!banner) return;
             
-            const btn = document.getElementById('step2Btn');
-            const btnOnly = document.getElementById('step2BtnOnly');
-            btn.disabled = true;
-            btnOnly.disabled = true;
-            btn.innerHTML = withAnalysis
-                ? '<span class="spinner"></span> Creando y analizando...'
-                : '📁 Crear Carpeta';
-            btnOnly.innerHTML = withAnalysis
-                ? '📁 Crear Carpeta'
-                : '<span class="spinner"></span> Creando...';
+            banner.classList.remove('hidden');
+            const colors = {
+                loading: { bg: '#e0f2fe', border: '#7dd3fc', icon: '⏳' },
+                success: { bg: '#dcfce7', border: '#86efac', icon: '✓' },
+                error:   { bg: '#fee2e2', border: '#fca5a5', icon: '⚠️' }
+            };
+            const c = colors[state] || colors.loading;
+            banner.style.background = c.bg;
+            banner.style.border = '1px solid ' + c.border;
+            icon.textContent = c.icon;
+            txt.textContent = text;
             
-            const internalComments = document.getElementById('internalComments').value.trim();
-            budgetData.internalComments = internalComments;
-            const totalPages = uploadedFiles.reduce((sum, f) => sum + (f.pages || 1), 0);
-            budgetData.pageCount = totalPages;
-            
+            if (retry) retryBtn.classList.remove('hidden');
+            else retryBtn.classList.add('hidden');
+        }
+        
+        function hideBgBanner() {
+            const banner = document.getElementById('bgStatusBanner');
+            if (banner) banner.classList.add('hidden');
+        }
+
+        async function retryBackgroundCreate() {
+            if (!bgState.pendingFiles) return;
+            showBgBanner('loading', '🔄 Reintentando creación de carpeta...', false);
+            await runBackgroundCreate(bgState.pendingFiles, bgState.pendingWithAnalysis, bgState.pendingInternalComments);
+        }
+
+        // Ejecuta la creación de carpeta (y opcionalmente análisis) en background
+        async function runBackgroundCreate(files, withAnalysis, internalComments) {
             try {
-                showStatus(withAnalysis
-                    ? 'Creando carpeta y analizando palabras en paralelo...'
-                    : 'Creando carpeta...', 'loading');
+                const totalPages = files.reduce((sum, f) => sum + (f.pages || 1), 0);
                 
-                // ── Lanzar operaciones ──
-                let folderResult, claudeResult;
-                
-                if (withAnalysis) {
-                    // Paralelo: crear carpeta + analizar palabras
-                    [folderResult, claudeResult] = await Promise.all([
-                        fetch(apiUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'createBudgetFolder',
-                                channel: budgetData.channel,
-                                sourceLang: budgetData.sourceLang,
-                                targetLang: budgetData.targetLang,
-                                clientEmail: budgetData.clientEmail,
-                                clientWhatsApp: budgetData.clientWhatsApp,
-                                internalComments: internalComments,
-                                totalPages: totalPages,
-                                files: uploadedFiles
-                            })
-                        }).then(r => r.json()),
-                        fetch(apiUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'countWordsFromBase64',
-                                files: uploadedFiles,
-                                sourceLang: budgetData.sourceLang,
-                                internalComments: internalComments
-                            })
-                        }).then(r => r.json())
-                    ]);
-                } else {
-                    // Solo crear carpeta
-                    folderResult = await fetch(apiUrl, {
+                // Lanzar carpeta y, si procede, análisis en paralelo
+                const promises = [
+                    fetch(apiUrl, {
                         method: 'POST',
                         body: JSON.stringify({
                             action: 'createBudgetFolder',
@@ -4325,80 +4339,217 @@
                             clientWhatsApp: budgetData.clientWhatsApp,
                             internalComments: internalComments,
                             totalPages: totalPages,
-                            files: uploadedFiles
+                            files: files
                         })
-                    }).then(r => r.json());
-                    claudeResult = { success: false };
+                    }).then(r => r.json())
+                ];
+                
+                if (withAnalysis) {
+                    promises.push(fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'countWordsParallel',
+                            files: files,
+                            sourceLang: budgetData.sourceLang,
+                            internalComments: internalComments
+                        })
+                    }).then(r => r.json()));
                 }
                 
-                if (!folderResult.success) throw new Error(folderResult.error);
+                const results = await Promise.all(promises);
+                const folderResult = results[0];
+                const claudeResult = withAnalysis ? results[1] : null;
                 
+                if (!folderResult.success) {
+                    throw new Error(folderResult.error || 'Error creando carpeta');
+                }
+                
+                // Guardar datos de carpeta
                 budgetData.id = folderResult.budgetId;
                 budgetData.folderId = folderResult.folderId;
                 budgetData.folderUrl = folderResult.folderUrl;
-                budgetData.numArchivos = uploadedFiles.length;
+                budgetData.numArchivos = files.length;
+                bgState.folderCreated = true;
+                bgState.folderError = null;
+                bgState.pendingFiles = null;
                 
-                // Guardar resultados de palabras si Claude tuvo éxito
-                if (claudeResult.success) {
-                    budgetData.fileAnalysis = claudeResult.analysis || [];
-                    budgetData.wordCount = claudeResult.totalWords || 0;
-                    
-                    // Guardar en hoja + TXTs en Drive (operación rápida)
-                    fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'saveWordCountResults',
-                            budgetId: budgetData.id,
-                            folderId: budgetData.folderId,
-                            analysis: claudeResult.analysis,
-                            totalWords: claudeResult.totalWords,
-                            totalPages: claudeResult.totalPages,
-                            sourceLang: budgetData.sourceLang
-                        })
-                    }); // fire-and-forget: no esperamos
-                } else {
-                    console.warn('Claude no pudo analizar palabras:', claudeResult.error);
-                    budgetData.wordCount = 0;
-                    budgetData.fileAnalysis = [];
+                // Actualizar UI con ID de presupuesto
+                const idDisplay = document.getElementById('budgetIdDisplay');
+                if (idDisplay) {
+                    idDisplay.textContent = budgetData.id;
+                    idDisplay.classList.add('active');
+                }
+                const delBtn = document.getElementById('deleteBudgetBtn');
+                if (delBtn) delBtn.style.display = 'inline-block';
+                const folderLink = document.getElementById('folderLink');
+                if (folderLink) {
+                    folderLink.href = budgetData.folderUrl;
+                    folderLink.classList.remove('hidden');
                 }
                 
-                // Update UI
-                document.getElementById('budgetIdDisplay').textContent = budgetData.id;
-                document.getElementById('budgetIdDisplay').classList.add('active');
-                document.getElementById('deleteBudgetBtn').style.display = 'inline-block';
+                // Activar botón Extraer ahora que existe carpeta
+                const extractBtn = document.getElementById('step2BtnExtract');
+                if (extractBtn) extractBtn.disabled = false;
                 
-                const folderLink = document.getElementById('folderLink');
-                folderLink.href = budgetData.folderUrl;
-                folderLink.classList.remove('hidden');
+                // Procesar resultado del análisis si lo hubo
+                if (withAnalysis && claudeResult) {
+                    if (claudeResult.success) {
+                        budgetData.fileAnalysis = claudeResult.analysis || [];
+                        budgetData.wordCount = claudeResult.totalWords || 0;
+                        bgState.analysisDone = true;
+                        
+                        // Guardar resultado en hoja (fire-and-forget)
+                        fetch(apiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'saveWordCountResults',
+                                budgetId: budgetData.id,
+                                folderId: budgetData.folderId,
+                                analysis: claudeResult.analysis,
+                                totalWords: claudeResult.totalWords,
+                                totalPages: claudeResult.totalPages,
+                                sourceLang: budgetData.sourceLang
+                            })
+                        });
+                        
+                        // Actualizar resumen de palabras si está visible
+                        refreshWordCountSummary();
+                        
+                        showBgBanner('success', `✓ Carpeta creada · ${budgetData.id} · ${budgetData.wordCount} palabras`, false);
+                    } else {
+                        bgState.analysisError = claudeResult.error;
+                        showBgBanner('success', `✓ Carpeta creada · ${budgetData.id} · ⚠️ recuento falló`, false);
+                    }
+                } else {
+                    showBgBanner('success', `✓ Carpeta creada · ${budgetData.id}`, false);
+                }
                 
-                completedSteps.add(2);
-                completedSteps.add(4); // Tasación opcional — se marca verde al avanzar
-                updateProgressSteps();
-                hideStatus();
+                // Auto-ocultar el banner tras 4s en éxito
+                setTimeout(hideBgBanner, 4000);
                 
-                const wordMsg = claudeResult.success
-                    ? ` · ${budgetData.wordCount} palabras`
-                    : ' · recuento pendiente';
-                showSuccess('Carpeta creada' + wordMsg, budgetData.id);
-                
-                setTimeout(() => {
-                    hideSuccess();
-                    showCard(4);  // Ir directamente a Tasación
-                }, 1800);
-                
-            } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
+            } catch(error) {
+                bgState.folderError = error.message;
+                bgState.pendingFiles = files;
+                bgState.pendingWithAnalysis = withAnalysis;
+                bgState.pendingInternalComments = internalComments;
+                showBgBanner('error', '⚠️ No se pudo crear la carpeta: ' + error.message, true);
+            }
+        }
+        
+        // Refrescar el resumen de palabras en paso 4 si está visible
+        function refreshWordCountSummary() {
+            const summaryBox = document.getElementById('wordCountSummaryBox');
+            if (!summaryBox || summaryBox.classList.contains('hidden')) return;
+            // Re-disparar el render del paso 4
+            if (typeof showCard === 'function' && currentStep === 4) showCard(4);
+        }
+
+        async function createFolderAndContinue(withAnalysis = true, foreground = false) {
+            if (uploadedFiles.length === 0) {
+                showStatus('Adjunta al menos un archivo', 'warning');
+                return;
             }
             
-            btn.disabled = false;
-            btnOnly.disabled = false;
-            btn.innerHTML = '📁+🔢 Crear y Analizar →';
-            btnOnly.innerHTML = '📁 Crear Carpeta';
+            const btn = document.getElementById('step2Btn');
+            const btnOnly = document.getElementById('step2BtnOnly');
+            const btnExtract = document.getElementById('step2BtnExtract');
+            
+            const internalComments = document.getElementById('internalComments').value.trim();
+            budgetData.internalComments = internalComments;
+            const totalPages = uploadedFiles.reduce((sum, f) => sum + (f.pages || 1), 0);
+            budgetData.pageCount = totalPages;
+            
+            // Reset estado background
+            bgState = {
+                folderCreated: false,
+                folderError: null,
+                analysisDone: false,
+                analysisError: null,
+                pendingFiles: null,
+                pendingWithAnalysis: withAnalysis,
+                pendingInternalComments: internalComments
+            };
+            
+            // Modo BACKGROUND: lanzar y avanzar inmediatamente al paso 3
+            const filesSnapshot = uploadedFiles.slice();
+            
+            // Deshabilitar botones durante el proceso
+            btn.disabled = true;
+            btnOnly.disabled = true;
+            
+            // Mostrar banner de estado
+            showBgBanner('loading', withAnalysis
+                ? '⏳ Creando carpeta y analizando documentos en background...'
+                : '⏳ Creando carpeta en background...', false);
+            
+            // Marcar paso 2 como completado y avanzar
+            completedSteps.add(2);
+            completedSteps.add(4);
+            updateProgressSteps();
+            
+            // Lanzar tarea de fondo (sin await)
+            runBackgroundCreate(filesSnapshot, withAnalysis, internalComments);
+            
+            // Avanzar inmediatamente al paso 4 (Solic. Tasación)
+            setTimeout(() => showCard(4), 300);
         }
 
         // Mantener createFolder como alias para compatibilidad
         async function createFolder() {
             return createFolderAndContinue(true);
+        }
+
+        // ====== EXTRAER TEXTOS (botón Extraer) ======
+        async function extractTexts() {
+            // Verificar que existe carpeta (creada o en proceso)
+            if (!budgetData.folderId) {
+                if (bgState.folderCreated === false && bgState.pendingFiles === null) {
+                    showStatus('Primero crea la carpeta', 'warning');
+                    return;
+                }
+                showStatus('Espera a que termine la creación de la carpeta', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('step2BtnExtract');
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner"></span> Extrayendo...';
+            }
+            
+            showStatus('Extrayendo texto en paralelo (Sonnet)...', 'loading');
+            
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'extractTextParallel',
+                        folderId: budgetData.folderId,
+                        budgetId: budgetData.id,
+                        sourceLang: budgetData.sourceLang,
+                        internalComments: budgetData.internalComments || ''
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    budgetData.fileAnalysis = data.analysis || [];
+                    budgetData.wordCount = data.totalWords || 0;
+                    refreshWordCountSummary();
+                    hideStatus();
+                    showSuccess(`✓ Extracción completada · ${data.totalWords} palabras · ${data.totalPages} páginas`, budgetData.id);
+                    setTimeout(hideSuccess, 3500);
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch(e) {
+                showStatus('Error: ' + e.message, 'error');
+            }
+            
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            }
         }
 
         // ====== WORD COUNT ======
