@@ -1069,19 +1069,21 @@
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
 
-            <!-- v3.7.4: Metadatos opcionales del presupuesto -->
+            <!-- v3.7.4 (UX fix v3.7.5): Metadatos opcionales del presupuesto -->
             <div id="docMetaSection" style="margin-top:12px; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
                 <div style="font-size:0.8rem; color:#64748b; margin-bottom:8px; font-weight:500;">📋 Metadatos del documento (opcional, para histórico)</div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                     <div>
                         <label style="font-size:0.8rem; color:#475569; display:block; margin-bottom:4px;">Tipo de documento</label>
-                        <input list="docTypesList" id="docType" placeholder="Varios" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box;">
-                        <datalist id="docTypesList"></datalist>
+                        <select id="docType" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box; background:white;">
+                            <option value="Varios">Varios</option>
+                        </select>
                     </div>
                     <div>
                         <label style="font-size:0.8rem; color:#475569; display:block; margin-bottom:4px;">País de origen</label>
-                        <input list="countriesList" id="docCountry" placeholder="(ninguno)" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box;">
-                        <datalist id="countriesList"></datalist>
+                        <select id="docCountry" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box; background:white;">
+                            <option value="">(ninguno)</option>
+                        </select>
                     </div>
                 </div>
                 <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:0.9rem; color:#475569; cursor:pointer;">
@@ -1666,8 +1668,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.4';
-        const HTML_DATE = '04/05/2026';
+        const HTML_VERSION = '3.7.5';
+        const HTML_DATE = '07/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -3486,9 +3488,15 @@
                     const docTypeField = document.getElementById('docType');
                     const docCountryField = document.getElementById('docCountry');
                     const docApostilleField = document.getElementById('docApostille');
+                    // Asignar valor PRIMERO, luego repoblar (populateDocMetadata
+                    // conservará el valor actual al rellenar las opciones).
                     if (docTypeField) docTypeField.value = budgetData.tipoDocumento;
                     if (docCountryField) docCountryField.value = budgetData.paisOrigen;
                     if (docApostilleField) docApostilleField.checked = budgetData.apostilla;
+                    populateDocMetadata();
+                    // Forzar la selección por si el valor era nuevo y no estaba en la lista
+                    if (docTypeField) docTypeField.value = budgetData.tipoDocumento;
+                    if (docCountryField) docCountryField.value = budgetData.paisOrigen;
                     
                     // Restaurar análisis detallado (array de archivos con palabras/páginas)
                     budgetData.fileAnalysis = b.analisisDetalle || [];
@@ -3662,14 +3670,40 @@
             }
         }
 
-        // v3.7.4: poblar datalists de tipo de documento y país
+        // v3.7.4 (v3.7.5: selects clásicos): poblar selectores de tipo/país.
+        // Conserva el valor actualmente seleccionado si existe, para no perderlo
+        // al repoblar tras retomar un presupuesto.
         function populateDocMetadata() {
-            const types = window.allDocumentTypes || ['Varios'];
+            const types = window.allDocumentTypes && window.allDocumentTypes.length ? window.allDocumentTypes : ['Varios'];
             const countries = window.allCountries || [];
-            const dlTypes = document.getElementById('docTypesList');
-            const dlCountries = document.getElementById('countriesList');
-            if (dlTypes) dlTypes.innerHTML = types.map(t => `<option value="${t}"></option>`).join('');
-            if (dlCountries) dlCountries.innerHTML = countries.map(c => `<option value="${c}"></option>`).join('');
+
+            const typeSelect = document.getElementById('docType');
+            const countrySelect = document.getElementById('docCountry');
+
+            if (typeSelect) {
+                const currentType = typeSelect.value || 'Varios';
+                // Asegurar que "Varios" esté siempre presente al principio
+                const typesWithVarios = types.includes('Varios') ? types : ['Varios'].concat(types);
+                typeSelect.innerHTML = typesWithVarios
+                    .map(t => `<option value="${t}"${t === currentType ? ' selected' : ''}>${t}</option>`)
+                    .join('');
+                // Si el currentType no existía en la lista, lo añadimos para no perderlo
+                if (!typesWithVarios.includes(currentType) && currentType) {
+                    typeSelect.insertAdjacentHTML('beforeend', `<option value="${currentType}" selected>${currentType}</option>`);
+                }
+            }
+
+            if (countrySelect) {
+                const currentCountry = countrySelect.value || '';
+                let html = `<option value=""${currentCountry === '' ? ' selected' : ''}>(ninguno)</option>`;
+                html += countries
+                    .map(c => `<option value="${c}"${c === currentCountry ? ' selected' : ''}>${c}</option>`)
+                    .join('');
+                countrySelect.innerHTML = html;
+                if (currentCountry && !countries.includes(currentCountry)) {
+                    countrySelect.insertAdjacentHTML('beforeend', `<option value="${currentCountry}" selected>${currentCountry}</option>`);
+                }
+            }
         }
 
         // ====== LANGUAGES ======
