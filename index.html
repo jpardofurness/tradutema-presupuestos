@@ -724,9 +724,14 @@
             <div class="file-list" id="quickFileList"></div>
             <div class="file-total" id="quickFileTotal" style="display:none;"></div>
             
-            <button class="btn btn-primary btn-orange action-btn" id="quickCountBtn" onclick="doQuickCount()" style="display:none;">
-                🔢 Contar Palabras
-            </button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;" id="quickActionButtons">
+                <button class="btn btn-primary btn-orange action-btn" id="quickCountBtn" onclick="doQuickCount()" style="display:none; flex:1; min-width:140px;">
+                    🔢 Contar Palabras
+                </button>
+                <button class="btn action-btn" id="quickExtractBtn" onclick="doQuickExtract()" style="display:none; flex:1; min-width:140px; background:#7c3aed; color:white;">
+                    📄 Extraer
+                </button>
+            </div>
             
             <div class="results-box hidden" id="quickCountResults">
                 <div class="results-title">Resultado del análisis</div>
@@ -1063,7 +1068,28 @@
             </div>
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
-            
+
+            <!-- v3.7.4: Metadatos opcionales del presupuesto -->
+            <div id="docMetaSection" style="margin-top:12px; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+                <div style="font-size:0.8rem; color:#64748b; margin-bottom:8px; font-weight:500;">📋 Metadatos del documento (opcional, para histórico)</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div>
+                        <label style="font-size:0.8rem; color:#475569; display:block; margin-bottom:4px;">Tipo de documento</label>
+                        <input list="docTypesList" id="docType" placeholder="Varios" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box;">
+                        <datalist id="docTypesList"></datalist>
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem; color:#475569; display:block; margin-bottom:4px;">País de origen</label>
+                        <input list="countriesList" id="docCountry" placeholder="(ninguno)" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box;">
+                        <datalist id="countriesList"></datalist>
+                    </div>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:0.9rem; color:#475569; cursor:pointer;">
+                    <input type="checkbox" id="docApostille" style="width:16px; height:16px; cursor:pointer;">
+                    Lleva apostilla
+                </label>
+            </div>
+
             <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
                 <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false, false)" disabled style="flex:1;min-width:130px;">
                     📁 Crear Carpeta
@@ -1328,6 +1354,10 @@
                         <input type="radio" name="calcMethod" value="provider" onchange="onCalcMethodChange()">
                         <span class="calc-method-label">🤝 Por cotización proveedor + margen</span>
                     </label>
+                    <label class="calc-method-option">
+                        <input type="radio" name="calcMethod" value="historical" onchange="onCalcMethodChange()">
+                        <span class="calc-method-label">📊 Según Tipo de Documento (histórico)</span>
+                    </label>
                 </div>
             </div>
             
@@ -1502,7 +1532,28 @@
                     <!-- Se rellena con JS -->
                 </div>
             </div>
-            
+
+            <!-- OPCIÓN 5 (v3.7.4): Cálculo según Tipo de Documento (histórico) -->
+            <div class="margin-calc-box hidden" id="step5TariffCalcHistorical">
+                <div class="margin-calc-header">
+                    <span>📊 Histórico según Tipo de Documento</span>
+                </div>
+                <div id="historicalCriteria" style="font-size:0.85rem; color:#475569; margin-bottom:10px; padding:8px 10px; background:#f1f5f9; border-radius:6px;">
+                    <!-- Resumen de filtros aplicados -->
+                </div>
+                <div id="historicalLoading" style="display:none; text-align:center; padding:14px; color:#64748b; font-size:0.9rem;">
+                    <span class="spinner"></span> Buscando presupuestos pasados…
+                </div>
+                <div id="historicalResults" style="max-height:340px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; background:white;">
+                    <!-- Se rellena con JS -->
+                </div>
+                <div class="margin-divider" style="margin-top:14px;"></div>
+                <div class="margin-calc-row input-row">
+                    <span class="margin-label">Tu tarifa (IVA inc.):</span>
+                    <input type="number" id="quoteAmountHistorical" step="0.01" min="0" placeholder="Ej: 30.00" onchange="onHistoricalAmountChange()">
+                </div>
+            </div>
+
             <!-- Plazo común para todos los métodos -->
             <div class="quote-row">
                 <div class="form-group">
@@ -1615,7 +1666,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.2';
+        const HTML_VERSION = '3.7.4';
         const HTML_DATE = '04/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1678,7 +1729,28 @@
                 loadData();
             }
             updateClientMessage();
-            
+
+            // v3.7.4: listeners para metadatos. Si hay budgetId ya creado, persistir cambio.
+            const docTypeEl = document.getElementById('docType');
+            const docCountryEl = document.getElementById('docCountry');
+            const docApostilleEl = document.getElementById('docApostille');
+            const persistDocMeta = () => {
+                if (!budgetData.id) return;  // aún no se ha creado carpeta
+                fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'updateBudgetBasicData',
+                        budgetId: budgetData.id,
+                        tipoDocumento: (docTypeEl?.value || '').trim() || 'Varios',
+                        paisOrigen: (docCountryEl?.value || '').trim(),
+                        apostilla: !!docApostilleEl?.checked
+                    })
+                }).catch(e => console.warn('persistDocMeta:', e));
+            };
+            if (docTypeEl) docTypeEl.addEventListener('change', persistDocMeta);
+            if (docCountryEl) docCountryEl.addEventListener('change', persistDocMeta);
+            if (docApostilleEl) docApostilleEl.addEventListener('change', persistDocMeta);
+
             // Setup drag & drop for file upload
             const dropArea = document.getElementById('fileUploadArea');
             
@@ -1867,6 +1939,14 @@
             if (clientWhatsApp) clientWhatsApp.value = '';
             if (clientEmailStep1) clientEmailStep1.value = '';
             if (clientWhatsAppStep1) clientWhatsAppStep1.value = '';
+
+            // v3.7.4: limpiar metadatos del documento
+            const docTypeReset = document.getElementById('docType');
+            const docCountryReset = document.getElementById('docCountry');
+            const docApostilleReset = document.getElementById('docApostille');
+            if (docTypeReset) docTypeReset.value = '';
+            if (docCountryReset) docCountryReset.value = '';
+            if (docApostilleReset) docApostilleReset.checked = false;
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
             
             // Reset contacted providers section
@@ -2763,17 +2843,20 @@
             const total = document.getElementById('quickFileTotal');
             const area = document.getElementById('quickUploadArea');
             const btn = document.getElementById('quickCountBtn');
-            
+            const btnExtract = document.getElementById('quickExtractBtn');
+
             if (quickFiles.length === 0) {
                 list.innerHTML = '';
                 total.style.display = 'none';
                 area.classList.remove('has-files');
                 btn.style.display = 'none';
+                if (btnExtract) btnExtract.style.display = 'none';
                 return;
             }
-            
+
             area.classList.add('has-files');
-            btn.style.display = 'block';
+            btn.style.display = 'inline-block';
+            if (btnExtract) btnExtract.style.display = 'inline-block';
             
             let html = '';
             let totalSize = 0;
@@ -2902,7 +2985,85 @@
             window.analysisData = data;  // Para reusar las funciones de desglose
             showBreakdownModal(0);  // Mostrar primer archivo
         }
-        
+
+        // v3.7.4: doQuickExtract - extrae texto sin presupuesto, guarda en _ContarPalabras/timestamp
+        async function doQuickExtract() {
+            if (quickFiles.length === 0) return;
+            if (!confirm('Se extraerá el texto de ' + quickFiles.length + ' archivo(s) y se guardará en _PRESUPUESTOS/_ContarPalabras/.\n\n¿Continuar?')) return;
+
+            const btn = document.getElementById('quickExtractBtn');
+            const btnCount = document.getElementById('quickCountBtn');
+            btn.disabled = true;
+            btnCount.disabled = true;
+            const origLabel = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner"></span> Extrayendo...';
+
+            try {
+                showStatus('Extrayendo texto de los documentos...', 'loading');
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'quickExtract',
+                        files: quickFiles,
+                        sourceLang: document.getElementById('quickSourceLang').value || ''
+                    })
+                });
+
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Error desconocido');
+
+                hideStatus();
+
+                // Mostrar resultado en la tabla habitual
+                window.quickAnalysisData = data;
+                const tbody = document.getElementById('quickCountBody');
+                let html = '';
+                (data.analysis || []).forEach(f => {
+                    html += `
+                        <tr>
+                            <td>${f.fileName || f.name}</td>
+                            <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
+                            <td style="text-align:right">${f.pages || 0}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+
+                const failedNote = (data.failedPages > 0)
+                    ? `<div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:6px;color:#92400e;font-size:0.85rem;">⚠️ ${data.failedPages} página(s) no se pudieron procesar.</div>`
+                    : '';
+
+                document.getElementById('quickCountTotals').innerHTML = `
+                    <div class="results-grid">
+                        <div class="result-item">
+                            <div class="result-label">Total palabras</div>
+                            <div class="result-value">${(data.totalWords || 0).toLocaleString('es-ES')}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-label">Total páginas</div>
+                            <div class="result-value">${data.totalPages || 0}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px; padding:10px; background:#f0f9ff; border-radius:6px; font-size:0.9rem;">
+                        ✓ Textos extraídos en carpeta <strong>_ContarPalabras/${data.folderName}</strong>
+                        <a href="${data.folderUrl}" target="_blank" style="display:inline-block; margin-left:8px; color:#7c3aed; font-weight:500;">📁 Abrir en Drive</a>
+                    </div>
+                    ${failedNote}
+                `;
+
+                document.getElementById('quickCountResults').classList.remove('hidden');
+
+            } catch(error) {
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 4000);
+            }
+
+            btn.disabled = false;
+            btnCount.disabled = false;
+            btn.innerHTML = origLabel;
+        }
+
         function applyQuickBreakdown() {
             // Recalcular totales para quick count
             const data = window.quickAnalysisData;
@@ -3317,6 +3478,17 @@
                     if (internalCommentsField) {
                         internalCommentsField.value = budgetData.internalComments;
                     }
+
+                    // v3.7.4: restaurar metadatos del documento
+                    budgetData.tipoDocumento = b.tipoDocumento || 'Varios';
+                    budgetData.paisOrigen = b.paisOrigen || '';
+                    budgetData.apostilla = !!b.apostilla;
+                    const docTypeField = document.getElementById('docType');
+                    const docCountryField = document.getElementById('docCountry');
+                    const docApostilleField = document.getElementById('docApostille');
+                    if (docTypeField) docTypeField.value = budgetData.tipoDocumento;
+                    if (docCountryField) docCountryField.value = budgetData.paisOrigen;
+                    if (docApostilleField) docApostilleField.checked = budgetData.apostilla;
                     
                     // Restaurar análisis detallado (array de archivos con palabras/páginas)
                     budgetData.fileAnalysis = b.analisisDetalle || [];
@@ -3444,6 +3616,9 @@
                     allProviders = data.providers || [];
                     allTariffs = data.tariffs || [];
                     if (data.marginParams) marginParams = data.marginParams;
+                    // v3.7.4: catálogos
+                    window.allDocumentTypes = data.documentTypes || ['Varios'];
+                    window.allCountries = data.countries || [];
                     apiVersion = data.version || '?';
                     apiDate = data.versionDate || '';
                     
@@ -3451,6 +3626,7 @@
                     updateVersionIndicator();
                     
                     populateLanguages();
+                    populateDocMetadata();
                     hideStatus();
                     
                     // Auto-sync silencioso WooCommerce (última semana, en background)
@@ -3484,6 +3660,16 @@
                     apiDisplay.textContent = 'Cargando...';
                 }
             }
+        }
+
+        // v3.7.4: poblar datalists de tipo de documento y país
+        function populateDocMetadata() {
+            const types = window.allDocumentTypes || ['Varios'];
+            const countries = window.allCountries || [];
+            const dlTypes = document.getElementById('docTypesList');
+            const dlCountries = document.getElementById('countriesList');
+            if (dlTypes) dlTypes.innerHTML = types.map(t => `<option value="${t}"></option>`).join('');
+            if (dlCountries) dlCountries.innerHTML = countries.map(c => `<option value="${c}"></option>`).join('');
         }
 
         // ====== LANGUAGES ======
@@ -4339,7 +4525,11 @@
                             clientWhatsApp: budgetData.clientWhatsApp,
                             internalComments: internalComments,
                             totalPages: totalPages,
-                            files: files
+                            files: files,
+                            // v3.7.4: metadatos opcionales
+                            tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
+                            paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
+                            apostilla: !!document.getElementById('docApostille')?.checked
                         })
                     }).then(r => r.json())
                 ];
@@ -5494,12 +5684,14 @@
             const directBox = document.getElementById('step5TariffCalcDirect');
             const wordsBox = document.getElementById('step5TariffCalcWords');
             const providerBox = document.getElementById('step5TariffCalcProvider');
-            
+            const historicalBox = document.getElementById('step5TariffCalcHistorical');
+
             pagesBox.classList.add('hidden');
             directBox.classList.add('hidden');
             wordsBox.classList.add('hidden');
             providerBox.classList.add('hidden');
-            
+            if (historicalBox) historicalBox.classList.add('hidden');
+
             if (method === 'pages') {
                 pagesBox.classList.remove('hidden');
             } else if (method === 'direct') {
@@ -5514,8 +5706,111 @@
             } else if (method === 'provider') {
                 providerBox.classList.remove('hidden');
                 recalculateFromProvider();
+            } else if (method === 'historical') {
+                historicalBox.classList.remove('hidden');
+                loadHistoricalQuotes();
             }
-            
+
+            updateClientMessage();
+        }
+
+        // v3.7.4: cargar histórico de presupuestos coincidentes
+        async function loadHistoricalQuotes() {
+            const sourceLang = budgetData.sourceLang || '';
+            const targetLang = budgetData.targetLang || '';
+            const tipoDoc = (document.getElementById('docType')?.value || '').trim() || 'Varios';
+            const pais = (document.getElementById('docCountry')?.value || '').trim();
+            const apostilla = !!document.getElementById('docApostille')?.checked;
+
+            const criteria = document.getElementById('historicalCriteria');
+            const loading = document.getElementById('historicalLoading');
+            const results = document.getElementById('historicalResults');
+
+            if (criteria) {
+                criteria.innerHTML = `Filtros: <strong>${sourceLang}</strong> → <strong>${targetLang}</strong> · Tipo: <strong>${tipoDoc}</strong>${pais ? ' · País: <strong>' + pais + '</strong>' : ''} · Apostilla: <strong>${apostilla ? 'Sí' : 'No'}</strong>`;
+            }
+            if (loading) loading.style.display = 'block';
+            if (results) results.innerHTML = '';
+
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'getHistoricalQuotes',
+                        sourceLang: sourceLang,
+                        targetLang: targetLang,
+                        tipoDocumento: tipoDoc,
+                        paisOrigen: pais,
+                        apostilla: apostilla
+                    })
+                });
+                const data = await resp.json();
+                if (loading) loading.style.display = 'none';
+
+                if (!data.success) {
+                    if (results) results.innerHTML = `<div style="padding:14px; color:#dc2626; font-size:0.9rem;">Error: ${data.error || 'desconocido'}</div>`;
+                    return;
+                }
+
+                const quotes = data.quotes || [];
+                if (quotes.length === 0) {
+                    if (results) results.innerHTML = `<div style="padding:14px; color:#64748b; font-size:0.9rem; text-align:center;">No se encontraron presupuestos pasados con estos criterios.</div>`;
+                    return;
+                }
+
+                // Tabla de resultados
+                let html = `
+                    <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                        <thead>
+                            <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                                <th style="padding:8px; text-align:left;">Fecha</th>
+                                <th style="padding:8px; text-align:left;">Ref</th>
+                                <th style="padding:8px; text-align:right;">Págs</th>
+                                <th style="padding:8px; text-align:right;">Pal.</th>
+                                <th style="padding:8px; text-align:left;">Cotizaciones proveedores</th>
+                                <th style="padding:8px; text-align:right;">Importe cliente</th>
+                                <th style="padding:8px; text-align:right;">Plazo</th>
+                                <th style="padding:8px; text-align:left;">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                quotes.forEach((q, idx) => {
+                    const importeNum = parseFloat(String(q.importeCliente || '0').replace(',', '.')) || 0;
+                    html += `
+                        <tr style="border-bottom:1px solid #f1f5f9; ${idx === 0 ? 'background:#fefce8;' : ''}">
+                            <td style="padding:6px 8px; white-space:nowrap;">${q.fecha || ''}</td>
+                            <td style="padding:6px 8px; font-family:monospace;">${q.ref || ''}</td>
+                            <td style="padding:6px 8px; text-align:right;">${q.paginas || ''}</td>
+                            <td style="padding:6px 8px; text-align:right;">${q.palabras || ''}</td>
+                            <td style="padding:6px 8px; color:#475569; font-size:0.8rem;">${q.cotizaciones || '-'}</td>
+                            <td style="padding:6px 8px; text-align:right; font-weight:600; cursor:pointer; color:#7c3aed;" title="Usar este importe" onclick="useHistoricalAmount(${importeNum})">${q.importeCliente || ''}</td>
+                            <td style="padding:6px 8px; text-align:right;">${q.plazoCliente || ''}</td>
+                            <td style="padding:6px 8px; font-size:0.8rem; color:#64748b;">${q.estado || ''}</td>
+                        </tr>
+                    `;
+                });
+                html += `</tbody></table>`;
+
+                if (results) results.innerHTML = html;
+            } catch(e) {
+                if (loading) loading.style.display = 'none';
+                if (results) results.innerHTML = `<div style="padding:14px; color:#dc2626; font-size:0.9rem;">Error: ${e.message}</div>`;
+            }
+        }
+
+        // Click en importe pasado → copiar al input
+        function useHistoricalAmount(amount) {
+            const inp = document.getElementById('quoteAmountHistorical');
+            if (inp) {
+                inp.value = amount.toFixed(2);
+                onHistoricalAmountChange();
+            }
+        }
+
+        function onHistoricalAmountChange() {
+            const amount = parseFloat(document.getElementById('quoteAmountHistorical').value) || 0;
+            budgetData.amount = amount;
             updateClientMessage();
         }
         
@@ -5766,6 +6061,8 @@
                 return document.getElementById('quoteAmountWords').value || '';
             } else if (currentCalcMethod === 'provider') {
                 return document.getElementById('quoteAmountProvider').value || '';
+            } else if (currentCalcMethod === 'historical') {
+                return document.getElementById('quoteAmountHistorical').value || '';
             }
             return '';
         }
