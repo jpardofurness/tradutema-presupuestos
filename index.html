@@ -1680,7 +1680,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.9';
+        const HTML_VERSION = '3.7.12';
         const HTML_DATE = '08/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1954,11 +1954,11 @@
             if (clientEmailStep1) clientEmailStep1.value = '';
             if (clientWhatsAppStep1) clientWhatsAppStep1.value = '';
 
-            // v3.7.4: limpiar metadatos del documento
+            // v3.7.4: limpiar metadatos del documento (v3.7.11: tipo doc por defecto "Varios")
             const docTypeReset = document.getElementById('docType');
             const docCountryReset = document.getElementById('docCountry');
             const docApostilleReset = document.getElementById('docApostille');
-            if (docTypeReset) docTypeReset.value = '';
+            if (docTypeReset) docTypeReset.value = 'Varios';
             if (docCountryReset) docCountryReset.value = '';
             if (docApostilleReset) docApostilleReset.checked = false;
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
@@ -2001,7 +2001,49 @@
             // Reset comentarios internos (paso 1)
             const internalComments = document.getElementById('internalComments');
             if (internalComments) internalComments.value = '';
-            
+
+            // v3.7.10: reset completo del paso 3 (Solicitar tasación a proveedores)
+            // Plazo de entrega → siempre vuelve a "Plazo abierto"
+            deadlineType = 'open';
+            const deadlineOpenBtn = document.getElementById('deadlineOpen');
+            const deadlineFixedBtn = document.getElementById('deadlineFixed');
+            const deadlineFieldsBox = document.getElementById('deadlineFields');
+            if (deadlineOpenBtn) deadlineOpenBtn.classList.add('active');
+            if (deadlineFixedBtn) deadlineFixedBtn.classList.remove('active');
+            if (deadlineFieldsBox) deadlineFieldsBox.classList.remove('visible');
+            const deadlineDate = document.getElementById('deadlineDate');
+            const deadlineTime = document.getElementById('deadlineTime');
+            if (deadlineDate) deadlineDate.value = '';
+            if (deadlineTime) deadlineTime.value = '18:00';
+            // Checkboxes custom y campos de tarifa propuesta
+            const includeWordCount = document.getElementById('includeWordCount');
+            const includeProposedRate = document.getElementById('includeProposedRate');
+            const proposedRateFields = document.getElementById('proposedRateFields');
+            const proposedTariff = document.getElementById('proposedTariff');
+            const proposedTotal = document.getElementById('proposedTotal');
+            if (includeWordCount) includeWordCount.classList.remove('checked');
+            if (includeProposedRate) includeProposedRate.classList.remove('checked');
+            if (proposedRateFields) proposedRateFields.classList.add('hidden');
+            if (proposedTariff) proposedTariff.value = '';
+            if (proposedTotal) proposedTotal.value = '';
+            // Mensaje editado en el modal de preview a proveedor
+            const providerMessageEdit = document.getElementById('providerMessageEdit');
+            if (providerMessageEdit) providerMessageEdit.value = '';
+
+            // v3.7.10: reset paso 4 (importes adicionales y modo del histórico)
+            const quoteAmountDirect = document.getElementById('quoteAmountDirect');
+            const quoteAmountHistorical = document.getElementById('quoteAmountHistorical');
+            if (quoteAmountDirect) quoteAmountDirect.value = '';
+            if (quoteAmountHistorical) quoteAmountHistorical.value = '';
+            // Modo del histórico vuelve a "exact" por defecto
+            const historicalModeExact = document.querySelector('input[name="historicalMode"][value="exact"]');
+            if (historicalModeExact) historicalModeExact.checked = true;
+            // Limpiar resultados del histórico si estaban renderizados
+            const historicalResults = document.getElementById('historicalResults');
+            const historicalCriteria = document.getElementById('historicalCriteria');
+            if (historicalResults) historicalResults.innerHTML = '';
+            if (historicalCriteria) historicalCriteria.innerHTML = '';
+
             // Reset buttons
             if (step1Btn) step1Btn.disabled = true;
             if (step2Btn) { step2Btn.disabled = true; step2Btn.style.display = ''; }
@@ -3719,40 +3761,66 @@
         }
 
         // ====== LANGUAGES ======
+        // v3.7.12: orden con FIGS+ primero, luego alfabético respetando acentos
+        function sortLanguagesFIGSFirst(arr) {
+            const PRIORITY = ['Alemán', 'Inglés', 'Italiano', 'Francés', 'Portugués'];
+            const priority = arr.filter(l => PRIORITY.includes(l))
+                .sort((a, b) => PRIORITY.indexOf(a) - PRIORITY.indexOf(b));
+            const rest = arr.filter(l => !PRIORITY.includes(l))
+                .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+            return priority.concat(rest);
+        }
+
         function populateLanguages() {
             const sourceSet = new Set();
             const targetSet = new Set();
-            
+
             allTariffs.forEach(t => {
                 if (t.idiomaOrigen) sourceSet.add(t.idiomaOrigen);
                 if (t.idiomaDestino) targetSet.add(t.idiomaDestino);
             });
-            
+
             const sourceSelect = document.getElementById('sourceLang');
             const targetSelect = document.getElementById('targetLang');
             const quickSourceSelect = document.getElementById('quickSourceLang');
-            
+
             sourceSelect.innerHTML = '<option value="">Seleccionar...</option>';
             targetSelect.innerHTML = '<option value="">Seleccionar...</option>';
             if (quickSourceSelect) quickSourceSelect.innerHTML = '<option value="">Seleccionar idioma...</option>';
-            
-            [...sourceSet].sort().forEach(lang => {
+
+            sortLanguagesFIGSFirst([...sourceSet]).forEach(lang => {
                 sourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
                 if (quickSourceSelect) quickSourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
             });
-            
-            [...targetSet].sort().forEach(lang => {
+
+            sortLanguagesFIGSFirst([...targetSet]).forEach(lang => {
                 targetSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
             });
         }
 
         function onLanguageChange() {
-            const src = document.getElementById('sourceLang').value;
-            const tgt = document.getElementById('targetLang').value;
-            
+            const sourceEl = document.getElementById('sourceLang');
+            const targetEl = document.getElementById('targetLang');
+            let src = sourceEl.value;
+            let tgt = targetEl.value;
+
+            // v3.7.12: si se elige un origen no-español y destino está vacío,
+            // auto-rellenar destino con Español (solo si la opción existe).
+            // A la inversa también: destino no-español + origen vacío → origen Español.
+            const ESP = 'Español';
+            const hasOption = (selectEl, value) =>
+                Array.from(selectEl.options).some(o => o.value === value);
+            if (src && src !== ESP && !tgt && hasOption(targetEl, ESP)) {
+                targetEl.value = ESP;
+                tgt = ESP;
+            } else if (tgt && tgt !== ESP && !src && hasOption(sourceEl, ESP)) {
+                sourceEl.value = ESP;
+                src = ESP;
+            }
+
             budgetData.sourceLang = src;
             budgetData.targetLang = tgt;
-            
+
             if (src && tgt) {
                 const tariff = allTariffs.find(t => t.idiomaOrigen === src && t.idiomaDestino === tgt);
                 if (tariff) {
@@ -3764,7 +3832,7 @@
                     budgetData.tariffPage2 = parseFloat(String(tariff.tarifaPagina2).replace(',', '.')) || 0;
                 }
             }
-            
+
             filterProviders();
             checkStep1Complete();
         }
@@ -3773,8 +3841,20 @@
             // Capturar datos del cliente del paso 1
             const emailEl = document.getElementById('clientEmailStep1');
             const whatsappEl = document.getElementById('clientWhatsAppStep1');
-            if (emailEl) budgetData.clientEmail = emailEl.value.trim();
-            if (whatsappEl) budgetData.clientWhatsApp = whatsappEl.value.trim();
+            const email = emailEl ? emailEl.value.trim() : '';
+            const whatsapp = whatsappEl ? whatsappEl.value.trim() : '';
+            if (emailEl) budgetData.clientEmail = email;
+            if (whatsappEl) budgetData.clientWhatsApp = whatsapp;
+
+            // v3.7.12: auto-marcar canal según el campo rellenado, solo si
+            // todavía no había canal elegido (respeta selección manual previa).
+            if (!budgetData.channel) {
+                if (email && !whatsapp) {
+                    selectChannel('M');
+                } else if (whatsapp && !email) {
+                    selectChannel('W');
+                }
+            }
         }
 
         function filterProviders() {
