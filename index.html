@@ -1540,6 +1540,18 @@
                 <div class="margin-calc-header">
                     <span>📊 Histórico según Tipo de Documento</span>
                 </div>
+                <!-- v3.7.8: toggle modo de coincidencia -->
+                <div style="display:flex; gap:14px; align-items:center; margin-bottom:8px; font-size:0.85rem; color:#475569;">
+                    <span style="font-weight:500;">Coincidencia:</span>
+                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="radio" name="historicalMode" value="exact" checked onchange="loadHistoricalQuotes()">
+                        Exacta (mismo tipo + país + apostilla)
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="radio" name="historicalMode" value="languages" onchange="loadHistoricalQuotes()">
+                        Toda la combinación de idiomas
+                    </label>
+                </div>
                 <div id="historicalCriteria" style="font-size:0.85rem; color:#475569; margin-bottom:10px; padding:8px 10px; background:#f1f5f9; border-radius:6px;">
                     <!-- Resumen de filtros aplicados -->
                 </div>
@@ -1668,7 +1680,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.5';
+        const HTML_VERSION = '3.7.8';
         const HTML_DATE = '07/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3861,9 +3873,23 @@
             showCard(step);
         }
 
-        function goToStep(step) {
+        async function goToStep(step) {
             const stepEl = document.querySelector(`.progress-step[data-step="${step}"]`);
             if (stepEl.classList.contains('locked')) return;
+
+            // v3.7.6: si saliendo del paso 2 hay archivos pendientes de subir,
+            // sincronizar antes de avanzar para que las acciones siguientes
+            // (envío a proveedores, análisis, etc.) usen el estado correcto.
+            if (currentStep === 2 && step !== 2 && uploadedFiles && uploadedFiles.length > 0 && budgetData.folderId) {
+                const ok = await syncPendingUploads();
+                if (!ok) {
+                    if (!confirm('No se han podido subir todos los archivos a Drive. ¿Avanzar de todos modos?')) {
+                        return;
+                    }
+                }
+                hideStatus();
+            }
+
             saveBudgetDataIfNeeded();
             showCard(step);
         }
@@ -4308,10 +4334,63 @@
             total.style.display = 'block';
         }
 
+        // v3.7.7: helper compartido (definido más abajo)
         function removeFile(index) {
+            const removed = uploadedFiles[index];
+            const removedName = removed ? removed.name : '';
             uploadedFiles.splice(index, 1);
             renderFiles();
+            if (removedName) recomputeAnalysisAfterRemoval(removedName);
         }
+
+        // v3.7.7: tras eliminar un archivo (local pendiente o ya en Drive),
+        // actualizar fileAnalysis, wordCount y pageCount, refrescar la UI del
+        // paso 3 si está visible y persistir al Sheet si el presupuesto existe.
+        function recomputeAnalysisAfterRemoval(removedName) {
+            if (!removedName) return;
+
+            // Quitar la entrada correspondiente del análisis (match por nombre)
+            if (Array.isArray(budgetData.fileAnalysis) && budgetData.fileAnalysis.length > 0) {
+                budgetData.fileAnalysis = budgetData.fileAnalysis.filter(f => {
+                    const fname = f.fileName || f.name || '';
+                    return fname !== removedName;
+                });
+            }
+
+            // Recalcular totales
+            const newWords = (budgetData.fileAnalysis || []).reduce((s, f) => s + (parseInt(f.words) || 0), 0);
+            const newPages = (budgetData.fileAnalysis || []).reduce((s, f) => s + (parseInt(f.pages) || 0), 0);
+
+            // Si no había análisis previo, dejar wordCount como estaba (no inventarlo en 0).
+            // Solo actualizamos si hay análisis registrado.
+            const hadAnalysis = budgetData.wordCount && budgetData.wordCount > 0;
+            if (hadAnalysis) {
+                budgetData.wordCount = newWords;
+                budgetData.pageCount = newPages || budgetData.pageCount;
+            }
+
+            // Refrescar resumen del paso 3 si está visible
+            try {
+                if (typeof refreshWordCountSummary === 'function') refreshWordCountSummary();
+            } catch(e) { /* no pasa nada */ }
+
+            // Persistir al Sheet si el presupuesto ya existe
+            if (budgetData.id && hadAnalysis) {
+                fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'updateBudgetBasicData',
+                        budgetId: budgetData.id,
+                        wordCount: newWords,
+                        pages: newPages,
+                        numArchivos: (budgetData.folderFiles || []).filter(f => f.name && !f.name.endsWith('.txt')).length
+                            + (uploadedFiles || []).length
+                    })
+                }).catch(e => console.warn('Persist after removal:', e));
+            }
+        }
+
+
 
         function previewLocalFile(index) {
             const file = uploadedFiles[index];
@@ -4410,6 +4489,9 @@
 
         async function removeDriveFile(fileId, index) {
             if (!confirm('¿Eliminar este archivo de la carpeta de Drive?')) return;
+            // Capturar nombre antes de borrar (para recomputar el análisis)
+            const removed = (budgetData.folderFiles || []).find(f => f.id === fileId);
+            const removedName = removed ? removed.name : '';
             showStatus('Eliminando archivo...', 'loading');
             try {
                 const resp = await fetch(apiUrl, {
@@ -4420,6 +4502,7 @@
                 if (data.success) {
                     budgetData.folderFiles = budgetData.folderFiles.filter(f => f.id !== fileId);
                     renderFolderFiles();
+                    if (removedName) recomputeAnalysisAfterRemoval(removedName);
                     hideStatus();
                 } else {
                     showStatus('Error: ' + data.error, 'error');
@@ -4429,33 +4512,50 @@
             }
         }
 
+        // v3.7.6: sincronizar archivos pendientes de subir a Drive.
+        // Se llama desde reanalyzeFromFolder Y desde el avance al paso 3,
+        // así los archivos añadidos en paso 2 al retomar siempre llegan a Drive
+        // antes de enviar tasación a proveedores.
+        async function syncPendingUploads() {
+            if (!uploadedFiles || uploadedFiles.length === 0) return true;
+            if (!budgetData.folderId) return false;
+            showStatus('Subiendo archivos nuevos a Drive...', 'loading');
+            try {
+                const uploadResp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'uploadFilesToFolder',
+                        folderId: budgetData.folderId,
+                        files: uploadedFiles
+                    })
+                });
+                const uploadData = await uploadResp.json();
+                if (uploadData.success) {
+                    uploadData.uploaded.forEach(f => {
+                        if (!budgetData.folderFiles) budgetData.folderFiles = [];
+                        budgetData.folderFiles.push(f);
+                    });
+                    uploadedFiles = [];
+                    renderFileList();
+                    if (typeof renderFolderFiles === 'function') renderFolderFiles();
+                    return true;
+                } else {
+                    showStatus('Error subiendo archivos: ' + (uploadData.error || ''), 'error');
+                    return false;
+                }
+            } catch(e) {
+                showStatus('Error subiendo archivos: ' + e.message, 'error');
+                return false;
+            }
+        }
+
         async function reanalyzeFromFolder() {
             const btn = document.getElementById('reanalyzeBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analizando...'; }
             showStatus('Analizando documentos con Claude...', 'loading');
 
             // Si hay archivos nuevos pendientes de subir, subirlos primero
-            if (uploadedFiles.length > 0) {
-                showStatus('Subiendo archivos nuevos...', 'loading');
-                try {
-                    const uploadResp = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'uploadFilesToFolder',
-                            folderId: budgetData.folderId,
-                            files: uploadedFiles
-                        })
-                    });
-                    const uploadData = await uploadResp.json();
-                    if (uploadData.success) {
-                        uploadData.uploaded.forEach(f => budgetData.folderFiles.push(f));
-                        uploadedFiles = [];
-                        renderFileList();
-                    }
-                } catch(e) {
-                    showStatus('Error subiendo archivos: ' + e.message, 'error');
-                }
-            }
+            await syncPendingUploads();
 
             try {
                 const resp = await fetch(apiUrl, {
@@ -5372,9 +5472,19 @@
         }
 
         // ====== PROVIDER EMAIL ======
-        function previewProviderEmail() {
+        async function previewProviderEmail() {
             if (selectedProviders.size === 0) return;
-            
+
+            // v3.7.6: garantizar que cualquier archivo pendiente esté en Drive
+            // antes de mostrar la preview (de lo contrario se enviaría sin él).
+            if (uploadedFiles && uploadedFiles.length > 0 && budgetData.folderId) {
+                const ok = await syncPendingUploads();
+                if (!ok) {
+                    if (!confirm('No se han podido subir todos los archivos. ¿Continuar de todos modos?')) return;
+                }
+                hideStatus();
+            }
+
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
             const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
@@ -5385,8 +5495,26 @@
                 <div style="margin-top: 8px;"><strong>Destinatarios (${providers.length}):</strong> ${providers.map(p => p.nombre).join(', ')}</div>
             `;
             
-            if (uploadedFiles.length > 0) {
-                recipientsHtml += `<div style="margin-top: 8px; color: #1e8449;"><strong>📎 Adjuntos:</strong> ${uploadedFiles.length} archivo(s)</div>`;
+            // v3.7.6: lista completa de archivos (Drive + pendientes de subir)
+            const driveFiles = (budgetData.folderFiles || [])
+                .filter(f => f.name && !f.name.endsWith('.txt'))  // excluir _RECUENTO.txt y similares
+                .map(f => f.name);
+            const pendingFiles = (uploadedFiles || []).map(f => f.name);
+            const allFiles = driveFiles.concat(pendingFiles);
+
+            if (allFiles.length > 0) {
+                const filesList = allFiles.map(n => `<li style="margin:2px 0;">${n}</li>`).join('');
+                const pendingNote = pendingFiles.length > 0
+                    ? ` <span style="color:#7c3aed; font-weight:500;">(${pendingFiles.length} se subirán al enviar)</span>`
+                    : '';
+                recipientsHtml += `
+                    <div style="margin-top: 8px; color: #1e8449;">
+                        <strong>📎 Adjuntos: ${allFiles.length} archivo(s)</strong>${pendingNote}
+                        <ul style="margin:6px 0 0 20px; padding:0; font-size:0.85rem; color:#475569; font-weight:normal;">${filesList}</ul>
+                    </div>
+                `;
+            } else {
+                recipientsHtml += `<div style="margin-top: 8px; color: #b91c1c;"><strong>⚠️ Sin adjuntos</strong></div>`;
             }
             
             document.getElementById('previewRecipients').innerHTML = recipientsHtml;
@@ -5431,6 +5559,17 @@
                     const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
                     body += `* Plazo requerido: ${dateObj.toLocaleDateString('es-ES', options)} a las ${time}\n`;
                 }
+            }
+
+            // v3.7.6: lista de archivos adjuntos (Drive + pendientes de subir)
+            const driveFiles = (budgetData.folderFiles || [])
+                .filter(f => f.name && !f.name.endsWith('.txt'))
+                .map(f => f.name);
+            const pendingFiles = (uploadedFiles || []).map(f => f.name);
+            const allFiles = driveFiles.concat(pendingFiles);
+            if (allFiles.length > 0) {
+                body += `* Archivos adjuntos (${allFiles.length}):\n`;
+                allFiles.forEach(n => { body += `   - ${n}\n`; });
             }
             
             if (includeProposedRate) {
@@ -5748,7 +5887,7 @@
             updateClientMessage();
         }
 
-        // v3.7.4: cargar histórico de presupuestos coincidentes
+        // v3.7.4 (extendido v3.7.8): cargar histórico con modo configurable
         async function loadHistoricalQuotes() {
             const sourceLang = budgetData.sourceLang || '';
             const targetLang = budgetData.targetLang || '';
@@ -5756,12 +5895,20 @@
             const pais = (document.getElementById('docCountry')?.value || '').trim();
             const apostilla = !!document.getElementById('docApostille')?.checked;
 
+            // v3.7.8: modo seleccionado en los radios
+            const modeRadio = document.querySelector('input[name="historicalMode"]:checked');
+            const matchMode = modeRadio ? modeRadio.value : 'exact';
+
             const criteria = document.getElementById('historicalCriteria');
             const loading = document.getElementById('historicalLoading');
             const results = document.getElementById('historicalResults');
 
             if (criteria) {
-                criteria.innerHTML = `Filtros: <strong>${sourceLang}</strong> → <strong>${targetLang}</strong> · Tipo: <strong>${tipoDoc}</strong>${pais ? ' · País: <strong>' + pais + '</strong>' : ''} · Apostilla: <strong>${apostilla ? 'Sí' : 'No'}</strong>`;
+                if (matchMode === 'exact') {
+                    criteria.innerHTML = `Filtros: <strong>${sourceLang}</strong> → <strong>${targetLang}</strong> · Tipo: <strong>${tipoDoc}</strong>${pais ? ' · País: <strong>' + pais + '</strong>' : ''} · Apostilla: <strong>${apostilla ? 'Sí' : 'No'}</strong>`;
+                } else {
+                    criteria.innerHTML = `Filtros: <strong>${sourceLang}</strong> → <strong>${targetLang}</strong> (cualquier tipo, país y apostilla)`;
+                }
             }
             if (loading) loading.style.display = 'block';
             if (results) results.innerHTML = '';
@@ -5775,7 +5922,8 @@
                         targetLang: targetLang,
                         tipoDocumento: tipoDoc,
                         paisOrigen: pais,
-                        apostilla: apostilla
+                        apostilla: apostilla,
+                        matchMode: matchMode
                     })
                 });
                 const data = await resp.json();
@@ -5788,17 +5936,36 @@
 
                 const quotes = data.quotes || [];
                 if (quotes.length === 0) {
-                    if (results) results.innerHTML = `<div style="padding:14px; color:#64748b; font-size:0.9rem; text-align:center;">No se encontraron presupuestos pasados con estos criterios.</div>`;
+                    let empty = `<div style="padding:14px; color:#64748b; font-size:0.9rem; text-align:center;">No se encontraron presupuestos pasados con estos criterios.`;
+                    if (matchMode === 'exact') {
+                        empty += `<br><br><a href="javascript:void(0)" onclick="document.querySelector('input[name=&quot;historicalMode&quot;][value=&quot;languages&quot;]').click()" style="color:#7c3aed; font-weight:500;">↗ Ver toda la combinación de idiomas</a>`;
+                    }
+                    empty += `</div>`;
+                    if (results) results.innerHTML = empty;
                     return;
                 }
 
-                // Tabla de resultados
+                // Helper: formatear cotización con €/palabra calculado al vuelo
+                const fmtCotizacion = (cot, palabras) => {
+                    let s = `${cot.nombre}: ${cot.tarifa !== null ? cot.tarifa + '€' : '?€'}`;
+                    if (cot.plazo !== null && cot.plazo !== '') s += `/${cot.plazo}d`;
+                    // €/palabra calculado al vuelo si tenemos los dos datos
+                    if (cot.tarifa !== null && palabras && Number(palabras) > 0) {
+                        const ratio = cot.tarifa / Number(palabras);
+                        s += ` <span style="color:#7c3aed;">(${ratio.toFixed(3)} €/p)</span>`;
+                    }
+                    return s;
+                };
+
+                // Construir tabla. Si modo "languages", añadimos columna "Tipo" para distinguir entradas.
+                const showTipoCol = (matchMode === 'languages');
                 let html = `
                     <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
                         <thead>
                             <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
                                 <th style="padding:8px; text-align:left;">Fecha</th>
                                 <th style="padding:8px; text-align:left;">Ref</th>
+                                ${showTipoCol ? '<th style="padding:8px; text-align:left;">Tipo</th>' : ''}
                                 <th style="padding:8px; text-align:right;">Págs</th>
                                 <th style="padding:8px; text-align:right;">Pal.</th>
                                 <th style="padding:8px; text-align:left;">Cotizaciones proveedores</th>
@@ -5811,13 +5978,18 @@
                 `;
                 quotes.forEach((q, idx) => {
                     const importeNum = parseFloat(String(q.importeCliente || '0').replace(',', '.')) || 0;
+                    const cotsArr = Array.isArray(q.cotizaciones) ? q.cotizaciones : [];
+                    const cotsHtml = cotsArr.length > 0
+                        ? cotsArr.map(c => fmtCotizacion(c, q.palabras)).join(' · ')
+                        : '-';
                     html += `
                         <tr style="border-bottom:1px solid #f1f5f9; ${idx === 0 ? 'background:#fefce8;' : ''}">
                             <td style="padding:6px 8px; white-space:nowrap;">${q.fecha || ''}</td>
                             <td style="padding:6px 8px; font-family:monospace;">${q.ref || ''}</td>
+                            ${showTipoCol ? '<td style="padding:6px 8px; color:#475569;">' + (q.tipoDocumento || '-') + '</td>' : ''}
                             <td style="padding:6px 8px; text-align:right;">${q.paginas || ''}</td>
                             <td style="padding:6px 8px; text-align:right;">${q.palabras || ''}</td>
-                            <td style="padding:6px 8px; color:#475569; font-size:0.8rem;">${q.cotizaciones || '-'}</td>
+                            <td style="padding:6px 8px; color:#475569; font-size:0.8rem;">${cotsHtml}</td>
                             <td style="padding:6px 8px; text-align:right; font-weight:600; cursor:pointer; color:#7c3aed;" title="Usar este importe" onclick="useHistoricalAmount(${importeNum})">${q.importeCliente || ''}</td>
                             <td style="padding:6px 8px; text-align:right;">${q.plazoCliente || ''}</td>
                             <td style="padding:6px 8px; font-size:0.8rem; color:#64748b;">${q.estado || ''}</td>
