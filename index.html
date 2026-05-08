@@ -1680,8 +1680,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.8';
-        const HTML_DATE = '07/05/2026';
+        const HTML_VERSION = '3.7.9';
+        const HTML_DATE = '08/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -4512,32 +4512,34 @@
             }
         }
 
-        // v3.7.6: sincronizar archivos pendientes de subir a Drive.
-        // Se llama desde reanalyzeFromFolder Y desde el avance al paso 3,
-        // así los archivos añadidos en paso 2 al retomar siempre llegan a Drive
-        // antes de enviar tasación a proveedores.
+        // v3.7.6 (hotfix v3.7.9): sincronizar archivos pendientes de subir a Drive.
+        // Crítico: vaciar uploadedFiles ANTES de cualquier render(), de modo que
+        // si una función de render falla, los archivos NO se reintenten subir
+        // (esto causaba duplicados en v3.7.6/7/8).
         async function syncPendingUploads() {
             if (!uploadedFiles || uploadedFiles.length === 0) return true;
             if (!budgetData.folderId) return false;
             showStatus('Subiendo archivos nuevos a Drive...', 'loading');
             try {
+                const filesToUpload = uploadedFiles.slice();  // copia defensiva
                 const uploadResp = await fetch(apiUrl, {
                     method: 'POST',
                     body: JSON.stringify({
                         action: 'uploadFilesToFolder',
                         folderId: budgetData.folderId,
-                        files: uploadedFiles
+                        files: filesToUpload
                     })
                 });
                 const uploadData = await uploadResp.json();
                 if (uploadData.success) {
-                    uploadData.uploaded.forEach(f => {
-                        if (!budgetData.folderFiles) budgetData.folderFiles = [];
-                        budgetData.folderFiles.push(f);
-                    });
+                    // PASO 1 (crítico): vaciar uploadedFiles ANTES de cualquier render
                     uploadedFiles = [];
-                    renderFileList();
-                    if (typeof renderFolderFiles === 'function') renderFolderFiles();
+                    if (!budgetData.folderFiles) budgetData.folderFiles = [];
+                    (uploadData.uploaded || []).forEach(f => budgetData.folderFiles.push(f));
+                    // PASO 2: render protegido. Nombres correctos: renderFiles + renderFolderFiles.
+                    // (Antes se llamaba a renderFileList que no existe -> excepción -> duplicados)
+                    try { if (typeof renderFiles === 'function') renderFiles(); } catch(e) { console.warn('renderFiles:', e); }
+                    try { if (typeof renderFolderFiles === 'function') renderFolderFiles(); } catch(e) { console.warn('renderFolderFiles:', e); }
                     return true;
                 } else {
                     showStatus('Error subiendo archivos: ' + (uploadData.error || ''), 'error');
@@ -5483,6 +5485,24 @@
                     if (!confirm('No se han podido subir todos los archivos. ¿Continuar de todos modos?')) return;
                 }
                 hideStatus();
+            }
+
+            // v3.7.9: refrescar folderFiles desde Drive en tiempo real para
+            // que la lista del modal refleje exactamente lo que el backend
+            // adjuntará al email (protege contra desincronizaciones previas).
+            if (budgetData.folderId) {
+                try {
+                    const refreshResp = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'listFolderFiles', folderId: budgetData.folderId })
+                    });
+                    const refreshData = await refreshResp.json();
+                    if (refreshData.success && Array.isArray(refreshData.files)) {
+                        budgetData.folderFiles = refreshData.files;
+                    }
+                } catch(e) {
+                    console.warn('Refresh folderFiles failed:', e);
+                }
             }
 
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
