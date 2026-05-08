@@ -9,6 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%233498db'/><text x='50' y='65' font-size='45' font-weight='bold' text-anchor='middle' fill='white'>TT</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
             --tradutema-blue: #3498db;
@@ -1685,7 +1686,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.15';
+        const HTML_VERSION = '3.7.16';
         const HTML_DATE = '08/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3055,10 +3056,11 @@
             showBreakdownModal(0);  // Mostrar primer archivo
         }
 
-        // v3.7.4: doQuickExtract - extrae texto sin presupuesto, guarda en _ContarPalabras/timestamp
+        // v3.7.16: doQuickExtract — extrae texto sin presupuesto, sin escribir
+        // en Drive. Los TXTs se exponen como elementos arrastrables (drag-out)
+        // que el usuario suelta en la carpeta de su PC que prefiera.
         async function doQuickExtract() {
             if (quickFiles.length === 0) return;
-            if (!confirm('Se extraerá el texto de ' + quickFiles.length + ' archivo(s) y se guardará en _PRESUPUESTOS/_ContarPalabras/.\n\n¿Continuar?')) return;
 
             const btn = document.getElementById('quickExtractBtn');
             const btnCount = document.getElementById('quickCountBtn');
@@ -3084,6 +3086,9 @@
 
                 hideStatus();
 
+                // Liberar URLs anteriores antes de regenerar
+                releaseQuickExtractBlobUrls();
+
                 // Mostrar resultado en la tabla habitual
                 window.quickAnalysisData = data;
                 const tbody = document.getElementById('quickCountBody');
@@ -3091,7 +3096,7 @@
                 (data.analysis || []).forEach(f => {
                     html += `
                         <tr>
-                            <td>${f.fileName || f.name}</td>
+                            <td>${escapeHtml(f.fileName || f.name || '')}</td>
                             <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
                             <td style="text-align:right">${f.pages || 0}</td>
                         </tr>
@@ -3114,12 +3119,18 @@
                             <div class="result-value">${data.totalPages || 0}</div>
                         </div>
                     </div>
-                    <div style="margin-top:10px; padding:10px; background:#f0f9ff; border-radius:6px; font-size:0.9rem;">
-                        ✓ Textos extraídos en carpeta <strong>_ContarPalabras/${data.folderName}</strong>
-                        <a href="${data.folderUrl}" target="_blank" style="display:inline-block; margin-left:8px; color:#7c3aed; font-weight:500;">📁 Abrir en Drive</a>
+                    <div id="quickExtractDragPanel" style="margin-top:14px;padding:14px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;">
+                        <div style="font-weight:600;color:#5b21b6;margin-bottom:6px;">📂 Archivos extraídos</div>
+                        <div style="font-size:0.85rem;color:#6d28d9;margin-bottom:10px;">
+                            Arrastra cualquier elemento a una carpeta de tu PC para guardarlo.
+                            También puedes pulsar el botón de descarga (⬇) para descargarlo a tu carpeta de Descargas.
+                        </div>
+                        <div id="quickExtractDragList" style="display:flex;flex-direction:column;gap:6px;"></div>
                     </div>
                     ${failedNote}
                 `;
+
+                renderQuickExtractDragList(data);
 
                 document.getElementById('quickCountResults').classList.remove('hidden');
 
@@ -3131,6 +3142,153 @@
             btn.disabled = false;
             btnCount.disabled = false;
             btn.innerHTML = origLabel;
+        }
+
+        // ── Drag-out de los textos extraídos por quickExtract ──
+        // Genera un blob por archivo + ZIP con todos + _RECUENTO.txt y los hace
+        // arrastrables vía DownloadURL (Chromium/Chrome/Edge).
+        window.quickExtractBlobUrls = window.quickExtractBlobUrls || [];
+
+        function releaseQuickExtractBlobUrls() {
+            (window.quickExtractBlobUrls || []).forEach(u => {
+                try { URL.revokeObjectURL(u); } catch(e) {}
+            });
+            window.quickExtractBlobUrls = [];
+        }
+
+        function makeDraggableItem({ icon, fileName, mimeType, getBlob, subtitle }) {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;background:white;border:1px solid #e5e7eb;border-radius:6px;cursor:grab;user-select:none;';
+            row.draggable = true;
+            row.title = 'Arrastra este elemento a una carpeta de tu PC';
+
+            row.innerHTML = `
+                <div style="font-size:1.3rem;">${icon}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:500;color:#1f2937;font-size:0.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(fileName)}</div>
+                    ${subtitle ? `<div style="font-size:0.78rem;color:#6b7280;">${escapeHtml(subtitle)}</div>` : ''}
+                </div>
+                <button class="qx-dl-btn" type="button" title="Descargar a la carpeta Descargas" style="background:#7c3aed;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">⬇</button>
+            `;
+
+            // Pre-generar el blob URL al construir el item para que el primer
+            // drag-out tenga la URL disponible de forma síncrona.
+            let cachedUrl = null;
+            let preparing = null;
+            const ensureUrl = () => {
+                if (cachedUrl) return Promise.resolve(cachedUrl);
+                if (preparing) return preparing;
+                preparing = Promise.resolve()
+                    .then(() => getBlob())
+                    .then(blob => {
+                        cachedUrl = URL.createObjectURL(blob);
+                        window.quickExtractBlobUrls.push(cachedUrl);
+                        return cachedUrl;
+                    });
+                return preparing;
+            };
+            // Disparar la generación cuanto antes
+            ensureUrl().catch(err => {
+                console.error('Error preparando blob para ' + fileName + ':', err);
+            });
+
+            row.addEventListener('dragstart', (ev) => {
+                row.style.cursor = 'grabbing';
+                if (!cachedUrl) {
+                    // Aún no listo: cancelar este drag y dejar que el usuario lo
+                    // reintente en un instante.
+                    ev.preventDefault();
+                    return;
+                }
+                ev.dataTransfer.effectAllowed = 'copy';
+                ev.dataTransfer.setData('DownloadURL',
+                    `${mimeType}:${fileName}:${cachedUrl}`);
+            });
+            row.addEventListener('dragend', () => { row.style.cursor = 'grab'; });
+
+            // Botón de descarga clásica como fallback
+            row.querySelector('.qx-dl-btn').addEventListener('click', async (ev) => {
+                ev.stopPropagation();
+                try {
+                    const url = await ensureUrl();
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } catch(e) {
+                    alert('Error preparando el archivo: ' + e.message);
+                }
+            });
+
+            return row;
+        }
+
+        function renderQuickExtractDragList(data) {
+            const list = document.getElementById('quickExtractDragList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const files = (data.analysis || []).filter(f => f.extractedText);
+
+            // 1. ZIP con todo (primero, para destacarlo)
+            if (files.length > 1) {
+                const zipName = 'extraccion_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.zip';
+                list.appendChild(makeDraggableItem({
+                    icon: '📦',
+                    fileName: zipName,
+                    mimeType: 'application/zip',
+                    subtitle: `${files.length} TXTs + recuento`,
+                    getBlob: async () => {
+                        if (typeof JSZip === 'undefined') {
+                            throw new Error('JSZip no cargó. Comprueba tu conexión.');
+                        }
+                        const zip = new JSZip();
+                        files.forEach(f => {
+                            zip.file(stripExtension(f.fileName) + '.txt', f.extractedText || '');
+                        });
+                        if (data.recuentoTxt) zip.file('_RECUENTO.txt', data.recuentoTxt);
+                        return await zip.generateAsync({ type: 'blob' });
+                    }
+                }));
+            }
+
+            // 2. Un TXT por archivo
+            files.forEach(f => {
+                const txtName = stripExtension(f.fileName) + '.txt';
+                list.appendChild(makeDraggableItem({
+                    icon: '📄',
+                    fileName: txtName,
+                    mimeType: 'text/plain',
+                    subtitle: `${(f.words || 0).toLocaleString('es-ES')} palabras · ${f.pages || 0} pág.`,
+                    getBlob: async () => new Blob([f.extractedText || ''], { type: 'text/plain;charset=utf-8' })
+                }));
+            });
+
+            // 3. _RECUENTO.txt
+            if (data.recuentoTxt) {
+                list.appendChild(makeDraggableItem({
+                    icon: '🧾',
+                    fileName: '_RECUENTO.txt',
+                    mimeType: 'text/plain',
+                    subtitle: 'Resumen TSV',
+                    getBlob: async () => new Blob([data.recuentoTxt], { type: 'text/plain;charset=utf-8' })
+                }));
+            }
+        }
+
+        function stripExtension(name) {
+            return (name || '').replace(/\.[^.\/\\]+$/, '');
+        }
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         function applyQuickBreakdown() {
