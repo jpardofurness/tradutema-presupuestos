@@ -1090,6 +1090,11 @@
                     <input type="checkbox" id="docApostille" style="width:16px; height:16px; cursor:pointer;">
                     Lleva apostilla
                 </label>
+                <!-- v3.7.15: marcar/desmarcar guardado en histórico -->
+                <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:0.9rem; color:#475569; cursor:pointer;">
+                    <input type="checkbox" id="docInHistory" checked style="width:16px; height:16px; cursor:pointer;">
+                    Guardar en histórico para futuras consultas
+                </label>
             </div>
 
             <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
@@ -1680,7 +1685,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.14';
+        const HTML_VERSION = '3.7.15';
         const HTML_DATE = '08/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1748,6 +1753,7 @@
             const docTypeEl = document.getElementById('docType');
             const docCountryEl = document.getElementById('docCountry');
             const docApostilleEl = document.getElementById('docApostille');
+            const docInHistoryEl = document.getElementById('docInHistory');  // v3.7.15
             const persistDocMeta = () => {
                 if (!budgetData.id) return;  // aún no se ha creado carpeta
                 fetch(apiUrl, {
@@ -1757,13 +1763,15 @@
                         budgetId: budgetData.id,
                         tipoDocumento: (docTypeEl?.value || '').trim() || 'Varios',
                         paisOrigen: (docCountryEl?.value || '').trim(),
-                        apostilla: !!docApostilleEl?.checked
+                        apostilla: !!docApostilleEl?.checked,
+                        enHistorico: docInHistoryEl?.checked !== false  // v3.7.15
                     })
                 }).catch(e => console.warn('persistDocMeta:', e));
             };
             if (docTypeEl) docTypeEl.addEventListener('change', persistDocMeta);
             if (docCountryEl) docCountryEl.addEventListener('change', persistDocMeta);
             if (docApostilleEl) docApostilleEl.addEventListener('change', persistDocMeta);
+            if (docInHistoryEl) docInHistoryEl.addEventListener('change', persistDocMeta);  // v3.7.15
 
             // Setup drag & drop for file upload
             const dropArea = document.getElementById('fileUploadArea');
@@ -1961,9 +1969,11 @@
             const docTypeReset = document.getElementById('docType');
             const docCountryReset = document.getElementById('docCountry');
             const docApostilleReset = document.getElementById('docApostille');
+            const docInHistoryReset = document.getElementById('docInHistory');  // v3.7.15
             if (docTypeReset) docTypeReset.value = 'Varios';
             if (docCountryReset) docCountryReset.value = '';
             if (docApostilleReset) docApostilleReset.checked = false;
+            if (docInHistoryReset) docInHistoryReset.checked = true;  // v3.7.15: default Sí
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
             
             // Reset contacted providers section
@@ -3542,14 +3552,17 @@
                     budgetData.tipoDocumento = b.tipoDocumento || 'Varios';
                     budgetData.paisOrigen = b.paisOrigen || '';
                     budgetData.apostilla = !!b.apostilla;
+                    budgetData.enHistorico = (b.enHistorico !== false);  // v3.7.15: default true
                     const docTypeField = document.getElementById('docType');
                     const docCountryField = document.getElementById('docCountry');
                     const docApostilleField = document.getElementById('docApostille');
+                    const docInHistoryField = document.getElementById('docInHistory');  // v3.7.15
                     // Asignar valor PRIMERO, luego repoblar (populateDocMetadata
                     // conservará el valor actual al rellenar las opciones).
                     if (docTypeField) docTypeField.value = budgetData.tipoDocumento;
                     if (docCountryField) docCountryField.value = budgetData.paisOrigen;
                     if (docApostilleField) docApostilleField.checked = budgetData.apostilla;
+                    if (docInHistoryField) docInHistoryField.checked = budgetData.enHistorico;
                     populateDocMetadata();
                     // Forzar la selección por si el valor era nuevo y no estaba en la lista
                     if (docTypeField) docTypeField.value = budgetData.tipoDocumento;
@@ -4766,7 +4779,9 @@
                             // v3.7.4: metadatos opcionales
                             tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
                             paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
-                            apostilla: !!document.getElementById('docApostille')?.checked
+                            apostilla: !!document.getElementById('docApostille')?.checked,
+                            // v3.7.15: marcar para histórico (default true)
+                            enHistorico: document.getElementById('docInHistory')?.checked !== false
                         })
                     }).then(r => r.json())
                 ];
