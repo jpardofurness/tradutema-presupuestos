@@ -578,7 +578,7 @@
             <div style="display: flex; align-items: center; gap: 12px;">
                 <button class="home-link" onclick="showHomeScreen()" id="homeBtn" style="display: none;">🏠 Inicio</button>
                 <div class="budget-id" id="budgetIdDisplay">Sin crear</div>
-                <button class="delete-btn" id="deleteBudgetBtn" onclick="confirmDeleteBudget()" title="Eliminar presupuesto y carpeta" style="display: none;">🗑️</button>
+                <button class="delete-btn" id="deleteBudgetBtn" onclick="confirmDeleteBudgetFromHeader()" title="Eliminar presupuesto y carpeta" style="display: none;">🗑️</button>
             </div>
         </div>
     </header>
@@ -1680,7 +1680,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.12';
+        const HTML_VERSION = '3.7.14';
         const HTML_DATE = '08/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1845,14 +1845,17 @@
             resetBudgetState();
         }
         
-        // Confirmar eliminación de presupuesto
-        function confirmDeleteBudget() {
+        // v3.7.14: renombrada desde confirmDeleteBudget para evitar colisión
+        // con la función homónima del listado (que sí recibe budgetId como
+        // parámetro). Antes la 2ª declaración sobrescribía la 1ª y el botón
+        // del header pasaba undefined al backend.
+        function confirmDeleteBudgetFromHeader() {
             if (!budgetData.id) {
                 showStatus('No hay presupuesto para eliminar', 'warning');
                 setTimeout(hideStatus, 2000);
                 return;
             }
-            
+
             const confirmed = confirm(
                 `¿Estás seguro de que quieres eliminar el presupuesto ${budgetData.id}?\n\n` +
                 `Esto eliminará:\n` +
@@ -1860,7 +1863,7 @@
                 `• La carpeta de Drive con todos los archivos\n\n` +
                 `Esta acción NO se puede deshacer.`
             );
-            
+
             if (confirmed) {
                 deleteBudget();
             }
@@ -4592,43 +4595,61 @@
             }
         }
 
-        // v3.7.6 (hotfix v3.7.9): sincronizar archivos pendientes de subir a Drive.
-        // Crítico: vaciar uploadedFiles ANTES de cualquier render(), de modo que
-        // si una función de render falla, los archivos NO se reintenten subir
-        // (esto causaba duplicados en v3.7.6/7/8).
+        // v3.7.13: mutex global. Si dos invocaciones llegan a la vez, todas
+        // esperan la misma promesa en lugar de duplicar la subida.
+        let syncUploadPromise = null;
+
+        // v3.7.6 (hotfix v3.7.9, mutex v3.7.13): sincronizar archivos pendientes.
         async function syncPendingUploads() {
+            // Si hay una subida en curso, encolarse a la promesa existente
+            if (syncUploadPromise) {
+                return syncUploadPromise;
+            }
+
             if (!uploadedFiles || uploadedFiles.length === 0) return true;
             if (!budgetData.folderId) return false;
-            showStatus('Subiendo archivos nuevos a Drive...', 'loading');
-            try {
-                const filesToUpload = uploadedFiles.slice();  // copia defensiva
-                const uploadResp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'uploadFilesToFolder',
-                        folderId: budgetData.folderId,
-                        files: filesToUpload
-                    })
-                });
-                const uploadData = await uploadResp.json();
-                if (uploadData.success) {
-                    // PASO 1 (crítico): vaciar uploadedFiles ANTES de cualquier render
+
+            // Crear la promesa y guardarla en el mutex ANTES de cualquier await
+            syncUploadPromise = (async () => {
+                showStatus('Subiendo archivos nuevos a Drive...', 'loading');
+                try {
+                    // Capturar+vaciar uploadedFiles ATÓMICAMENTE antes de await.
+                    // Si dos llamadas llegan exactamente a la vez, la segunda
+                    // verá syncUploadPromise ya establecida y no entrará aquí.
+                    const filesToUpload = uploadedFiles.slice();
                     uploadedFiles = [];
-                    if (!budgetData.folderFiles) budgetData.folderFiles = [];
-                    (uploadData.uploaded || []).forEach(f => budgetData.folderFiles.push(f));
-                    // PASO 2: render protegido. Nombres correctos: renderFiles + renderFolderFiles.
-                    // (Antes se llamaba a renderFileList que no existe -> excepción -> duplicados)
-                    try { if (typeof renderFiles === 'function') renderFiles(); } catch(e) { console.warn('renderFiles:', e); }
-                    try { if (typeof renderFolderFiles === 'function') renderFolderFiles(); } catch(e) { console.warn('renderFolderFiles:', e); }
-                    return true;
-                } else {
-                    showStatus('Error subiendo archivos: ' + (uploadData.error || ''), 'error');
+
+                    const uploadResp = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'uploadFilesToFolder',
+                            folderId: budgetData.folderId,
+                            files: filesToUpload
+                        })
+                    });
+                    const uploadData = await uploadResp.json();
+                    if (uploadData.success) {
+                        if (!budgetData.folderFiles) budgetData.folderFiles = [];
+                        (uploadData.uploaded || []).forEach(f => budgetData.folderFiles.push(f));
+                        try { if (typeof renderFiles === 'function') renderFiles(); } catch(e) { console.warn('renderFiles:', e); }
+                        try { if (typeof renderFolderFiles === 'function') renderFolderFiles(); } catch(e) { console.warn('renderFolderFiles:', e); }
+                        return true;
+                    } else {
+                        // Si falló, devolver los archivos a uploadedFiles para reintentar manualmente
+                        uploadedFiles = filesToUpload.concat(uploadedFiles);
+                        showStatus('Error subiendo archivos: ' + (uploadData.error || ''), 'error');
+                        return false;
+                    }
+                } catch(e) {
+                    showStatus('Error subiendo archivos: ' + e.message, 'error');
                     return false;
+                } finally {
+                    // Liberar el mutex pase lo que pase
+                    syncUploadPromise = null;
                 }
-            } catch(e) {
-                showStatus('Error subiendo archivos: ' + e.message, 'error');
-                return false;
-            }
+            })();
+
+            return syncUploadPromise;
         }
 
         async function reanalyzeFromFolder() {
