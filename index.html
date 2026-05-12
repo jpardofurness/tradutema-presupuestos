@@ -1690,7 +1690,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.20';
+        const HTML_VERSION = '3.7.21';
         const HTML_DATE = '12/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3088,10 +3088,11 @@
         function toggleQuickSettingsPanel(idx) {
             const panel = document.getElementById('quickSettingsPanel_' + idx);
             if (!panel) return;
-            const isHidden = panel.style.display === 'none' || panel.style.display === '';
-            panel.style.display = isHidden ? '' : 'none';
-            if (isHidden) window.openQuickSettingsPanels.add(idx);
-            else window.openQuickSettingsPanels.delete(idx);
+            // v3.7.21 FIX: ver toggleSettingsPanel. style.display='' = visible.
+            const isCurrentlyVisible = panel.style.display !== 'none';
+            panel.style.display = isCurrentlyVisible ? 'none' : '';
+            if (isCurrentlyVisible) window.openQuickSettingsPanels.delete(idx);
+            else window.openQuickSettingsPanels.add(idx);
         }
 
         function renderQuickFiles() {
@@ -3827,7 +3828,15 @@
 
         async function loadBudget(budgetId) {
             showStatus('Cargando presupuesto...', 'loading');
-            
+
+            // v3.7.21 FIX bug #1: reset defensivo. Si el usuario crea un
+            // presupuesto y luego vuelve al listado para abrir el mismo (o
+            // cualquier otro) sin pasar por Inicio, uploadedFiles puede
+            // contener archivos residuales que se mostrarían erróneamente como
+            // "Pendientes de subir" en paso 2.
+            uploadedFiles = [];
+            if (window.openSettingsPanels) window.openSettingsPanels.clear();
+
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -4701,12 +4710,24 @@
 
         // ====== FILES ======
         async function handleFiles(files) {
+            // v3.7.21 FIX bug #1: rechazar nombres que ya están en Drive
+            // (folderFiles). Si el archivo ya está subido al presupuesto, no
+            // tiene sentido tenerlo otra vez en uploadedFiles como pendiente.
+            const inDriveByName = new Set(
+                (budgetData.folderFiles || []).map(f => (f.name || '').toLowerCase())
+            );
+            const skipped = [];
+
             for (const file of files) {
                 if (uploadedFiles.some(f => f.name === file.name)) continue;
-                
+                if (inDriveByName.has((file.name || '').toLowerCase())) {
+                    skipped.push(file.name);
+                    continue;
+                }
+
                 // Leer archivo como base64
                 const base64 = await readFileAsBase64(file);
-                
+
                 // Contar páginas
                 let pages = 1;
                 if (file.type === 'application/pdf') {
@@ -4714,7 +4735,7 @@
                 } else if (file.type.startsWith('image/')) {
                     pages = 1;
                 }
-                
+
                 uploadedFiles.push({
                     name: file.name,
                     size: file.size,
@@ -4725,6 +4746,14 @@
                     instructions: ''     // v3.7.19
                 });
                 renderFiles();
+            }
+
+            if (skipped.length > 0) {
+                showStatus(
+                    'Archivo(s) ya en Drive (omitidos): ' + skipped.join(', '),
+                    'warning'
+                );
+                setTimeout(hideStatus, 3500);
             }
         }
         
@@ -4824,10 +4853,13 @@
             const safeKey = cssId(key);
             const panel = document.getElementById('settingsPanel_' + safeKey);
             if (!panel) return;
-            const isHidden = panel.style.display === 'none' || panel.style.display === '';
-            panel.style.display = isHidden ? '' : 'none';
-            if (isHidden) window.openSettingsPanels.add(key);
-            else window.openSettingsPanels.delete(key);
+            // v3.7.21 FIX: el panel cuando está abierto tiene style.display=''
+            // (no 'none'). La lógica anterior consideraba '' como oculto y nunca
+            // cerraba el panel. Comprobar contra 'none' explícitamente.
+            const isCurrentlyVisible = panel.style.display !== 'none';
+            panel.style.display = isCurrentlyVisible ? 'none' : '';
+            if (isCurrentlyVisible) window.openSettingsPanels.delete(key);
+            else window.openSettingsPanels.add(key);
         }
 
         // Renderiza el bloque "file-item + panel ⚙" para un archivo (pendiente
@@ -4893,7 +4925,13 @@
             const driveFiles = (budgetData.folderFiles || []).filter(f =>
                 f.mimeType !== 'text/plain' && f.name !== 'desktop.ini'
             );
-            const pendingFiles = uploadedFiles || [];
+            // v3.7.21 FIX bug #1: dedup defensivo. Si por cualquier motivo un
+            // archivo aparece en folderFiles Y en uploadedFiles, lo mostramos
+            // solo como Drive (es el estado más actualizado).
+            const inDriveByName = new Set(driveFiles.map(f => (f.name || '').toLowerCase()));
+            const pendingFiles = (uploadedFiles || []).filter(
+                f => !inDriveByName.has((f.name || '').toLowerCase())
+            );
 
             if (driveFiles.length === 0 && pendingFiles.length === 0) {
                 list.innerHTML = '';
@@ -5431,6 +5469,16 @@
                 bgState.folderCreated = true;
                 bgState.folderError = null;
                 bgState.pendingFiles = null;
+
+                // v3.7.21 FIX bug #1: vaciar uploadedFiles ahora que los
+                // archivos están en Drive. Sin esto, al retomar el presupuesto
+                // los mismos archivos aparecerían como "Pendientes de subir".
+                // También listar archivos subidos en folderFiles para reflejar
+                // el estado actual de Drive en la UI.
+                uploadedFiles = [];
+                if (folderResult.uploadedFiles) {
+                    budgetData.folderFiles = folderResult.uploadedFiles;
+                }
                 
                 // Actualizar UI con ID de presupuesto
                 const idDisplay = document.getElementById('budgetIdDisplay');
