@@ -1067,9 +1067,9 @@
                 <div class="file-upload-icon">📄</div>
                 <div class="file-upload-text">
                     <strong>Toca para adjuntar archivos</strong><br>
-                    <small>PDF, imágenes, Word (max 20MB total)</small>
+                    <small>PDF, imágenes (max 20MB total)</small>
                 </div>
-                <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.tiff,.bmp" onchange="handleFiles(this.files)">
+                <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.tiff,.bmp" onchange="handleFiles(this.files)">
             </div>
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
@@ -1690,7 +1690,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.21';
+        const HTML_VERSION = '3.7.23';
         const HTML_DATE = '12/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3315,8 +3315,9 @@
                 });
                 tbody.innerHTML = html;
 
-                const failedNote = (data.failedPages > 0)
-                    ? `<div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:6px;color:#92400e;font-size:0.85rem;">⚠️ ${data.failedPages} página(s) no se pudieron procesar.</div>`
+                const failedCount = Array.isArray(data.failedPages) ? data.failedPages.length : (data.failedPages || 0);
+                const failedNote = (failedCount > 0)
+                    ? `<div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:6px;color:#92400e;font-size:0.85rem;">⚠️ ${failedCount} página(s) no se pudieron procesar. Vuelve a pulsar "Contar palabras" para reintentar.</div>`
                     : '';
 
                 document.getElementById('quickCountTotals').innerHTML = `
@@ -3872,6 +3873,7 @@
                     budgetData.savedQuoteDays = b.plazo || '';
                     budgetData.savedUrgency = b.recargoUrgencia || '';
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
+                    budgetData.hasRecuento = !!b.hasRecuento;  // v3.7.22
                     
                     // Restaurar traductores contactados
                     // Primero obtenemos el historial para enriquecer con emails
@@ -4709,6 +4711,19 @@
         }
 
         // ====== FILES ======
+        // v3.7.22: ignorar archivos que la app no procesa (docx, doc, txt).
+        // El usuario los puede tener en la carpeta local para uso personal
+        // (recuento de comprobación, notas) pero no entran al análisis.
+        function isUnsupportedForAnalysis(file) {
+            const name = (file.name || '').toLowerCase();
+            const type = file.type || '';
+            if (type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return true;
+            if (type === 'application/msword') return true;
+            if (type === 'text/plain') return true;
+            if (name.endsWith('.docx') || name.endsWith('.doc') || name.endsWith('.txt')) return true;
+            return false;
+        }
+
         async function handleFiles(files) {
             // v3.7.21 FIX bug #1: rechazar nombres que ya están en Drive
             // (folderFiles). Si el archivo ya está subido al presupuesto, no
@@ -4717,8 +4732,14 @@
                 (budgetData.folderFiles || []).map(f => (f.name || '').toLowerCase())
             );
             const skipped = [];
+            const unsupported = [];
 
             for (const file of files) {
+                // v3.7.22: rechazar docx/doc/txt (no se analizan)
+                if (isUnsupportedForAnalysis(file)) {
+                    unsupported.push(file.name);
+                    continue;
+                }
                 if (uploadedFiles.some(f => f.name === file.name)) continue;
                 if (inDriveByName.has((file.name || '').toLowerCase())) {
                     skipped.push(file.name);
@@ -4748,7 +4769,14 @@
                 renderFiles();
             }
 
-            if (skipped.length > 0) {
+            // Mensajes informativos (prevalece el de "no soportado" si los hay)
+            if (unsupported.length > 0) {
+                showStatus(
+                    'No se analizan Word/TXT (omitidos): ' + unsupported.join(', '),
+                    'warning'
+                );
+                setTimeout(hideStatus, 4000);
+            } else if (skipped.length > 0) {
                 showStatus(
                     'Archivo(s) ya en Drive (omitidos): ' + skipped.join(', '),
                     'warning'
@@ -4922,9 +4950,18 @@
             const area = document.getElementById('fileUploadArea');
             if (!list || !total || !area) return;
 
-            const driveFiles = (budgetData.folderFiles || []).filter(f =>
-                f.mimeType !== 'text/plain' && f.name !== 'desktop.ini'
-            );
+            // v3.7.22: ignorar también docx/doc/txt en el listado (por si el
+            // backend de una versión previa los devuelve). Sólo PDF/imágenes.
+            const driveFiles = (budgetData.folderFiles || []).filter(f => {
+                if (f.mimeType === 'text/plain') return false;
+                if (f.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return false;
+                if (f.mimeType === 'application/msword') return false;
+                if (f.name === 'desktop.ini') return false;
+                if (f.name && f.name.charAt(0) === '_') return false;
+                const lower = (f.name || '').toLowerCase();
+                if (lower.endsWith('.docx') || lower.endsWith('.doc') || lower.endsWith('.txt')) return false;
+                return true;
+            });
             // v3.7.21 FIX bug #1: dedup defensivo. Si por cualquier motivo un
             // archivo aparece en folderFiles Y en uploadedFiles, lo mostramos
             // solo como Drive (es el estado más actualizado).
@@ -5032,14 +5069,19 @@
             if (!btnCreateOnly || !btnCreateAndAnalyze || !btnExtract) return;
 
             const hasFolder = !!budgetData.folderId;
-            const sourceFilesInDrive = (budgetData.folderFiles || []).filter(f =>
-                f.mimeType !== 'text/plain' && f.name !== 'desktop.ini'
-            );
+            // v3.7.22: docx/doc/txt/_RECUENTO.txt están excluidos del listado
+            // de Drive. Para detectar si ya hay análisis previo, miramos:
+            //  - hasRecuento (flag dedicado del backend, basado en
+            //    _RECUENTO.txt existente)
+            //  - o el wordCount/fileAnalysis ya cargados en budgetData.
+            const sourceFilesInDrive = (budgetData.folderFiles || []);
             const hasFilesInDrive = sourceFilesInDrive.length > 0;
             const hasPendingFiles = (uploadedFiles || []).length > 0;
             const hasAnyFiles = hasFilesInDrive || hasPendingFiles;
-            const hasRecuento = (budgetData.folderFiles || []).some(f => f.name === '_RECUENTO.txt');
-            const hasAnalysis = hasRecuento || (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0);
+            const hasRecuento = !!budgetData.hasRecuento;
+            const hasAnalysis = hasRecuento ||
+                (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) ||
+                (budgetData.wordCount && budgetData.wordCount > 0);
 
             if (hasFolder) {
                 // Carpeta ya existe: los dos botones de creación no aplican
@@ -5341,11 +5383,24 @@
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
                     budgetData.wordCount = data.totalWords || 0;
+                    budgetData.hasRecuento = true;  // v3.7.22: se acaba de crear _RECUENTO.txt
                     completedSteps.add(4);
                     updateProgressSteps();
                     hideStatus();
-                    showSuccess(`Análisis completado · ${data.totalWords} palabras`, budgetData.id);
-                    setTimeout(() => { hideSuccess(); showCard(4); }, 1800);
+                    // v3.7.23: si Claude falló en alguna página, avisar para reintentar
+                    const failedCount = Array.isArray(data.failedPages) ? data.failedPages.length : 0;
+                    if (failedCount > 0) {
+                        const totalPages = data.totalPages || 0;
+                        const okPages = totalPages - failedCount;
+                        showStatus(
+                            `⚠️ Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron). Pulsa "Reanalizar" otra vez para reintentar las que faltan.`,
+                            'warning'
+                        );
+                        setTimeout(hideStatus, 9000);
+                    } else {
+                        showSuccess(`Análisis completado · ${data.totalWords} palabras · ${data.totalPages} páginas`, budgetData.id);
+                        setTimeout(() => { hideSuccess(); showCard(4); }, 1800);
+                    }
                 } else {
                     showStatus('Error: ' + data.error, 'error');
                 }
@@ -5389,6 +5444,7 @@
             const colors = {
                 loading: { bg: '#e0f2fe', border: '#7dd3fc', icon: '⏳' },
                 success: { bg: '#dcfce7', border: '#86efac', icon: '✓' },
+                warning: { bg: '#fef3c7', border: '#fcd34d', icon: '⚠️' },  // v3.7.23
                 error:   { bg: '#fee2e2', border: '#fca5a5', icon: '⚠️' }
             };
             const c = colors[state] || colors.loading;
@@ -5538,8 +5594,20 @@
                         
                         // Actualizar resumen de palabras si está visible
                         refreshWordCountSummary();
-                        
-                        showBgBanner('success', `✓ Carpeta creada · ${budgetData.id} · ${budgetData.wordCount} palabras`, false);
+
+                        // v3.7.23: detectar páginas fallidas y avisar
+                        const failedCount = Array.isArray(claudeResult.failedPages) ? claudeResult.failedPages.length : 0;
+                        if (failedCount > 0) {
+                            const totalPages = claudeResult.totalPages || 0;
+                            const okPages = totalPages - failedCount;
+                            showBgBanner(
+                                'warning',
+                                `⚠️ ${budgetData.id} · Análisis parcial: ${okPages}/${totalPages} páginas (${failedCount} fallaron). Reanaliza desde paso 2 para reintentar.`,
+                                false
+                            );
+                        } else {
+                            showBgBanner('success', `✓ Carpeta creada · ${budgetData.id} · ${budgetData.wordCount} palabras`, false);
+                        }
                     } else {
                         bgState.analysisError = claudeResult.error;
                         showBgBanner('success', `✓ Carpeta creada · ${budgetData.id} · ⚠️ recuento falló`, false);
