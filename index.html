@@ -1707,7 +1707,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.27';
+        const HTML_VERSION = '3.7.28';
         const HTML_DATE = '14/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -5826,9 +5826,67 @@
                 bgState.pendingFiles = files;
                 bgState.pendingWithAnalysis = withAnalysis;
                 bgState.pendingInternalComments = internalComments;
-                const msg = '⚠️ No se pudo crear la carpeta: ' + error.message;
-                showBgBanner('error', msg, true);
-                showGlobalAnalysisBanner('error', '❌ ' + (budgetData.id || '') + ' · ' + msg);
+
+                // v3.7.28: diagnóstico mejorado
+                // "Failed to fetch" típicamente significa: timeout de Apps Script
+                // (6min duro) o caída de red. Intentamos rescatar si la carpeta
+                // se llegó a crear en backend pese al timeout.
+                const isFailedToFetch = /failed to fetch|networkerror|load failed/i.test(error.message || '');
+                let diagnostic = error.message;
+                let recovered = false;
+                if (isFailedToFetch) {
+                    diagnostic = 'Sin respuesta del servidor (posible timeout de Apps Script al pasar de 6 min, o red caída). Intentando rescatar la carpeta...';
+                    showBgBanner('loading', diagnostic, false);
+                    showGlobalAnalysisBanner('loading', '⏳ ' + diagnostic);
+
+                    // Esperar 4s y luego buscar la carpeta por huella (origen+destino+canal+ventana 10min)
+                    await new Promise(r => setTimeout(r, 4000));
+                    try {
+                        const fpResp = await fetch(apiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'findBudgetByFingerprint',
+                                origen: budgetData.sourceLang,
+                                destino: budgetData.targetLang,
+                                canal: budgetData.channel || '',
+                                minutesBack: 10
+                            })
+                        });
+                        const fpData = await fpResp.json();
+                        if (fpData.success && fpData.found && fpData.budget) {
+                            // ¡Rescate! La carpeta existe.
+                            budgetData.id = fpData.budget.id;
+                            budgetData.folderId = fpData.budget.folderId;
+                            budgetData.folderUrl = fpData.budget.folderUrl;
+                            bgState.folderCreated = true;
+                            bgState.folderError = null;
+                            bgState.pendingFiles = null;
+                            uploadedFiles = [];
+                            recovered = true;
+                            // Refrescar UI
+                            const idDisplay = document.getElementById('budgetIdDisplay');
+                            if (idDisplay) { idDisplay.textContent = budgetData.id; idDisplay.classList.add('active'); }
+                            const delBtn = document.getElementById('deleteBudgetBtn');
+                            if (delBtn) delBtn.style.display = 'inline-block';
+                            if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+                            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+
+                            const recMsg = `⚠️ Carpeta rescatada · ${budgetData.id} — el servidor respondió tarde pero la carpeta SÍ se creó. ${withAnalysis ? 'Pulsa "Reanalizar" en el paso 2 si necesitas terminar el análisis.' : ''}`;
+                            showBgBanner('warning', recMsg, false);
+                            showGlobalAnalysisBanner('warning', recMsg);
+                        }
+                    } catch(rescueErr) {
+                        console.log('Rescue intento falló:', rescueErr);
+                    }
+                }
+
+                if (!recovered) {
+                    const msg = isFailedToFetch
+                        ? `⚠️ No se obtuvo respuesta del servidor. Probable timeout (>6 min) o red caída. La carpeta puede haberse creado igual — pulsa "Reintentar" o revisa el listado de presupuestos. Detalle: ${error.message}`
+                        : '⚠️ No se pudo crear la carpeta: ' + error.message;
+                    showBgBanner('error', msg, true);
+                    showGlobalAnalysisBanner('error', '❌ ' + (budgetData.id || '') + ' · ' + msg);
+                }
             }
         }
         
