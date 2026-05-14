@@ -1704,7 +1704,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.29';
+        const HTML_VERSION = '3.7.32';
         const HTML_DATE = '14/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -5542,6 +5542,9 @@
                 `⏳ Analizando ${numFiles} archivo(s) del presupuesto ${budgetData.id}... Puedes navegar; este aviso se mantendrá visible.`
             );
 
+            // v3.7.32: instrumentación global
+            const t_start = performance.now();
+
             try {
                 // Si hay archivos nuevos pendientes de subir, subirlos primero
                 await syncPendingUploads();
@@ -5559,6 +5562,33 @@
                 });
                 const data = await resp.json();
                 if (data._perf) logPerfToConsole(data._perf, 'Reanalizar');  // v3.7.27
+                // v3.7.32: log etapas (en reanalyzeFolder el backend hace TODO,
+                // no hay etapa de upload de archivos ni saveResults separada)
+                const t_end = performance.now();
+                const total_ms = Math.round(t_end - t_start);
+                const claudeMs = (data._perf && data._perf.totalMs) || 0;
+                // El resto = todo lo que NO es Claude (lectura archivos Drive, split,
+                // guardado TXTs/recuento, escribir hoja...)
+                const otherBackend_ms = Math.max(0, total_ms - claudeMs);
+                fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'logStageTimings',
+                        budgetId: budgetData.id,
+                        action_label: 'Reanalizar',
+                        stages: {
+                            uploadFiles_ms: 0,
+                            createFolder_ms: 0,
+                            claudeAnalysis_ms: claudeMs,
+                            saveResults_ms: otherBackend_ms,
+                            total_ms: total_ms
+                        },
+                        meta: { numFiles: numFiles, totalBytes: 0 }
+                    })
+                }).catch(e => console.warn('logStageTimings fallo:', e));
+                console.log(`%c[Tradutema STAGES] Reanalizar (${budgetData.id}) %ctotal=${(total_ms/1000).toFixed(1)}s · claude=${(claudeMs/1000).toFixed(1)}s · otroBackend=${(otherBackend_ms/1000).toFixed(1)}s`,
+                    'color:#7c3aed;font-weight:bold;', 'color:#475569;');
+
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
                     budgetData.wordCount = data.totalWords || 0;
@@ -5659,6 +5689,25 @@
 
         // Ejecuta la creación de carpeta (y opcionalmente análisis) en background
         async function runBackgroundCreate(files, withAnalysis, internalComments) {
+            // v3.7.32: instrumentación global de etapas
+            const stageTimings = {
+                t_start: performance.now(),
+                t_promiseAllEnd: 0,
+                t_saveResultsStart: 0,
+                t_saveResultsEnd: 0,
+                t_end: 0,
+                backendCreateFolderMs: 0,
+                backendClaudeMs: 0,
+                backendSaveResultsMs: 0
+            };
+            // Tamaño aproximado del payload de archivos (base64)
+            let approxBytes = 0;
+            try {
+                files.forEach(f => { approxBytes += (f.content || '').length; });
+                // base64 es 33% más grande que los bytes reales
+                approxBytes = Math.round(approxBytes * 0.75);
+            } catch(e) {}
+
             try {
                 const totalPages = files.reduce((sum, f) => sum + (f.pages || 1), 0);
                 
@@ -5699,8 +5748,12 @@
                 }
                 
                 const results = await Promise.all(promises);
+                stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
                 const folderResult = results[0];
                 const claudeResult = withAnalysis ? results[1] : null;
+                // v3.7.32: capturar tiempos backend
+                stageTimings.backendCreateFolderMs = (folderResult._timings && folderResult._timings.totalMs) || 0;
+                stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
                 
                 if (!folderResult.success) {
                     throw new Error(folderResult.error || 'Error creando carpeta');
@@ -5751,6 +5804,19 @@
                 if (withAnalysis && claudeResult) {
                     if (claudeResult._debug) console.log('[Tradutema DEBUG]', claudeResult._debug);
                     if (claudeResult._perf) logPerfToConsole(claudeResult._perf, 'Crear y Analizar');
+                    // v3.7.31: registrar en hoja Performance con budgetId real
+                    // (countWordsParallel no lo tenía porque iba en paralelo)
+                    if (claudeResult._perf && budgetData.id) {
+                        fetch(apiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'logPerformance',
+                                budgetId: budgetData.id,
+                                action_label: 'Crear y Analizar',
+                                perf: claudeResult._perf
+                            })
+                        }).catch(e => console.warn('logPerformance fallo:', e));
+                    }
                     if (claudeResult.success) {
                         budgetData.fileAnalysis = claudeResult.analysis || [];
                         budgetData.wordCount = claudeResult.totalWords || 0;
@@ -5771,21 +5837,43 @@
                         // También dejarlo en budgetData para que el resto del flujo lo vea
                         budgetData.fileSettings = Object.assign({}, budgetData.fileSettings || {}, initialFileSettings);
 
-                        // Guardar resultado en hoja (fire-and-forget)
-                        fetch(apiUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'saveWordCountResults',
-                                budgetId: budgetData.id,
-                                folderId: budgetData.folderId,
-                                analysis: claudeResult.analysis,
-                                totalWords: claudeResult.totalWords,
-                                totalPages: claudeResult.totalPages,
-                                sourceLang: budgetData.sourceLang,
-                                fileSettings: initialFileSettings  // v3.7.19
-                            })
-                        });
-                        
+                        // v3.7.30 FIX: Guardar resultado en hoja AWAIT (antes era fire-and-forget).
+                        // En presupuestos grandes (mucho extractedText), el navegador podía
+                        // abortar el fetch antes de que llegara al backend, dejando los TXTs
+                        // sin generar en Drive. Ahora esperamos y damos feedback al usuario.
+                        showBgBanner('loading', '💾 Guardando análisis en Drive (TXTs + _RECUENTO.txt)...', false);
+                        showGlobalAnalysisBanner('loading', `⏳ ${budgetData.id} · Guardando análisis en Drive...`);
+                        stageTimings.t_saveResultsStart = performance.now();  // v3.7.32
+                        try {
+                            const saveResp = await fetch(apiUrl, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    action: 'saveWordCountResults',
+                                    budgetId: budgetData.id,
+                                    folderId: budgetData.folderId,
+                                    analysis: claudeResult.analysis,
+                                    totalWords: claudeResult.totalWords,
+                                    totalPages: claudeResult.totalPages,
+                                    sourceLang: budgetData.sourceLang,
+                                    fileSettings: initialFileSettings  // v3.7.19
+                                })
+                            });
+                            const saveData = await saveResp.json();
+                            if (!saveData.success) {
+                                console.warn('saveWordCountResults: el backend reportó fallo', saveData);
+                            }
+                            // v3.7.32: capturar timing backend de saveResults
+                            if (saveData._timings && saveData._timings.totalMs) {
+                                stageTimings.backendSaveResultsMs = saveData._timings.totalMs;
+                            }
+                        } catch(saveErr) {
+                            console.error('saveWordCountResults: fallo en la llamada', saveErr);
+                            // No es bloqueante: la hoja Presupuestos quizá tampoco se actualizó,
+                            // pero el usuario verá el resultado en pantalla y podrá reanalizar
+                            // desde el paso 2 si los TXTs no están en Drive.
+                        }
+                        stageTimings.t_saveResultsEnd = performance.now();  // v3.7.32
+
                         // Actualizar resumen de palabras si está visible
                         refreshWordCountSummary();
 
@@ -5822,6 +5910,10 @@
                 // Auto-ocultar el banner del paso 2 tras 4s en éxito
                 // (el banner global persiste hasta que el usuario lo cierre)
                 setTimeout(hideBgBanner, 4000);
+
+                // v3.7.32: registrar resumen de etapas en Performance
+                stageTimings.t_end = performance.now();
+                logStageTimingsToSheet(stageTimings, withAnalysis ? 'Crear y Analizar' : 'Crear Carpeta', files.length, approxBytes);
                 
             } catch(error) {
                 bgState.folderError = error.message;
@@ -8122,6 +8214,67 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         // ====== STATUS & SUCCESS ======
+        // v3.7.32: registrar un resumen GLOBAL de etapas en la hoja Performance.
+        // stageTimings = { t_start, t_promiseAllEnd, t_saveResultsStart,
+        //                  t_saveResultsEnd, t_end,
+        //                  backendCreateFolderMs, backendClaudeMs, backendSaveResultsMs }
+        // Calcula:
+        //   total_ms          = t_end - t_start
+        //   uploadFiles_ms    = (t_promiseAllEnd - t_start) - max(backendCreate, backendClaude)
+        //                       (lo que tarda enviar archivos sobre la red, descontando lo que
+        //                        el backend reportó como procesamiento interno)
+        //   createFolder_ms   = backendCreateFolderMs (lo que tardó el backend)
+        //   claudeAnalysis_ms = backendClaudeMs       (lo que tardó el backend)
+        //   saveResults_ms    = t_saveResultsEnd - t_saveResultsStart
+        function logStageTimingsToSheet(stageTimings, actionLabel, numFiles, totalBytes) {
+            try {
+                const t = stageTimings;
+                const total_ms = Math.round(t.t_end - t.t_start);
+                const promiseAll_ms = Math.round(t.t_promiseAllEnd - t.t_start);
+                const maxBackendDuringPromiseAll = Math.max(
+                    t.backendCreateFolderMs || 0,
+                    t.backendClaudeMs || 0
+                );
+                // upload time = lo que el navegador tardó en llamar a backend - lo que el backend ejecutó
+                const uploadFiles_ms = Math.max(0, promiseAll_ms - maxBackendDuringPromiseAll);
+                const saveResults_ms = t.t_saveResultsEnd && t.t_saveResultsStart
+                    ? Math.round(t.t_saveResultsEnd - t.t_saveResultsStart)
+                    : 0;
+
+                const payload = {
+                    action: 'logStageTimings',
+                    budgetId: budgetData.id || '',
+                    action_label: actionLabel,
+                    stages: {
+                        uploadFiles_ms: uploadFiles_ms,
+                        createFolder_ms: t.backendCreateFolderMs || 0,
+                        claudeAnalysis_ms: t.backendClaudeMs || 0,
+                        saveResults_ms: saveResults_ms,
+                        total_ms: total_ms
+                    },
+                    meta: {
+                        numFiles: numFiles || 0,
+                        totalBytes: totalBytes || 0
+                    }
+                };
+
+                // Resumen en consola
+                console.log(
+                    `%c[Tradutema STAGES] ${actionLabel} (${budgetData.id || '?'}) %ctotal=${(total_ms/1000).toFixed(1)}s · upload=${(uploadFiles_ms/1000).toFixed(1)}s · createFolder=${((t.backendCreateFolderMs||0)/1000).toFixed(1)}s · claude=${((t.backendClaudeMs||0)/1000).toFixed(1)}s · saveResults=${(saveResults_ms/1000).toFixed(1)}s`,
+                    'color:#7c3aed;font-weight:bold;',
+                    'color:#475569;'
+                );
+
+                // Enviar a hoja (fire-and-forget, ya no es crítico)
+                fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                }).catch(e => console.warn('logStageTimings fallo:', e));
+            } catch(e) {
+                console.warn('logStageTimingsToSheet error:', e);
+            }
+        }
+
         // v3.7.27: imprime un resumen de rendimiento en consola tras cada
         // análisis para que se pueda diagnosticar por qué fue lento. También
         // se guarda en la pestaña "Performance" de la spreadsheet.
