@@ -1707,8 +1707,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.25';
-        const HTML_DATE = '13/05/2026';
+        const HTML_VERSION = '3.7.27';
+        const HTML_DATE = '14/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -3422,6 +3422,7 @@
                 });
 
                 const data = await response.json();
+                if (data._perf) logPerfToConsole(data._perf, 'Recuento rápido');  // v3.7.27
                 if (!data.success) throw new Error(data.error || 'Error desconocido');
 
                 hideStatus();
@@ -5555,6 +5556,7 @@
                     })
                 });
                 const data = await resp.json();
+                if (data._perf) logPerfToConsole(data._perf, 'Reanalizar');  // v3.7.27
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
                     budgetData.wordCount = data.totalWords || 0;
@@ -5746,6 +5748,7 @@
                 // Procesar resultado del análisis si lo hubo
                 if (withAnalysis && claudeResult) {
                     if (claudeResult._debug) console.log('[Tradutema DEBUG]', claudeResult._debug);
+                    if (claudeResult._perf) logPerfToConsole(claudeResult._perf, 'Crear y Analizar');
                     if (claudeResult.success) {
                         budgetData.fileAnalysis = claudeResult.analysis || [];
                         budgetData.wordCount = claudeResult.totalWords || 0;
@@ -5933,6 +5936,7 @@
                 });
                 const data = await resp.json();
                 if (data._debug) console.log('[Tradutema DEBUG]', data._debug);
+                if (data._perf) logPerfToConsole(data._perf, 'Re-extraer');  // v3.7.27
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
                     budgetData.wordCount = data.totalWords || 0;
@@ -8058,6 +8062,43 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         // ====== STATUS & SUCCESS ======
+        // v3.7.27: imprime un resumen de rendimiento en consola tras cada
+        // análisis para que se pueda diagnosticar por qué fue lento. También
+        // se guarda en la pestaña "Performance" de la spreadsheet.
+        function logPerfToConsole(perf, action) {
+            if (!perf || !perf.perPage) return;
+            const totalS = (perf.totalMs / 1000).toFixed(1);
+            const pass1S = (perf.pass1Ms / 1000).toFixed(1);
+            const retryS = (perf.retryMs / 1000).toFixed(1);
+            console.log(
+                `%c[Tradutema PERF] ${action || ''} %ctotal=${totalS}s · 1ª pasada=${pass1S}s · reintentos=${retryS}s · fallos=${perf.failures || 0} · ${perf.requests} archivo(s)/página(s) · modelo=${perf.model}`,
+                'color:#0c4a6e;font-weight:bold;',
+                'color:#475569;'
+            );
+            // Detalle por archivo (agrupado)
+            const byFile = {};
+            perf.perPage.forEach(p => {
+                if (!byFile[p.fileName]) byFile[p.fileName] = { fileName: p.fileName, pages: 0, sizeKB: 0, ms: 0, attempts: 1, errors: 0 };
+                const acc = byFile[p.fileName];
+                if (p.wholeFile) acc.pages = Math.max(acc.pages, p.totalPagesInFile || 1);
+                else acc.pages += 1;
+                acc.sizeKB += Math.round((p.sizeBytes || 0) / 1024);
+                acc.ms += p.ms || 0;
+                if (p.attempts > acc.attempts) acc.attempts = p.attempts;
+                if (p.finalError) acc.errors += 1;
+            });
+            const rows = Object.values(byFile).map(f => ({
+                Archivo: f.fileName,
+                Pág: f.pages,
+                'Tamaño (KB)': f.sizeKB,
+                's': (f.ms / 1000).toFixed(1),
+                'Intentos': f.attempts,
+                'Error': f.errors ? 'SÍ' : ''
+            })).sort((a, b) => parseFloat(b.s) - parseFloat(a.s));
+            if (console.table) console.table(rows);
+            else console.log(rows);
+        }
+
         function showStatus(msg, type) {
             const el = document.getElementById('statusMessage');
             el.className = 'status-message visible ' + type;
