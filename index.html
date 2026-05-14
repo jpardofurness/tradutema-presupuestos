@@ -1126,9 +1126,6 @@
                 <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue(true, false)" disabled style="flex:2;min-width:230px;" title="Crea la carpeta, analiza los documentos y guarda los TXT extraídos en una sola operación">
                     📁+🔢+📄 Crear, Analizar y Extraer →
                 </button>
-                <button class="btn btn-secondary action-btn" id="step2BtnExtract" onclick="extractTexts()" disabled style="flex:1;min-width:130px;background:#7c3aed;color:white;" title="Re-generar los TXTs extraídos en Drive (sólo si los borraste o quieres rehacerlos)">
-                    📄 Re-extraer
-                </button>
             </div>
             
             <!-- Banner de estado de operaciones en background -->
@@ -1707,7 +1704,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.28';
+        const HTML_VERSION = '3.7.29';
         const HTML_DATE = '14/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -5232,10 +5229,11 @@
         function updateStep2Buttons() {
             const btnCreateOnly = document.getElementById('step2BtnOnly');
             const btnCreateAndAnalyze = document.getElementById('step2Btn');
+            // v3.7.29: btnExtract eliminado del DOM; cualquier acceso debe ser tolerante.
             const btnExtract = document.getElementById('step2BtnExtract');
             let btnReanalyze = document.getElementById('reanalyzeBtn');
 
-            if (!btnCreateOnly || !btnCreateAndAnalyze || !btnExtract) return;
+            if (!btnCreateOnly || !btnCreateAndAnalyze) return;
 
             const hasFolder = !!budgetData.folderId;
             // v3.7.22: docx/doc/txt/_RECUENTO.txt están excluidos del listado
@@ -5277,8 +5275,10 @@
                         : '🔢 Analizar →';
                 }
 
-                btnExtract.style.display = '';
-                btnExtract.disabled = !hasFilesInDrive;
+                if (btnExtract) {
+                    btnExtract.style.display = '';
+                    btnExtract.disabled = !hasFilesInDrive;
+                }
             } else {
                 // No hay carpeta: estado inicial. Botones Crear* aparecen,
                 // habilitados sólo si hay pendientes
@@ -5292,8 +5292,10 @@
                     btnReanalyze.disabled = true;
                 }
 
-                btnExtract.style.display = '';
-                btnExtract.disabled = true;
+                if (btnExtract) {
+                    btnExtract.style.display = '';
+                    btnExtract.disabled = true;
+                }
             }
         }
 
