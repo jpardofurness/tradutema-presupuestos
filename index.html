@@ -607,6 +607,23 @@
                 <span>Envío Cliente</span>
             </div>
         </div>
+        <!-- v3.7.24: resumen persistente del presupuesto (visible siempre que haya datos) -->
+        <div id="budgetSummaryBar" class="hidden" style="margin:10px auto 0;max-width:1100px;padding:10px 14px;background:white;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;flex-wrap:wrap;gap:14px;font-size:0.85rem;color:#334155;align-items:center;justify-content:space-between;">
+            <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
+                <span><span style="color:#64748b;">Palabras:</span> <strong id="bsBarPalabras" style="color:#0c4a6e;">—</strong></span>
+                <span><span style="color:#64748b;">Páginas:</span> <strong id="bsBarPaginas" style="color:#0c4a6e;">—</strong></span>
+                <span><span style="color:#64748b;">Tarifa:</span> <strong id="bsBarTarifa" style="color:#0c4a6e;">—</strong></span>
+                <span><span style="color:#64748b;">Importe:</span> <strong id="bsBarImporte" style="color:#15803d;">—</strong></span>
+                <span><span style="color:#64748b;">Plazo:</span> <strong id="bsBarPlazo" style="color:#0c4a6e;">—</strong></span>
+            </div>
+            <span id="bsBarEstado" style="font-size:0.78rem;color:#64748b;"></span>
+        </div>
+        <!-- v3.7.24: banner GLOBAL de progreso/resultado de análisis, persiste entre pestañas -->
+        <div id="globalAnalysisBanner" class="hidden" style="margin:6px auto 0;max-width:1100px;padding:10px 14px;border-radius:8px;font-size:0.88rem;display:flex;align-items:center;gap:10px;border:1px solid;">
+            <span id="globalAnalysisIcon" style="font-size:1.1rem;"></span>
+            <span id="globalAnalysisText" style="flex:1;"></span>
+            <button id="globalAnalysisDismiss" onclick="dismissGlobalAnalysisBanner()" style="background:transparent;border:0;color:inherit;opacity:0.6;cursor:pointer;font-size:1rem;padding:0 6px;" title="Cerrar">✕</button>
+        </div>
     </div>
 
     <main class="main">
@@ -1106,11 +1123,11 @@
                 <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false, false)" disabled style="flex:1;min-width:130px;">
                     📁 Crear Carpeta
                 </button>
-                <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue(true, false)" disabled style="flex:2;min-width:200px;">
-                    📁+🔢 Crear y Analizar →
+                <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue(true, false)" disabled style="flex:2;min-width:230px;" title="Crea la carpeta, analiza los documentos y guarda los TXT extraídos en una sola operación">
+                    📁+🔢+📄 Crear, Analizar y Extraer →
                 </button>
-                <button class="btn btn-secondary action-btn" id="step2BtnExtract" onclick="extractTexts()" disabled style="flex:1;min-width:130px;background:#7c3aed;color:white;">
-                    📄 Extraer
+                <button class="btn btn-secondary action-btn" id="step2BtnExtract" onclick="extractTexts()" disabled style="flex:1;min-width:130px;background:#7c3aed;color:white;" title="Re-generar los TXTs extraídos en Drive (sólo si los borraste o quieres rehacerlos)">
+                    📄 Re-extraer
                 </button>
             </div>
             
@@ -1690,8 +1707,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.23';
-        const HTML_DATE = '12/05/2026';
+        const HTML_VERSION = '3.7.25';
+        const HTML_DATE = '13/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1859,6 +1876,12 @@
             const hdrLocal = document.getElementById('hdrBtnLocalFolder');
             if (hdrDrive) hdrDrive.style.display = 'none';
             if (hdrLocal) hdrLocal.style.display = 'none';
+            // v3.7.24: ocultar banner de resumen
+            const bsBar = document.getElementById('budgetSummaryBar');
+            if (bsBar) bsBar.classList.add('hidden');
+            // v3.7.24: ocultar banner global de análisis (no persiste fuera del presupuesto)
+            const ab = document.getElementById('globalAnalysisBanner');
+            if (ab) ab.classList.add('hidden');
 
             // Reset state
             resetBudgetState();
@@ -2008,7 +2031,113 @@
             if (hdrDrive) hdrDrive.style.display = budgetData.folderUrl ? '' : 'none';
             if (hdrLocal) hdrLocal.style.display = budgetData.id ? '' : 'none';
         }
-        
+
+        // v3.7.24: actualizar el banner de resumen persistente con los totales
+        // del presupuesto. Llamado tras cargar/crear/analizar/guardar precio.
+        function updateBudgetSummaryBar() {
+            const bar = document.getElementById('budgetSummaryBar');
+            if (!bar) return;
+            if (!budgetData.id) {
+                bar.classList.add('hidden');
+                return;
+            }
+            const palabras = budgetData.wordCount || 0;
+            const paginas = budgetData.pageCount || (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.pages) || 0), 0) || 0;
+            const tarifa = parseFloat(budgetData.savedQuotePricePerWord || budgetData.savedQuoteRate || 0);
+            const importe = parseFloat(budgetData.savedQuoteTotal || 0);
+            const plazo = budgetData.savedQuoteDays || '';
+            const estado = budgetData.estado || '';
+
+            const fmtEuros = (n) => isFinite(n) && n > 0
+                ? n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+                : '—';
+            const fmtTarifa = (n) => isFinite(n) && n > 0
+                ? n.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) + ' €/pal'
+                : '—';
+
+            document.getElementById('bsBarPalabras').textContent = palabras > 0 ? palabras.toLocaleString('es-ES') : '—';
+            document.getElementById('bsBarPaginas').textContent = paginas > 0 ? paginas : '—';
+            document.getElementById('bsBarTarifa').textContent = fmtTarifa(tarifa);
+            document.getElementById('bsBarImporte').textContent = fmtEuros(importe);
+            document.getElementById('bsBarPlazo').textContent = plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—';
+            document.getElementById('bsBarEstado').textContent = estado;
+
+            // Mostrar solo si hay al menos un dato real (no todo en —)
+            const anyData = palabras > 0 || paginas > 0 || tarifa > 0 || importe > 0 || plazo;
+            if (anyData) bar.classList.remove('hidden');
+            else bar.classList.add('hidden');
+        }
+
+        // v3.7.24: banner GLOBAL de progreso/resultado, persistente en
+        // localStorage por presupuesto. Sobrevive a cambios de pestaña/paso
+        // y a recargas del navegador, para que si el usuario se va y vuelve
+        // siga viendo el último estado del análisis.
+        const ANALYSIS_BANNER_KEY_PREFIX = 'tradutema_analysisBanner_';
+
+        function showGlobalAnalysisBanner(state, text, opts) {
+            opts = opts || {};
+            const banner = document.getElementById('globalAnalysisBanner');
+            const icon = document.getElementById('globalAnalysisIcon');
+            const txt = document.getElementById('globalAnalysisText');
+            const dismissBtn = document.getElementById('globalAnalysisDismiss');
+            if (!banner) return;
+
+            const styles = {
+                loading: { bg: '#e0f2fe', border: '#7dd3fc', color: '#0c4a6e', icon: '⏳' },
+                success: { bg: '#dcfce7', border: '#86efac', color: '#14532d', icon: '✓' },
+                warning: { bg: '#fef3c7', border: '#fcd34d', color: '#78350f', icon: '⚠️' },
+                error:   { bg: '#fee2e2', border: '#fca5a5', color: '#7f1d1d', icon: '❌' }
+            };
+            const s = styles[state] || styles.loading;
+            banner.style.background = s.bg;
+            banner.style.borderColor = s.border;
+            banner.style.color = s.color;
+            icon.textContent = s.icon;
+            txt.textContent = text;
+            // El estado 'loading' no se puede cerrar (sigue corriendo)
+            if (dismissBtn) dismissBtn.style.display = (state === 'loading') ? 'none' : '';
+            banner.classList.remove('hidden');
+
+            // Persistir excepto si se pide explícitamente no hacerlo
+            if (opts.persist !== false && budgetData.id) {
+                try {
+                    localStorage.setItem(
+                        ANALYSIS_BANNER_KEY_PREFIX + budgetData.id,
+                        JSON.stringify({ state: state, text: text, ts: Date.now() })
+                    );
+                } catch(e) {}
+            }
+        }
+
+        function dismissGlobalAnalysisBanner() {
+            const banner = document.getElementById('globalAnalysisBanner');
+            if (banner) banner.classList.add('hidden');
+            if (budgetData.id) {
+                try { localStorage.removeItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id); } catch(e) {}
+            }
+        }
+
+        // Restaurar banner desde localStorage al cargar/abrir un presupuesto
+        function restoreGlobalAnalysisBanner() {
+            if (!budgetData.id) return;
+            try {
+                const raw = localStorage.getItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
+                if (!raw) return;
+                const saved = JSON.parse(raw);
+                // No restaurar banners más viejos de 24h
+                if (saved.ts && (Date.now() - saved.ts) > 24 * 3600 * 1000) {
+                    localStorage.removeItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
+                    return;
+                }
+                // No restaurar 'loading' (si la pestaña se cerró, ese análisis ya no continúa)
+                if (saved.state === 'loading') {
+                    localStorage.removeItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
+                    return;
+                }
+                showGlobalAnalysisBanner(saved.state, saved.text, { persist: false });
+            } catch(e) {}
+        }
+
         // v3.7.14: renombrada desde confirmDeleteBudget para evitar colisión
         // con la función homónima del listado (que sí recibe budgetId como
         // parámetro). Antes la 2ª declaración sobrescribía la 1ª y el botón
@@ -3742,6 +3871,10 @@
                             <span class="budget-item-detail">${canal}</span>
                             <span class="budget-item-detail">🌐 ${b.origen} → ${b.destino}</span>
                             ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} ${parseInt(b.palabras) === 1 ? 'palabra' : 'palabras'}</span>` : ''}
+                            ${b.paginas ? `<span class="budget-item-detail">📄 ${parseInt(b.paginas)} pág${parseInt(b.paginas) > 1 ? 's' : ''}</span>` : ''}
+                            ${(parseFloat(b.importe) > 0) ? `<span class="budget-item-detail" style="color:#15803d;font-weight:600;">💶 ${parseFloat(b.importe).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</span>` : ''}
+                            ${(parseFloat(b.tarifa) > 0) ? `<span class="budget-item-detail" style="color:#475569;font-size:0.78rem;">${parseFloat(b.tarifa).toLocaleString('es-ES', {minimumFractionDigits: 4, maximumFractionDigits: 4})} €/pal</span>` : ''}
+                            ${b.plazo ? `<span class="budget-item-detail" style="color:#475569;font-size:0.78rem;">⏱ ${b.plazo} días</span>` : ''}
                             ${contactoHtml}
                             ${pedidoHtml}
                         </div>
@@ -3872,6 +4005,16 @@
                     budgetData.savedAmount = b.importe || '';
                     budgetData.savedQuoteDays = b.plazo || '';
                     budgetData.savedUrgency = b.recargoUrgencia || '';
+                    // v3.7.24: sincronizar también los campos que usa el banner de resumen
+                    budgetData.savedQuoteTotal = parseFloat(b.importe) || 0;
+                    budgetData.wordCount = parseInt(b.palabras) || 0;
+                    budgetData.pageCount = parseInt(b.paginas) || 0;
+                    if (budgetData.wordCount > 0 && budgetData.savedQuoteTotal > 0) {
+                        budgetData.savedQuotePricePerWord = budgetData.savedQuoteTotal / budgetData.wordCount;
+                    } else {
+                        budgetData.savedQuotePricePerWord = parseFloat(b.tarifa) || 0;
+                    }
+                    budgetData.estado = b.estado || '';
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
                     budgetData.hasRecuento = !!b.hasRecuento;  // v3.7.22
                     
@@ -3982,6 +4125,10 @@
                     document.getElementById('deleteBudgetBtn').style.display = 'inline-block';
                     // v3.7.20: refrescar botones del header (Drive / Local)
                     if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+                    // v3.7.24: refrescar banner de resumen
+                    if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                    // v3.7.24: restaurar banner global de análisis si lo había
+                    if (typeof restoreGlobalAnalysisBanner === 'function') restoreGlobalAnalysisBanner();
                     
                     // Restaurar campos contacto en paso 1 (solo si tienen valor)
                     const clientEmailStep1 = document.getElementById('clientEmailStep1');
@@ -4851,10 +4998,10 @@
         // Construye el indicador "⚙ págs 1-5 · con instrucciones" en línea
         function buildSettingsBadge(pagesFilter, instructions) {
             const parts = [];
-            if (pagesFilter && pagesFilter.trim()) parts.push('págs ' + pagesFilter.trim());
+            if (pagesFilter && pagesFilter.trim()) parts.push('SOLO págs ' + pagesFilter.trim());
             if (instructions && instructions.trim()) parts.push('con instrucciones');
             if (!parts.length) return '';
-            return `<span class="settings-badge" style="display:inline-block;margin-left:6px;padding:2px 7px;background:#fef3c7;color:#92400e;border-radius:10px;font-size:0.72rem;font-weight:500;">⚙ ${parts.join(' · ')}</span>`;
+            return `<span class="settings-badge" style="display:inline-block;margin-left:6px;padding:3px 9px;background:#fb923c;color:white;border-radius:10px;font-size:0.72rem;font-weight:700;letter-spacing:0.3px;">⚙ ${parts.join(' · ')}</span>`;
         }
 
         function updateSettingsBadge(name, pendingIdx) {
@@ -4892,7 +5039,7 @@
 
         // Renderiza el bloque "file-item + panel ⚙" para un archivo (pendiente
         // o de Drive). pendingIdx es null para archivos de Drive.
-        function renderFileItemWithSettings({ name, sizeBytes, pagesStr, previewBtn, removeBtnHtml, pendingIdx, isPdfOrImg }) {
+        function renderFileItemWithSettings({ name, sizeBytes, pagesStr, wordsStr, previewBtn, removeBtnHtml, pendingIdx, isPdfOrImg }) {
             const s = readSettingsForFile(name, pendingIdx);
             const hasAny = !!(s.pagesFilter || s.instructions);
             const key = pendingIdx !== null && pendingIdx !== undefined ? 'p' + pendingIdx : 'd' + name;
@@ -4901,12 +5048,17 @@
             const sizeClass = sizeBytes > 2 * 1024 * 1024 ? 'file-size-large' : '';
             const pendingAttr = pendingIdx !== null && pendingIdx !== undefined ? String(pendingIdx) : '""';
             const nameEsc = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            // v3.7.24: combinar size/pages/words en una sola línea de detalle
+            const parts = [formatFileSize(sizeBytes)];
+            if (pagesStr) parts.push(pagesStr);
+            if (wordsStr) parts.push(`<strong style="color:#0c4a6e;">${wordsStr}</strong>`);
+            const detailHtml = parts.join(' · ');
 
             return `
                 <div class="file-item">
                     <div class="file-item-info">
                         <span class="file-item-name">${previewBtn} ${escHtml(name)}<span id="settingsBadge_${safeKey}">${buildSettingsBadge(s.pagesFilter, s.instructions)}</span></span>
-                        <span class="file-item-size ${sizeClass}">${formatFileSize(sizeBytes)}${pagesStr ? ' · ' + pagesStr : ''}</span>
+                        <span class="file-item-size ${sizeClass}">${detailHtml}</span>
                     </div>
                     <div class="file-item-actions">
                         <button id="settingsToggle_${safeKey}" type="button" title="${hasAny ? 'Ajustes configurados — pulsa para editar' : 'Configurar páginas e instrucciones para este archivo'}" onclick="toggleSettingsPanel('${key.replace(/'/g, "\\'")}')" style="background:transparent;border:0;font-size:1.05rem;cursor:pointer;color:${hasAny ? '#d97706' : '#6b7280'};padding:4px 8px;">⚙</button>
@@ -4987,16 +5139,27 @@
             // 1) Archivos ya en Drive
             if (driveFiles.length > 0) {
                 html += '<div class="folder-files-note">📁 Archivos en Drive (puedes eliminar o añadir más):</div>';
+                // v3.7.24: indexar análisis por nombre para mostrar palabras/páginas
+                const analysisByName = {};
+                (budgetData.fileAnalysis || []).forEach(a => {
+                    if (a && a.fileName) analysisByName[a.fileName] = a;
+                });
                 driveFiles.forEach((f, i) => {
                     totalSize += f.size || 0;
                     const previewBtn = f.id
                         ? `<a href="https://drive.google.com/file/d/${f.id}/view" target="_blank" class="btn-preview" title="Ver en Drive">👁️</a>`
                         : '';
                     const isPdfOrImg = (f.mimeType === 'application/pdf') || (f.mimeType && f.mimeType.indexOf('image/') === 0);
+                    const an = analysisByName[f.name];
+                    const pStr = an && an.pages ? `${an.pages} pág${an.pages > 1 ? 's' : ''}` : '';
+                    const wStr = an && an.words != null
+                        ? `${(an.words || 0).toLocaleString('es-ES')} palabras`
+                        : '';
                     html += renderFileItemWithSettings({
                         name: f.name,
                         sizeBytes: f.size || 0,
-                        pagesStr: '',
+                        pagesStr: pStr,
+                        wordsStr: wStr,
                         previewBtn: previewBtn,
                         removeBtnHtml: `<button class="file-item-remove" onclick="removeDriveFile('${f.id}', ${i})" title="Eliminar de Drive">✕</button>`,
                         pendingIdx: null,
@@ -5048,7 +5211,12 @@
             } else {
                 displayPages = pendingPages;
             }
-            total.innerHTML = `<strong>${totalCount}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${displayPages}</strong> página(s)`;
+            // v3.7.24: si hay análisis, añadir total de palabras al pie
+            const totalWords = (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.words) || 0), 0);
+            const wordsHtml = totalWords > 0
+                ? ` - <strong style="color:#0c4a6e;">${totalWords.toLocaleString('es-ES')} palabras</strong>`
+                : '';
+            total.innerHTML = `<strong>${totalCount}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${displayPages}</strong> página(s)${wordsHtml}`;
             total.style.display = 'block';
 
             updateStep2Buttons();
@@ -5363,6 +5531,13 @@
                 btn.dataset.busy = 'true';
             }
             showStatus('Analizando documentos con Claude...', 'loading');
+            // v3.7.24: banner global persistente "analizando"
+            const numFiles = (budgetData.folderFiles || []).filter(f =>
+                f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_'
+            ).length;
+            showGlobalAnalysisBanner('loading',
+                `⏳ Analizando ${numFiles} archivo(s) del presupuesto ${budgetData.id}... Puedes navegar; este aviso se mantendrá visible.`
+            );
 
             try {
                 // Si hay archivos nuevos pendientes de subir, subirlos primero
@@ -5383,26 +5558,36 @@
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
                     budgetData.wordCount = data.totalWords || 0;
+                    budgetData.pageCount = data.totalPages || budgetData.pageCount;
                     budgetData.hasRecuento = true;  // v3.7.22: se acaba de crear _RECUENTO.txt
                     completedSteps.add(4);
                     updateProgressSteps();
+                    if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();  // v3.7.24
                     hideStatus();
                     // v3.7.23: si Claude falló en alguna página, avisar para reintentar
                     const failedCount = Array.isArray(data.failedPages) ? data.failedPages.length : 0;
+                    const totalPages = data.totalPages || 0;
                     if (failedCount > 0) {
-                        const totalPages = data.totalPages || 0;
                         const okPages = totalPages - failedCount;
-                        showStatus(
-                            `⚠️ Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron). Pulsa "Reanalizar" otra vez para reintentar las que faltan.`,
-                            'warning'
-                        );
-                        setTimeout(hideStatus, 9000);
+                        const msg = `⚠️ Análisis parcial · ${budgetData.id} · ${okPages}/${totalPages} páginas procesadas · ${data.totalWords} palabras. Pulsa Reanalizar para reintentar las ${failedCount} que faltan.`;
+                        showGlobalAnalysisBanner('warning', msg);
+                        showStatus(msg, 'warning');
+                        setTimeout(hideStatus, 12000);
+                    } else if (data.totalWords === 0 && totalPages > 0) {
+                        // v3.7.24: 0 palabras con páginas procesadas = error de extracción
+                        const msg = `❌ ${budgetData.id} · 0 palabras en ${totalPages} página(s). Posibles causas: idioma origen incorrecto, escaneo borroso, sin texto legible. Verifica el idioma y reintenta.`;
+                        showGlobalAnalysisBanner('error', msg);
+                        showStatus(msg, 'error');
+                        setTimeout(hideStatus, 14000);
                     } else {
+                        const msg = `✓ Análisis completado · ${budgetData.id} · ${data.totalWords} palabras · ${data.totalPages} páginas`;
+                        showGlobalAnalysisBanner('success', msg);
                         showSuccess(`Análisis completado · ${data.totalWords} palabras · ${data.totalPages} páginas`, budgetData.id);
                         setTimeout(() => { hideSuccess(); showCard(4); }, 1800);
                     }
                 } else {
                     showStatus('Error: ' + data.error, 'error');
+                    showGlobalAnalysisBanner('error', `❌ ${budgetData.id} · Error: ${data.error}`);
                 }
             } catch(e) {
                 showStatus('Error: ' + e.message, 'error');
@@ -5551,6 +5736,8 @@
                 }
                 // v3.7.20: refrescar botones del header (Drive / Local)
                 if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+                // v3.7.24: refrescar banner de resumen
+                if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
                 
                 // Activar botón Extraer ahora que existe carpeta
                 const extractBtn = document.getElementById('step2BtnExtract');
@@ -5562,7 +5749,9 @@
                     if (claudeResult.success) {
                         budgetData.fileAnalysis = claudeResult.analysis || [];
                         budgetData.wordCount = claudeResult.totalWords || 0;
+                        budgetData.pageCount = claudeResult.totalPages || budgetData.pageCount;  // v3.7.25
                         bgState.analysisDone = true;
+                        if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
                         
                         // v3.7.19: construir fileSettings desde los archivos subidos
                         const initialFileSettings = {};
@@ -5597,26 +5786,36 @@
 
                         // v3.7.23: detectar páginas fallidas y avisar
                         const failedCount = Array.isArray(claudeResult.failedPages) ? claudeResult.failedPages.length : 0;
+                        const totalPages = claudeResult.totalPages || 0;
                         if (failedCount > 0) {
-                            const totalPages = claudeResult.totalPages || 0;
                             const okPages = totalPages - failedCount;
-                            showBgBanner(
-                                'warning',
-                                `⚠️ ${budgetData.id} · Análisis parcial: ${okPages}/${totalPages} páginas (${failedCount} fallaron). Reanaliza desde paso 2 para reintentar.`,
-                                false
-                            );
+                            const msg = `⚠️ ${budgetData.id} · Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron). Reanaliza desde paso 2 para reintentar.`;
+                            showBgBanner('warning', msg, false);
+                            showGlobalAnalysisBanner('warning', msg);
+                        } else if (budgetData.wordCount === 0 && totalPages > 0) {
+                            // v3.7.24: 0 palabras con páginas procesadas = error
+                            const msg = `❌ ${budgetData.id} · 0 palabras en ${totalPages} página(s). Verifica el idioma origen (¿es correcto?) y reanaliza.`;
+                            showBgBanner('error', msg, false);
+                            showGlobalAnalysisBanner('error', msg);
                         } else {
-                            showBgBanner('success', `✓ Carpeta creada · ${budgetData.id} · ${budgetData.wordCount} palabras`, false);
+                            const msg = `✓ Carpeta creada · ${budgetData.id} · ${budgetData.wordCount} palabras · ${totalPages} páginas`;
+                            showBgBanner('success', msg, false);
+                            showGlobalAnalysisBanner('success', msg);
                         }
                     } else {
                         bgState.analysisError = claudeResult.error;
-                        showBgBanner('success', `✓ Carpeta creada · ${budgetData.id} · ⚠️ recuento falló`, false);
+                        const msg = `✓ Carpeta creada · ${budgetData.id} · ⚠️ recuento falló: ${claudeResult.error || ''}`;
+                        showBgBanner('warning', msg, false);
+                        showGlobalAnalysisBanner('warning', msg);
                     }
                 } else {
-                    showBgBanner('success', `✓ Carpeta creada · ${budgetData.id}`, false);
+                    const msg = `✓ Carpeta creada · ${budgetData.id}`;
+                    showBgBanner('success', msg, false);
+                    showGlobalAnalysisBanner('success', msg);
                 }
                 
-                // Auto-ocultar el banner tras 4s en éxito
+                // Auto-ocultar el banner del paso 2 tras 4s en éxito
+                // (el banner global persiste hasta que el usuario lo cierre)
                 setTimeout(hideBgBanner, 4000);
                 
             } catch(error) {
@@ -5624,7 +5823,9 @@
                 bgState.pendingFiles = files;
                 bgState.pendingWithAnalysis = withAnalysis;
                 bgState.pendingInternalComments = internalComments;
-                showBgBanner('error', '⚠️ No se pudo crear la carpeta: ' + error.message, true);
+                const msg = '⚠️ No se pudo crear la carpeta: ' + error.message;
+                showBgBanner('error', msg, true);
+                showGlobalAnalysisBanner('error', '❌ ' + (budgetData.id || '') + ' · ' + msg);
             }
         }
         
@@ -5673,6 +5874,12 @@
             showBgBanner('loading', withAnalysis
                 ? '⏳ Creando carpeta y analizando documentos en background...'
                 : '⏳ Creando carpeta en background...', false);
+            // v3.7.24: banner global persistente
+            showGlobalAnalysisBanner('loading',
+                withAnalysis
+                    ? `⏳ Creando carpeta y analizando ${filesSnapshot.length} archivo(s)... Puedes navegar; este aviso se mantendrá visible.`
+                    : `⏳ Creando carpeta con ${filesSnapshot.length} archivo(s)...`
+            );
             
             // Marcar paso 2 como completado y avanzar
             completedSteps.add(2);
@@ -7541,7 +7748,15 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const urgency = document.getElementById('quoteUrgency').value || '';
             
             if (!budgetData.id) return;
-            
+
+            // v3.7.24: actualizar campos locales y banner de resumen
+            budgetData.savedQuoteTotal = parseFloat(amount) || 0;
+            budgetData.savedQuoteDays = quoteDaysValue;
+            if (budgetData.wordCount > 0 && amount > 0) {
+                budgetData.savedQuotePricePerWord = amount / budgetData.wordCount;
+            }
+            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+
             try {
                 await fetch(apiUrl, {
                     method: 'POST',
