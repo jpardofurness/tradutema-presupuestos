@@ -1062,11 +1062,11 @@
                 </div>
             </div>
             
-            <!-- Notas internas -->
+            <!-- Notas internas / instrucciones para el análisis -->
             <div class="form-group" style="margin-top: 16px;">
-                <label>📝 Notas internas (opcional)</label>
-                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2, Documento bilingüe, Revisar formato..." style="min-height: 60px;"></textarea>
-                <small style="color: #666; font-size: 11px;">Solo para ti. Aparecerán en el listado de presupuestos.</small>
+                <label>📝 Notas e instrucciones (opcional)</label>
+                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2 · Solo el cuerpo del documento, sin sellos · El documento está en X idioma · Revisar formato..." style="min-height: 60px;"></textarea>
+                <small style="color: #666; font-size: 11px;">📌 Se aplican al análisis con IA: si pides "solo página 1", la extracción y el recuento se restringirán a esa página. También aparecen en el listado de presupuestos para referencia.</small>
             </div>
             
             <button class="btn btn-primary action-btn" id="step1Btn" onclick="completeStep1()" disabled>
@@ -1112,9 +1112,9 @@
                     <input type="checkbox" id="docApostille" style="width:16px; height:16px; cursor:pointer;">
                     Lleva apostilla
                 </label>
-                <!-- v3.7.15: marcar/desmarcar guardado en histórico -->
+                <!-- v3.7.15: marcar/desmarcar guardado en histórico (v3.7.33: desactivado por defecto) -->
                 <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:0.9rem; color:#475569; cursor:pointer;">
-                    <input type="checkbox" id="docInHistory" checked style="width:16px; height:16px; cursor:pointer;">
+                    <input type="checkbox" id="docInHistory" style="width:16px; height:16px; cursor:pointer;">
                     Guardar en histórico para futuras consultas
                 </label>
             </div>
@@ -1704,8 +1704,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.32';
-        const HTML_DATE = '14/05/2026';
+        const HTML_VERSION = '3.7.33';
+        const HTML_DATE = '15/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2258,7 +2258,7 @@
             if (docTypeReset) docTypeReset.value = 'Varios';
             if (docCountryReset) docCountryReset.value = '';
             if (docApostilleReset) docApostilleReset.checked = false;
-            if (docInHistoryReset) docInHistoryReset.checked = true;  // v3.7.15: default Sí
+            if (docInHistoryReset) docInHistoryReset.checked = false;  // v3.7.33: default desactivado
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
             
             // Reset contacted providers section
@@ -3969,6 +3969,18 @@
             uploadedFiles = [];
             if (window.openSettingsPanels) window.openSettingsPanels.clear();
 
+            // v3.7.33: limpiar también los filtros del listado, para que la
+            // próxima vez que el usuario abra "Presupuestos" vea TODOS y no
+            // los del filtro anterior (que puede ya no encajar con su nueva
+            // búsqueda).
+            const filterIds = ['filterCode', 'filterStatus', 'filterChannel',
+                               'filterSource', 'filterTarget', 'filterEmail',
+                               'filterWhatsApp', 'filterDateFrom'];
+            filterIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -4310,7 +4322,8 @@
         // ====== LANGUAGES ======
         // v3.7.12: orden con FIGS+ primero, luego alfabético respetando acentos
         function sortLanguagesFIGSFirst(arr) {
-            const PRIORITY = ['Alemán', 'Inglés', 'Italiano', 'Francés', 'Portugués'];
+            // v3.7.33: Español primero, luego los grandes europeos, resto alfabético
+            const PRIORITY = ['Español', 'Alemán', 'Inglés', 'Italiano', 'Francés', 'Portugués'];
             const priority = arr.filter(l => PRIORITY.includes(l))
                 .sort((a, b) => PRIORITY.indexOf(a) - PRIORITY.indexOf(b));
             const rest = arr.filter(l => !PRIORITY.includes(l))
@@ -7709,8 +7722,20 @@
                 fileNames = uploadedFiles.map(f => f.name);
             } else if (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) {
                 fileNames = budgetData.fileAnalysis.map(f => f.fileName || f.name);
+            } else if (budgetData.folderFiles && budgetData.folderFiles.length > 0) {
+                // v3.7.33: si retomamos un presupuesto sin fileAnalysis (no analizado)
+                // pero con archivos en Drive, los listamos igualmente.
+                fileNames = budgetData.folderFiles
+                    .filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_')
+                    .map(f => f.name);
             }
-            const fileListStr = fileNames.join(', ') || 'documentos adjuntos';
+            // Formato por líneas en lugar de una sola cadena con comas
+            const fileListBlockEs = fileNames.length > 0
+                ? fileNames.map(n => '  • ' + n).join('\n')
+                : '  (documentos adjuntos)';
+            const fileListBlockEn = fileNames.length > 0
+                ? fileNames.map(n => '  • ' + n).join('\n')
+                : '  (attached documents)';
             
             // Traducir idiomas al inglés
             const srcLangEn = translateLanguageToEnglish(srcLang);
@@ -7741,9 +7766,20 @@
                 deliveryDateEn = 'the indicated date';
             }
             
-            // Texto de páginas y archivos
-            const pagesTextEs = totalPages > 0 ? `\n---\nTotal páginas a traducir: ${totalPages}\nArchivos: ${fileListStr}` : '';
-            const pagesTextEn = totalPages > 0 ? `\n---\nTotal pages to translate: ${totalPages}\nFiles: ${fileListStr}` : '';
+            // v3.7.33: bloque de archivos + páginas, mostrado SIEMPRE que haya
+            // archivos conocidos (antes estaba condicionado a totalPages > 0,
+            // así que si no había análisis Claude la lista no aparecía).
+            const hasFiles = fileNames.length > 0;
+            const pagesLineEs = totalPages > 0 ? `\nPáginas totales: ${totalPages}` : '';
+            const pagesLineEn = totalPages > 0 ? `\nTotal pages: ${totalPages}` : '';
+            const filesHeaderEs = numDocs === 1 ? 'Documento:' : `Documentos (${numDocs}):`;
+            const filesHeaderEn = numDocs === 1 ? 'Document:' : `Documents (${numDocs}):`;
+            const pagesTextEs = hasFiles
+                ? `\n---\n${filesHeaderEs}\n${fileListBlockEs}${pagesLineEs}\n---\n`
+                : '';
+            const pagesTextEn = hasFiles
+                ? `\n---\n${filesHeaderEn}\n${fileListBlockEn}${pagesLineEn}\n---\n`
+                : '';
             
             let message;
             
