@@ -2121,15 +2121,30 @@
                 const raw = localStorage.getItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
                 if (!raw) return;
                 const saved = JSON.parse(raw);
-                // No restaurar banners más viejos de 24h
-                if (saved.ts && (Date.now() - saved.ts) > 24 * 3600 * 1000) {
-                    localStorage.removeItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
-                    return;
-                }
                 // No restaurar 'loading' (si la pestaña se cerró, ese análisis ya no continúa)
                 if (saved.state === 'loading') {
                     localStorage.removeItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
                     return;
+                }
+                // TTL: success/warning duran 24h, errores solo 6h (suelen quedar
+                // obsoletos rápido — la siguiente operación los resuelve).
+                const ageMs = Date.now() - (saved.ts || 0);
+                const ttlMs = (saved.state === 'error' || saved.state === 'warning')
+                    ? 6 * 3600 * 1000 : 24 * 3600 * 1000;
+                if (ageMs > ttlMs) {
+                    localStorage.removeItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
+                    return;
+                }
+                // v3.7.33: si el presupuesto ya tiene carpeta (folderId) y el
+                // banner persistido es de error/warning sobre "no se pudo crear
+                // la carpeta" o "Failed to fetch", el error ya no es relevante:
+                // la carpeta SÍ se creó o ya existía. Lo descartamos.
+                if (budgetData.folderId && (saved.state === 'error' || saved.state === 'warning')) {
+                    const stale = /no se pudo crear la carpeta|failed to fetch|sin respuesta del servidor|posible timeout/i;
+                    if (stale.test(saved.text || '')) {
+                        localStorage.removeItem(ANALYSIS_BANNER_KEY_PREFIX + budgetData.id);
+                        return;
+                    }
                 }
                 showGlobalAnalysisBanner(saved.state, saved.text, { persist: false });
             } catch(e) {}
@@ -3968,6 +3983,10 @@
             // "Pendientes de subir" en paso 2.
             uploadedFiles = [];
             if (window.openSettingsPanels) window.openSettingsPanels.clear();
+            // v3.7.33: ocultar también el banner de error de creación de
+            // carpeta (bgStatusBanner) si quedó visible de un intento previo.
+            // Al retomar un presupuesto YA EXISTENTE, ese banner está obsoleto.
+            if (typeof hideBgBanner === 'function') hideBgBanner();
 
             // v3.7.33: limpiar también los filtros del listado, para que la
             // próxima vez que el usuario abra "Presupuestos" vea TODOS y no
