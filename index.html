@@ -5268,8 +5268,11 @@
                 btnCreateOnly.style.display = 'none';
                 btnCreateAndAnalyze.style.display = 'none';
 
-                // Crear botón Reanalizar dentro del mismo flex container, antes
-                // del botón Extraer, si no existe
+                // Crear botón Reanalizar dentro del mismo flex container, si no existe.
+                // v3.7.33 FIX: antes se usaba btnExtract.parentNode.insertBefore(...)
+                // pero btnExtract fue eliminado en v3.7.29, así que la inserción
+                // fallaba silenciosamente. Ahora insertamos al final del contenedor
+                // de botones Crear (que siempre existe).
                 if (!btnReanalyze) {
                     btnReanalyze = document.createElement('button');
                     btnReanalyze.id = 'reanalyzeBtn';
@@ -5277,7 +5280,8 @@
                     btnReanalyze.className = 'btn btn-primary btn-gold action-btn';
                     btnReanalyze.style.cssText = 'flex:2;min-width:200px;';
                     btnReanalyze.onclick = () => reanalyzeFromFolder();
-                    btnExtract.parentNode.insertBefore(btnReanalyze, btnExtract);
+                    const container = btnCreateAndAnalyze.parentNode;
+                    if (container) container.appendChild(btnReanalyze);
                 }
                 btnReanalyze.style.display = '';
                 // No machacar el botón si está en modo "Analizando..." (data-busy)
