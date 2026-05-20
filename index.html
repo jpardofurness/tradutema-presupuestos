@@ -582,6 +582,8 @@
                 <!-- v3.7.20: botones de acceso rápido -->
                 <button id="hdrBtnDriveFolder" onclick="openDriveFolder()" title="Abrir carpeta del presupuesto en Google Drive" style="display:none;background:#34a853;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📂 Drive</button>
                 <button id="hdrBtnLocalFolder" onclick="copyLocalFolderPath()" title="Copiar al portapapeles la ruta local del presupuesto (para pegar en el Explorer)" style="display:none;background:#0ea5e9;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">💻 Local</button>
+                <!-- v3.7.34: botón Guardar siempre visible para persistir datos editados del presupuesto -->
+                <button id="hdrBtnSave" onclick="saveCurrentBudget()" title="Guardar los datos editados del presupuesto (tarifa, plazo, email, mensaje, etc.)" style="display:none;background:#f59e0b;color:white;border:0;border-radius:5px;padding:6px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;">💾 Guardar</button>
                 <button id="hdrBtnSheet" onclick="openSpreadsheet()" title="Abrir Google Sheet de parámetros (Presupuestos, Tarifas, Proveedores, etc.)" style="background:#137333;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Sheet</button>
                 <button class="delete-btn" id="deleteBudgetBtn" onclick="confirmDeleteBudgetFromHeader()" title="Eliminar presupuesto y carpeta" style="display: none;">🗑️</button>
             </div>
@@ -1704,8 +1706,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.33';
-        const HTML_DATE = '15/05/2026';
+        const HTML_VERSION = '3.7.34';
+        const HTML_DATE = '19/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1873,6 +1875,8 @@
             const hdrLocal = document.getElementById('hdrBtnLocalFolder');
             if (hdrDrive) hdrDrive.style.display = 'none';
             if (hdrLocal) hdrLocal.style.display = 'none';
+            const hdrSave = document.getElementById('hdrBtnSave');  // v3.7.34
+            if (hdrSave) hdrSave.style.display = 'none';
             // v3.7.24: ocultar banner de resumen
             const bsBar = document.getElementById('budgetSummaryBar');
             if (bsBar) bsBar.classList.add('hidden');
@@ -2025,8 +2029,11 @@
         function updateHeaderButtons() {
             const hdrDrive = document.getElementById('hdrBtnDriveFolder');
             const hdrLocal = document.getElementById('hdrBtnLocalFolder');
+            const hdrSave = document.getElementById('hdrBtnSave');
             if (hdrDrive) hdrDrive.style.display = budgetData.folderUrl ? '' : 'none';
             if (hdrLocal) hdrLocal.style.display = budgetData.id ? '' : 'none';
+            // v3.7.34: botón Guardar visible siempre que haya un presupuesto cargado
+            if (hdrSave) hdrSave.style.display = budgetData.id ? '' : 'none';
         }
 
         // v3.7.24: actualizar el banner de resumen persistente con los totales
@@ -7989,6 +7996,38 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue + ', urgencia: ' + urgency);
             } catch (error) {
                 console.log('Error guardando datos cliente:', error);
+            }
+        }
+
+        // v3.7.34: guardado manual desde el botón del header. Persiste los
+        // datos editables del presupuesto (tarifa, plazo, email, whatsapp,
+        // mensaje al cliente, urgencia) sin necesidad de copiar/enviar.
+        async function saveCurrentBudget() {
+            if (!budgetData.id) {
+                showStatus('No hay presupuesto cargado para guardar', 'warning');
+                setTimeout(hideStatus, 2500);
+                return;
+            }
+            const btn = document.getElementById('hdrBtnSave');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Guardando...'; }
+            try {
+                await saveClientData();
+                if (btn) {
+                    btn.innerHTML = '✓ Guardado';
+                    btn.style.background = '#16a34a';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.style.background = '#f59e0b';
+                        btn.disabled = false;
+                    }, 1800);
+                }
+                showStatus('✓ Presupuesto guardado', 'success');
+                setTimeout(hideStatus, 2000);
+            } catch(e) {
+                if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
+                showStatus('Error al guardar: ' + e.message, 'error');
+                setTimeout(hideStatus, 3000);
             }
         }
 
