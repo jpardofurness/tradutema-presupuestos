@@ -1618,6 +1618,25 @@
             
             <div class="form-group">
                 <label style="font-weight: 600;">Mensaje al cliente (editable):</label>
+                <!-- v3.7.35: toggles de información a incluir en el presupuesto -->
+                <div id="msgInfoToggles" style="display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 10px;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.82rem;">
+                    <span style="color:#64748b;font-weight:600;">Incluir en el presupuesto:</span>
+                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                        <input type="checkbox" id="msgIncludeFileCount" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de archivos
+                    </label>
+                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                        <input type="checkbox" id="msgIncludeFileNames" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nombres de archivos
+                    </label>
+                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                        <input type="checkbox" id="msgIncludePages" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de páginas
+                    </label>
+                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                        <input type="checkbox" id="msgIncludeWords" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de palabras
+                    </label>
+                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                        <input type="checkbox" id="msgIncludeInstructions" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Notas/exclusiones
+                    </label>
+                </div>
                 <textarea class="editable-message" id="clientMessageEdit" rows="10" oninput="onClientMessageEdit()"></textarea>
             </div>
             
@@ -1706,7 +1725,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.34';
+        const HTML_VERSION = '3.7.35';
         const HTML_DATE = '19/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -7590,6 +7609,13 @@
             showStatus('Mensaje regenerado', 'success');
             setTimeout(hideStatus, 1500);
         }
+
+        // v3.7.35: regenerar sin toast (lo usan los toggles de info, que se
+        // pulsan a menudo y no necesitan confirmación ruidosa cada vez).
+        function regenerateMessageSilent() {
+            clientMessageEdited = false;
+            updateClientMessage();
+        }
         
         // ====== FUNCIONES HELPER PARA SINGULAR/PLURAL ======
         function pluralize(count, singular, plural) {
@@ -7759,14 +7785,6 @@
                     .filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_')
                     .map(f => f.name);
             }
-            // Formato por líneas en lugar de una sola cadena con comas
-            const fileListBlockEs = fileNames.length > 0
-                ? fileNames.map(n => '  • ' + n).join('\n')
-                : '  (documentos adjuntos)';
-            const fileListBlockEn = fileNames.length > 0
-                ? fileNames.map(n => '  • ' + n).join('\n')
-                : '  (attached documents)';
-            
             // Traducir idiomas al inglés
             const srcLangEn = translateLanguageToEnglish(srcLang);
             const tgtLangEn = translateLanguageToEnglish(tgtLang);
@@ -7796,20 +7814,58 @@
                 deliveryDateEn = 'the indicated date';
             }
             
-            // v3.7.33: bloque de archivos + páginas, mostrado SIEMPRE que haya
-            // archivos conocidos (antes estaba condicionado a totalPages > 0,
-            // así que si no había análisis Claude la lista no aparecía).
+            // v3.7.35: bloque de información configurable con toggles.
+            // Por defecto todos activados. Lee el estado de los checkboxes.
+            const incFileCount = document.getElementById('msgIncludeFileCount')?.checked !== false;
+            const incFileNames = document.getElementById('msgIncludeFileNames')?.checked !== false;
+            const incPages = document.getElementById('msgIncludePages')?.checked !== false;
+            const incWords = document.getElementById('msgIncludeWords')?.checked !== false;
+            const incInstructions = document.getElementById('msgIncludeInstructions')?.checked !== false;
+
             const hasFiles = fileNames.length > 0;
-            const pagesLineEs = totalPages > 0 ? `\nPáginas totales: ${totalPages}` : '';
-            const pagesLineEn = totalPages > 0 ? `\nTotal pages: ${totalPages}` : '';
-            const filesHeaderEs = numDocs === 1 ? 'Documento:' : `Documentos (${numDocs}):`;
-            const filesHeaderEn = numDocs === 1 ? 'Document:' : `Documents (${numDocs}):`;
-            const pagesTextEs = hasFiles
-                ? `\n---\n${filesHeaderEs}\n${fileListBlockEs}${pagesLineEs}\n---\n`
-                : '';
-            const pagesTextEn = hasFiles
-                ? `\n---\n${filesHeaderEn}\n${fileListBlockEn}${pagesLineEn}\n---\n`
-                : '';
+            const totalWords = budgetData.wordCount || 0;
+            const internalNotes = (budgetData.internalComments || '').trim();
+
+            // Construir el bloque ES
+            function buildInfoBlock(lang) {
+                const isEs = lang === 'es';
+                const lines = [];
+                // Encabezado documentos + recuento
+                if (hasFiles && (incFileCount || incFileNames)) {
+                    let header;
+                    if (incFileCount) {
+                        header = numDocs === 1
+                            ? (isEs ? 'Documento:' : 'Document:')
+                            : (isEs ? `Documentos (${numDocs}):` : `Documents (${numDocs}):`);
+                    } else {
+                        header = isEs ? 'Documentos:' : 'Documents:';
+                    }
+                    lines.push(header);
+                    if (incFileNames) {
+                        fileNames.forEach(n => lines.push('  • ' + n));
+                    }
+                } else if (hasFiles && !incFileNames && !incFileCount) {
+                    // ninguno de los dos: no añadir encabezado de docs
+                }
+                // Páginas
+                if (incPages && totalPages > 0) {
+                    lines.push(isEs ? `Páginas totales: ${totalPages}` : `Total pages: ${totalPages}`);
+                }
+                // Palabras (solo si hay análisis)
+                if (incWords && totalWords > 0) {
+                    lines.push(isEs ? `Palabras totales: ${totalWords.toLocaleString('es-ES')}` : `Total words: ${totalWords.toLocaleString('en-US')}`);
+                }
+                // Notas / instrucciones / exclusiones del cliente
+                if (incInstructions && internalNotes) {
+                    lines.push('');
+                    lines.push(isEs ? `Nota: ${internalNotes}` : `Note: ${internalNotes}`);
+                }
+                if (lines.length === 0) return '';
+                return `\n---\n${lines.join('\n')}\n---\n`;
+            }
+
+            const pagesTextEs = buildInfoBlock('es');
+            const pagesTextEn = buildInfoBlock('en');
             
             let message;
             
