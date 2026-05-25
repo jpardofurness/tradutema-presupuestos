@@ -1801,7 +1801,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.39';
+        const HTML_VERSION = '3.7.40';
         const HTML_DATE = '25/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2771,7 +2771,7 @@
                         H.forEach((h, i) => { o[h] = row[i] || ''; });
                         // v3.7.39: precalcular año y mes a partir de la fecha ISO
                         let year = '', month = '', fechaEs = '';
-                        if (o.date && o.date.length >= 7) {
+                        if (o.date && /^\d{4}-\d{2}/.test(o.date)) {
                             year = o.date.substring(0, 4);
                             month = o.date.substring(5, 7);
                             const dd = o.date.substring(8, 10);
