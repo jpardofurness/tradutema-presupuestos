@@ -989,12 +989,42 @@
 
             <!-- Buscador -->
             <div class="form-group" style="margin-bottom:8px;">
-                <input type="text" id="orderSearchInput" placeholder="Buscar por nombre, teléfono, email, nº pedido, archivo..."
+                <input type="text" id="orderSearchInput" placeholder="Buscar por nombre, teléfono, email, nº pedido, archivo, importe..."
                        oninput="renderOrderSearchResults()"
                        style="font-size:1rem;padding:12px 14px;">
             </div>
+
+            <!-- v3.7.39: filtros específicos -->
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                <select id="orderFilterLang" onchange="renderOrderSearchResults()" style="flex:1;min-width:130px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
+                    <option value="">🌐 Cualquier idioma</option>
+                </select>
+                <select id="orderFilterYear" onchange="renderOrderSearchResults()" style="flex:1;min-width:100px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
+                    <option value="">📅 Cualquier año</option>
+                </select>
+                <select id="orderFilterMonth" onchange="renderOrderSearchResults()" style="flex:1;min-width:110px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
+                    <option value="">Cualquier mes</option>
+                    <option value="01">Enero</option><option value="02">Febrero</option>
+                    <option value="03">Marzo</option><option value="04">Abril</option>
+                    <option value="05">Mayo</option><option value="06">Junio</option>
+                    <option value="07">Julio</option><option value="08">Agosto</option>
+                    <option value="09">Septiembre</option><option value="10">Octubre</option>
+                    <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                </select>
+                <select id="orderFilterStatus" onchange="renderOrderSearchResults()" style="flex:1;min-width:120px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
+                    <option value="">Cualquier estado</option>
+                    <option value="completed">Completado</option>
+                    <option value="processing">Procesando</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="on-hold">En espera</option>
+                    <option value="cancelled">Cancelado</option>
+                    <option value="refunded">Reembolsado</option>
+                </select>
+                <button onclick="clearOrderFilters()" style="padding:8px 12px;background:#e2e8f0;color:#475569;border:none;border-radius:8px;font-size:0.82rem;cursor:pointer;">✕ Limpiar</button>
+            </div>
+
             <div style="font-size:0.78rem;color:#888;margin-bottom:12px;">
-                💡 Busca en todos los campos a la vez, sin acentos. Usa espacios para combinar términos (ej: "garcia 2023").
+                💡 Combina el buscador de texto con los filtros. Ej: idioma "Checo" + año 2025 + mes Marzo.
             </div>
 
             <div id="orderSearchResults"></div>
@@ -1771,7 +1801,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.36';
+        const HTML_VERSION = '3.7.39';
         const HTML_DATE = '25/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2735,20 +2765,69 @@
                 const data = await resp.json();
                 if (data.success && data.orders) {
                     window.wooCacheHeaders = data.headers || [];
-                    // Convertir arrays compactos a objetos
                     const H = window.wooCacheHeaders;
                     window.wooCacheData = data.orders.map(row => {
                         const o = {};
                         H.forEach((h, i) => { o[h] = row[i] || ''; });
-                        // Campo precalculado para búsqueda (todos los campos concatenados sin acentos)
-                        o._search = normalizeText(row.join(' '));
+                        // v3.7.39: precalcular año y mes a partir de la fecha ISO
+                        let year = '', month = '', fechaEs = '';
+                        if (o.date && o.date.length >= 7) {
+                            year = o.date.substring(0, 4);
+                            month = o.date.substring(5, 7);
+                            const dd = o.date.substring(8, 10);
+                            if (dd && month && year) fechaEs = `${dd}/${month}/${year}`;
+                        }
+                        o._year = year;
+                        o._month = month;
+                        // v3.7.39: importe con coma además de punto, para que "167,00" lo encuentre
+                        const totalComma = String(o.total || '').replace('.', ',');
+                        // Campo de búsqueda enriquecido: todos los campos + fecha es + importe coma
+                        o._search = normalizeText(row.join(' ') + ' ' + fechaEs + ' ' + totalComma);
                         return o;
                     });
+                    populateOrderFilters();
                     await refreshWooCacheStatus();
                 }
             } catch(e) {
                 if (el) el.textContent = 'Error cargando caché: ' + e.message;
             }
+        }
+
+        // v3.7.39: poblar desplegables de idioma y año a partir de la caché
+        function populateOrderFilters() {
+            const langSel = document.getElementById('orderFilterLang');
+            const yearSel = document.getElementById('orderFilterYear');
+            if (!langSel || !yearSel) return;
+
+            // Idiomas únicos (origen y destino combinados)
+            const langSet = new Set();
+            const yearSet = new Set();
+            window.wooCacheData.forEach(o => {
+                if (o.langSource) langSet.add(o.langSource.trim());
+                if (o.langTarget) langSet.add(o.langTarget.trim());
+                if (o._year) yearSet.add(o._year);
+            });
+            const langs = Array.from(langSet).filter(Boolean).sort((a,b) => a.localeCompare(b, 'es'));
+            const years = Array.from(yearSet).filter(Boolean).sort((a,b) => b.localeCompare(a)); // desc
+
+            const curLang = langSel.value;
+            const curYear = yearSel.value;
+            langSel.innerHTML = '<option value="">🌐 Cualquier idioma</option>' +
+                langs.map(l => `<option value="${l}">${l}</option>`).join('');
+            yearSel.innerHTML = '<option value="">📅 Cualquier año</option>' +
+                years.map(y => `<option value="${y}">${y}</option>`).join('');
+            if (curLang) langSel.value = curLang;
+            if (curYear) yearSel.value = curYear;
+        }
+
+        function clearOrderFilters() {
+            ['orderFilterLang','orderFilterYear','orderFilterMonth','orderFilterStatus'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const input = document.getElementById('orderSearchInput');
+            if (input) input.value = '';
+            renderOrderSearchResults();
         }
 
         function renderOrderSearchResults() {
@@ -2761,26 +2840,49 @@
                 return;
             }
 
-            let results;
-            if (!q) {
-                // Sin búsqueda: mostrar los más recientes (primeros 30)
-                results = window.wooCacheData.slice(0, 30);
-            } else {
-                // Búsqueda por términos (todos deben aparecer = AND)
-                const terms = q.split(/\s+/).filter(Boolean);
-                results = window.wooCacheData.filter(o =>
-                    terms.every(t => o._search.indexOf(t) >= 0)
-                ).slice(0, 100);
-            }
+            // v3.7.39: valores de los filtros específicos
+            const fLang = normalizeText(document.getElementById('orderFilterLang')?.value || '');
+            const fYear = document.getElementById('orderFilterYear')?.value || '';
+            const fMonth = document.getElementById('orderFilterMonth')?.value || '';
+            const fStatus = document.getElementById('orderFilterStatus')?.value || '';
+            const hasFilters = fLang || fYear || fMonth || fStatus;
+
+            const terms = q ? q.split(/\s+/).filter(Boolean) : [];
+
+            let results = window.wooCacheData.filter(o => {
+                // Texto libre (AND de términos)
+                if (terms.length && !terms.every(t => o._search.indexOf(t) >= 0)) return false;
+                // Idioma (origen o destino)
+                if (fLang) {
+                    const src = normalizeText(o.langSource || '');
+                    const tgt = normalizeText(o.langTarget || '');
+                    const combo = normalizeText(o.langs || '');
+                    if (src.indexOf(fLang) < 0 && tgt.indexOf(fLang) < 0 && combo.indexOf(fLang) < 0) return false;
+                }
+                // Año / mes
+                if (fYear && o._year !== fYear) return false;
+                if (fMonth && o._month !== fMonth) return false;
+                // Estado
+                if (fStatus && o.status !== fStatus) return false;
+                return true;
+            });
+
+            // Orden por fecha desc y límite
+            results = results.slice(0, 200);
 
             if (results.length === 0) {
-                cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">Sin resultados para esa búsqueda.</div>';
+                cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">Sin resultados. Prueba a quitar algún filtro.</div>';
                 return;
             }
 
-            const countMsg = q
-                ? `${results.length} resultado(s)${results.length === 100 ? '+ (mostrando 100)' : ''}`
-                : `Mostrando los ${results.length} más recientes`;
+            const limited = results.length === 200;
+            let countMsg;
+            if (!q && !hasFilters) {
+                results = results.slice(0, 30);
+                countMsg = `Mostrando los ${results.length} más recientes (usa el buscador o los filtros)`;
+            } else {
+                countMsg = `${results.length} resultado(s)${limited ? '+ (mostrando 200)' : ''}`;
+            }
 
             let html = `<div style="font-size:0.78rem;color:#888;margin-bottom:10px;">${countMsg}</div>`;
             results.forEach(o => {
@@ -2801,6 +2903,10 @@
                 if (o.customerNote) lines.push(`📝 ${o.customerNote}`);
 
                 const wooUrl = `https://tradutema.com/wp-admin/post.php?post=${o.orderId}&action=edit`;
+                // v3.7.38: enlace al proyecto de Drive si el pedido está vinculado a un presupuesto
+                const driveLink = o.driveUrl
+                    ? `<a href="${o.driveUrl}" target="_blank" style="font-size:0.78rem;color:#16a34a;text-decoration:none;font-weight:600;margin-left:14px;">📂 Abrir proyecto Drive →</a>`
+                    : '';
                 html += `
                     <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:white;">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -2816,6 +2922,7 @@
                         </div>
                         <div style="margin-top:8px;">
                             <a href="${wooUrl}" target="_blank" style="font-size:0.78rem;color:#7c3aed;text-decoration:none;font-weight:600;">Abrir en WooCommerce →</a>
+                            ${driveLink}
                         </div>
                     </div>`;
             });
