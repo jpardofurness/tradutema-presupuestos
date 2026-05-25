@@ -677,6 +677,13 @@
                         <div class="home-btn-desc">Estadísticas y sugerencias de mejora</div>
                     </div>
                 </button>
+                <button class="home-btn" onclick="showOrderSearch()">
+                    <span class="home-btn-icon">🔍</span>
+                    <div class="home-btn-text">
+                        <div class="home-btn-title">Buscar Pedidos</div>
+                        <div class="home-btn-desc">Encuentra pedidos antiguos por nombre, teléfono, archivo...</div>
+                    </div>
+                </button>
 
                 <!-- Bloque de sincronización WooCommerce -->
                 <div style="background:#f8f4ff;border:1px solid #d5b8ff;border-radius:12px;padding:14px 16px;margin-top:4px;">
@@ -952,6 +959,45 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- ORDER SEARCH SCREEN (Buscador de pedidos WooCommerce) v3.7.34 -->
+        <div class="card hidden" id="orderSearchScreen">
+            <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
+            <div class="card-title">🔍 Buscar Pedidos</div>
+
+            <!-- Bloque de sincronización de la caché -->
+            <div style="background:#f8f4ff;border:1px solid #d5b8ff;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:180px;">
+                        <div style="font-weight:600;font-size:0.9rem;color:#6b21a8;">🛒 Caché de pedidos</div>
+                        <div style="font-size:0.78rem;color:#888;margin-top:2px;" id="wooCacheStatusText">Comprobando...</div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button id="wooSyncIncBtn" onclick="startWooCacheSync(false)" style="padding:7px 12px;background:#7c3aed;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;">🔄 Actualizar</button>
+                        <button id="wooSyncFullBtn" onclick="startWooCacheSync(true)" style="padding:7px 12px;background:#a855f7;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;font-weight:600;" title="Descarga TODO el histórico de pedidos (puede tardar varios minutos la primera vez)">⬇️ Sync completo</button>
+                    </div>
+                </div>
+                <!-- Barra de progreso de sync -->
+                <div id="wooSyncProgressWrap" style="display:none;margin-top:10px;">
+                    <div style="height:8px;background:#e9d5ff;border-radius:4px;overflow:hidden;">
+                        <div id="wooSyncProgressBar" style="height:100%;width:0%;background:#7c3aed;transition:width 0.3s;"></div>
+                    </div>
+                    <div id="wooSyncProgressText" style="font-size:0.75rem;color:#7c3aed;margin-top:4px;text-align:center;">Sincronizando...</div>
+                </div>
+            </div>
+
+            <!-- Buscador -->
+            <div class="form-group" style="margin-bottom:8px;">
+                <input type="text" id="orderSearchInput" placeholder="Buscar por nombre, teléfono, email, nº pedido, archivo..."
+                       oninput="renderOrderSearchResults()"
+                       style="font-size:1rem;padding:12px 14px;">
+            </div>
+            <div style="font-size:0.78rem;color:#888;margin-bottom:12px;">
+                💡 Busca en todos los campos a la vez, sin acentos. Usa espacios para combinar términos (ej: "garcia 2023").
+            </div>
+
+            <div id="orderSearchResults"></div>
         </div>
 
         <!-- BUDGET LIST SCREEN -->
@@ -1725,8 +1771,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.35';
-        const HTML_DATE = '19/05/2026';
+        const HTML_VERSION = '3.7.36';
+        const HTML_DATE = '25/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2622,6 +2668,230 @@
         function isOrder(b) {
             return (b.numeroPedido && String(b.numeroPedido).trim() !== '') ||
                    (b.estado && (b.estado.startsWith('3-') || b.estado === 'Pedido'));
+        }
+
+        // ====== BUSCADOR DE PEDIDOS (CACHÉ WOOCOMMERCE) v3.7.34 ======
+        // Caché en memoria: array de objetos {orderId, date, status, ...}
+        window.wooCacheData = window.wooCacheData || [];
+        window.wooCacheHeaders = window.wooCacheHeaders || [];
+
+        function normalizeText(s) {
+            // minúsculas + sin acentos
+            return String(s || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+        }
+
+        async function showOrderSearch() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
+            document.getElementById('orderSearchScreen').classList.remove('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('homeBtn').style.display = 'flex';
+
+            // Estado de la caché + cargar en memoria si no está
+            await refreshWooCacheStatus();
+            if (window.wooCacheData.length === 0) {
+                await loadWooCacheIntoMemory();
+            }
+            renderOrderSearchResults();
+            const input = document.getElementById('orderSearchInput');
+            if (input) input.focus();
+        }
+
+        async function refreshWooCacheStatus() {
+            const el = document.getElementById('wooCacheStatusText');
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'wooCacheStatus' })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    if (data.total > 0) {
+                        const fecha = data.latestDate ? new Date(data.latestDate).toLocaleDateString('es-ES') : '?';
+                        if (el) el.textContent = `${data.total.toLocaleString('es-ES')} pedidos en caché · último: ${fecha}`;
+                        window._wooLatestModified = data.latestModified || '';
+                    } else {
+                        if (el) el.textContent = 'Caché vacía — pulsa "Sync completo" para descargar el histórico';
+                    }
+                } else {
+                    if (el) el.textContent = 'Error consultando estado';
+                }
+            } catch(e) {
+                if (el) el.textContent = 'Error de conexión';
+            }
+        }
+
+        async function loadWooCacheIntoMemory() {
+            const el = document.getElementById('wooCacheStatusText');
+            try {
+                if (el) el.textContent = 'Cargando caché en memoria...';
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'getWooCache' })
+                });
+                const data = await resp.json();
+                if (data.success && data.orders) {
+                    window.wooCacheHeaders = data.headers || [];
+                    // Convertir arrays compactos a objetos
+                    const H = window.wooCacheHeaders;
+                    window.wooCacheData = data.orders.map(row => {
+                        const o = {};
+                        H.forEach((h, i) => { o[h] = row[i] || ''; });
+                        // Campo precalculado para búsqueda (todos los campos concatenados sin acentos)
+                        o._search = normalizeText(row.join(' '));
+                        return o;
+                    });
+                    await refreshWooCacheStatus();
+                }
+            } catch(e) {
+                if (el) el.textContent = 'Error cargando caché: ' + e.message;
+            }
+        }
+
+        function renderOrderSearchResults() {
+            const cont = document.getElementById('orderSearchResults');
+            if (!cont) return;
+            const q = normalizeText(document.getElementById('orderSearchInput').value.trim());
+
+            if (window.wooCacheData.length === 0) {
+                cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">No hay pedidos en caché. Pulsa "Sync completo" para descargar el histórico.</div>';
+                return;
+            }
+
+            let results;
+            if (!q) {
+                // Sin búsqueda: mostrar los más recientes (primeros 30)
+                results = window.wooCacheData.slice(0, 30);
+            } else {
+                // Búsqueda por términos (todos deben aparecer = AND)
+                const terms = q.split(/\s+/).filter(Boolean);
+                results = window.wooCacheData.filter(o =>
+                    terms.every(t => o._search.indexOf(t) >= 0)
+                ).slice(0, 100);
+            }
+
+            if (results.length === 0) {
+                cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">Sin resultados para esa búsqueda.</div>';
+                return;
+            }
+
+            const countMsg = q
+                ? `${results.length} resultado(s)${results.length === 100 ? '+ (mostrando 100)' : ''}`
+                : `Mostrando los ${results.length} más recientes`;
+
+            let html = `<div style="font-size:0.78rem;color:#888;margin-bottom:10px;">${countMsg}</div>`;
+            results.forEach(o => {
+                const name = [o.firstName, o.lastName].filter(Boolean).join(' ') || '(sin nombre)';
+                const fecha = o.date ? new Date(o.date).toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' }) : '';
+                const statusColor = {
+                    'completed': '#16a34a', 'processing': '#0ea5e9', 'pending': '#f59e0b',
+                    'cancelled': '#dc2626', 'refunded': '#888', 'on-hold': '#a855f7'
+                }[o.status] || '#888';
+                const lines = [];
+                if (o.email) lines.push(`✉️ ${o.email}`);
+                if (o.phone) lines.push(`📞 ${o.phone}`);
+                if (o.company) lines.push(`🏢 ${o.company}`);
+                if (o.city || o.country) lines.push(`📍 ${[o.city, o.country].filter(Boolean).join(', ')}`);
+                if (o.quoteRef) lines.push(`🏷️ Ref: ${o.quoteRef}`);
+                if (o.langs) lines.push(`🌐 ${o.langs}`);
+                if (o.fileNames) lines.push(`📎 ${o.fileNames}`);
+                if (o.customerNote) lines.push(`📝 ${o.customerNote}`);
+
+                const wooUrl = `https://tradutema.com/wp-admin/post.php?post=${o.orderId}&action=edit`;
+                html += `
+                    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:white;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                            <div style="font-weight:700;color:#1e293b;">#${o.orderId} · ${name}</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:0.72rem;padding:2px 8px;border-radius:10px;background:${statusColor}1a;color:${statusColor};font-weight:600;">${o.status || '?'}</span>
+                                <span style="font-size:0.78rem;color:#888;">${fecha}</span>
+                            </div>
+                        </div>
+                        ${o.total ? `<div style="font-size:0.82rem;color:#475569;margin-top:2px;">💰 ${o.total} ${o.currency || ''}</div>` : ''}
+                        <div style="font-size:0.8rem;color:#475569;margin-top:6px;line-height:1.6;">
+                            ${lines.join('<br>')}
+                        </div>
+                        <div style="margin-top:8px;">
+                            <a href="${wooUrl}" target="_blank" style="font-size:0.78rem;color:#7c3aed;text-decoration:none;font-weight:600;">Abrir en WooCommerce →</a>
+                        </div>
+                    </div>`;
+            });
+            cont.innerHTML = html;
+        }
+
+        // Sincronización con barra de progreso. full=true → reset + descarga todo.
+        async function startWooCacheSync(full) {
+            const wrap = document.getElementById('wooSyncProgressWrap');
+            const bar = document.getElementById('wooSyncProgressBar');
+            const txt = document.getElementById('wooSyncProgressText');
+            const incBtn = document.getElementById('wooSyncIncBtn');
+            const fullBtn = document.getElementById('wooSyncFullBtn');
+            if (incBtn) incBtn.disabled = true;
+            if (fullBtn) fullBtn.disabled = true;
+            if (wrap) wrap.style.display = 'block';
+
+            let startPage = 1;
+            let totalProcessed = 0;
+            let reset = full;
+            // Para sync incremental, usar la fecha del más reciente en caché
+            const afterISO = (!full && window._wooLatestModified) ? window._wooLatestModified : '';
+
+            try {
+                let done = false;
+                let safety = 0;  // límite de seguridad de llamadas (200 páginas = 20.000 pedidos)
+                while (!done && safety < 200) {
+                    safety++;
+                    if (txt) txt.textContent = full
+                        ? `Descargando histórico... ${totalProcessed.toLocaleString('es-ES')} pedidos procesados`
+                        : `Actualizando... ${totalProcessed} pedidos nuevos/modificados`;
+
+                    const resp = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'wooSyncCache',
+                            startPage: startPage,
+                            maxPages: 8,
+                            reset: reset,
+                            after: afterISO
+                        })
+                    });
+                    const data = await resp.json();
+                    if (!data.success) throw new Error(data.error || 'Error en sync');
+
+                    reset = false;  // solo resetear en la primera llamada
+                    totalProcessed += (data.processed || 0);
+                    // Progreso: en sync completo estimamos sobre 8000; en incremental es indeterminado
+                    if (full) {
+                        const pct = Math.min(99, Math.round((totalProcessed / 8000) * 100));
+                        if (bar) bar.style.width = pct + '%';
+                    } else {
+                        if (bar) bar.style.width = '100%';
+                    }
+
+                    if (data.done) {
+                        done = true;
+                    } else {
+                        startPage = data.nextPage;
+                    }
+                }
+
+                if (bar) bar.style.width = '100%';
+                if (txt) txt.textContent = `✓ Sincronización completada · ${totalProcessed.toLocaleString('es-ES')} pedidos procesados`;
+
+                // Recargar caché en memoria y refrescar
+                await loadWooCacheIntoMemory();
+                renderOrderSearchResults();
+
+                setTimeout(() => { if (wrap) wrap.style.display = 'none'; }, 3000);
+            } catch(e) {
+                if (txt) txt.textContent = '❌ Error: ' + e.message;
+            } finally {
+                if (incBtn) incBtn.disabled = false;
+                if (fullBtn) fullBtn.disabled = false;
+            }
         }
 
         async function showAnalysis() {
