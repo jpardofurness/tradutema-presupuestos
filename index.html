@@ -997,13 +997,13 @@
             <!-- v3.7.39: filtros específicos -->
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
                 <select id="orderFilterLang" onchange="renderOrderSearchResults()" style="flex:1;min-width:130px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
-                    <option value="">🌐 Cualquier idioma</option>
+                    <option value="">Idioma</option>
                 </select>
                 <select id="orderFilterYear" onchange="renderOrderSearchResults()" style="flex:1;min-width:100px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
-                    <option value="">📅 Cualquier año</option>
+                    <option value="">Año</option>
                 </select>
                 <select id="orderFilterMonth" onchange="renderOrderSearchResults()" style="flex:1;min-width:110px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
-                    <option value="">Cualquier mes</option>
+                    <option value="">Mes</option>
                     <option value="01">Enero</option><option value="02">Febrero</option>
                     <option value="03">Marzo</option><option value="04">Abril</option>
                     <option value="05">Mayo</option><option value="06">Junio</option>
@@ -1012,7 +1012,7 @@
                     <option value="11">Noviembre</option><option value="12">Diciembre</option>
                 </select>
                 <select id="orderFilterStatus" onchange="renderOrderSearchResults()" style="flex:1;min-width:120px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;">
-                    <option value="">Cualquier estado</option>
+                    <option value="">Estado</option>
                     <option value="completed">Completado</option>
                     <option value="processing">Procesando</option>
                     <option value="pending">Pendiente</option>
@@ -1801,7 +1801,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.40';
+        const HTML_VERSION = '3.7.42';
         const HTML_DATE = '25/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2812,9 +2812,9 @@
 
             const curLang = langSel.value;
             const curYear = yearSel.value;
-            langSel.innerHTML = '<option value="">🌐 Cualquier idioma</option>' +
+            langSel.innerHTML = '<option value="">Idioma</option>' +
                 langs.map(l => `<option value="${l}">${l}</option>`).join('');
-            yearSel.innerHTML = '<option value="">📅 Cualquier año</option>' +
+            yearSel.innerHTML = '<option value="">Año</option>' +
                 years.map(y => `<option value="${y}">${y}</option>`).join('');
             if (curLang) langSel.value = curLang;
             if (curYear) yearSel.value = curYear;
