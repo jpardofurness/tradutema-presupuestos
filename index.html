@@ -1801,8 +1801,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.43';
-        const HTML_DATE = '26/05/2026';
+        const HTML_VERSION = '3.7.45';
+        const HTML_DATE = '28/05/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2867,7 +2867,20 @@
                 return true;
             });
 
-            // Orden por fecha desc y límite
+            // v3.7.45: ordenar por fecha de creación descendente (más reciente
+            // primero). Se compara la fecha ISO como string (válido para ISO).
+            // Antes solo se hacía slice sin ordenar, así que el orden dependía
+            // del orden de la caché, no de la fecha.
+            results.sort((a, b) => {
+                const da = a.date || '';
+                const db = b.date || '';
+                if (da < db) return 1;
+                if (da > db) return -1;
+                // desempate por nº de pedido (mayor = más reciente)
+                return (parseInt(b.orderId) || 0) - (parseInt(a.orderId) || 0);
+            });
+
+            // Límite tras ordenar (conserva los más recientes)
             results = results.slice(0, 200);
 
             if (results.length === 0) {
@@ -5604,7 +5617,7 @@
             // 2) Archivos pendientes de subir
             if (pendingFiles.length > 0) {
                 if (driveFiles.length > 0) {
-                    html += '<div class="folder-files-note" style="margin-top:10px;color:#7c3aed;">⏳ Pendientes de subir (se subirán al pulsar Reanalizar):</div>';
+                    html += '<div class="folder-files-note" style="margin-top:10px;color:#7c3aed;">⏳ Pendientes de subir (pulsa "Solo subir a Drive" para subirlos sin analizar, o "Subir y Analizar"):</div>';
                 }
                 pendingFiles.forEach((f, i) => {
                     totalSize += f.size;
@@ -5690,6 +5703,25 @@
                 btnCreateOnly.style.display = 'none';
                 btnCreateAndAnalyze.style.display = 'none';
 
+                // v3.7.44: botón "Solo subir" (sube pendientes a Drive SIN analizar).
+                // Útil para presupuestos por página, que no necesitan recuento Claude.
+                let btnUploadOnly = document.getElementById('uploadOnlyBtn');
+                if (!btnUploadOnly) {
+                    btnUploadOnly = document.createElement('button');
+                    btnUploadOnly.id = 'uploadOnlyBtn';
+                    btnUploadOnly.type = 'button';
+                    btnUploadOnly.className = 'btn btn-secondary action-btn';
+                    btnUploadOnly.style.cssText = 'flex:1;min-width:150px;';
+                    btnUploadOnly.onclick = () => uploadOnlyFromFolder();
+                    const container = btnCreateAndAnalyze.parentNode;
+                    if (container) container.appendChild(btnUploadOnly);
+                }
+                // Solo se muestra/activa si hay archivos pendientes de subir
+                btnUploadOnly.style.display = hasPendingFiles ? '' : 'none';
+                btnUploadOnly.disabled = !hasPendingFiles;
+                btnUploadOnly.innerHTML = '📤 Solo subir a Drive';
+                btnUploadOnly.title = 'Sube los documentos nuevos a Drive y actualiza el nº de páginas, sin analizar con IA (para presupuesto por página)';
+
                 // Crear botón Reanalizar dentro del mismo flex container, si no existe.
                 // v3.7.33 FIX: antes se usaba btnExtract.parentNode.insertBefore(...)
                 // pero btnExtract fue eliminado en v3.7.29, así que la inserción
@@ -5709,9 +5741,14 @@
                 // No machacar el botón si está en modo "Analizando..." (data-busy)
                 if (btnReanalyze.dataset.busy !== 'true') {
                     btnReanalyze.disabled = !hasAnyFiles;
-                    btnReanalyze.innerHTML = hasAnalysis
-                        ? '🔄 Reanalizar →'
-                        : '🔢 Analizar →';
+                    // v3.7.44: etiqueta más clara según haya pendientes o no
+                    if (hasPendingFiles) {
+                        btnReanalyze.innerHTML = '🔢 Subir y Analizar →';
+                    } else {
+                        btnReanalyze.innerHTML = hasAnalysis
+                            ? '🔄 Reanalizar →'
+                            : '🔢 Analizar →';
+                    }
                 }
 
                 if (btnExtract) {
@@ -5725,6 +5762,13 @@
                 btnCreateAndAnalyze.style.display = '';
                 btnCreateOnly.disabled = !hasPendingFiles;
                 btnCreateAndAnalyze.disabled = !hasPendingFiles;
+
+                // v3.7.44: ocultar botón Solo subir cuando no hay carpeta
+                const btnUploadOnly = document.getElementById('uploadOnlyBtn');
+                if (btnUploadOnly) {
+                    btnUploadOnly.style.display = 'none';
+                    btnUploadOnly.disabled = true;
+                }
 
                 if (btnReanalyze) {
                     btnReanalyze.style.display = 'none';
@@ -5965,6 +6009,78 @@
             return syncUploadPromise;
         }
 
+        // v3.7.44: subir los archivos pendientes a Drive SIN analizar con Claude.
+        // Para presupuestos por página, donde no hace falta el recuento de palabras.
+        // Tras subir, recalcula el nº de páginas (cuenta archivos/páginas en Drive)
+        // y regenera el mensaje del cliente.
+        async function uploadOnlyFromFolder() {
+            if (!uploadedFiles || uploadedFiles.length === 0) {
+                showStatus('No hay archivos nuevos pendientes de subir', 'warning');
+                setTimeout(hideStatus, 2500);
+                return;
+            }
+            const btn = document.getElementById('uploadOnlyBtn');
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Subiendo...'; }
+            showStatus('Subiendo archivos a Drive...', 'loading');
+            try {
+                const ok = await syncPendingUploads();
+                if (ok) {
+                    // Recalcular páginas: sumar las páginas de todos los archivos
+                    // fuente que ahora están en Drive (excluye TXT y _RECUENTO).
+                    recomputePageCountFromDrive();
+                    // Regenerar el presupuesto con el nuevo nº de páginas
+                    refreshQuoteAfterFileChange();
+                    showStatus('✓ Archivos subidos y presupuesto actualizado', 'success');
+                    setTimeout(hideStatus, 2500);
+                } else {
+                    showStatus('No se pudieron subir los archivos. Reintenta.', 'error');
+                    setTimeout(hideStatus, 3000);
+                }
+            } catch(e) {
+                showStatus('Error subiendo: ' + e.message, 'error');
+                setTimeout(hideStatus, 3000);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+                updateStep2Buttons();
+            }
+        }
+
+        // v3.7.44: recalcula budgetData.pageCount sumando las páginas de los
+        // archivos fuente presentes en Drive (folderFiles). Usa el nº de páginas
+        // detectado al subir (pages) si está disponible.
+        function recomputePageCountFromDrive() {
+            const source = (budgetData.folderFiles || []).filter(f =>
+                f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_'
+            );
+            let pages = 0;
+            source.forEach(f => { pages += (f.pages || 1); });
+            if (pages > 0) budgetData.pageCount = pages;
+            budgetData.fileCount = source.length;
+        }
+
+        // v3.7.44: tras un cambio de archivos (subida o reanálisis), actualiza el
+        // campo de páginas del paso 4, recalcula el importe por páginas si ese es
+        // el método activo, y regenera el mensaje del cliente.
+        function refreshQuoteAfterFileChange() {
+            const quotePagesCount = document.getElementById('quotePagesCount');
+            if (quotePagesCount && budgetData.pageCount) {
+                quotePagesCount.value = budgetData.pageCount;
+            }
+            // Si el método de cálculo por páginas está activo, recalcular importe
+            if (typeof recalculateQuoteFromPages === 'function') {
+                const pagesMethod = document.querySelector('input[name="calcMethod"]:checked');
+                if (!pagesMethod || pagesMethod.value === 'pages') {
+                    recalculateQuoteFromPages();
+                    return; // recalculateQuoteFromPages ya llama a updateClientMessage
+                }
+            }
+            // Regenerar mensaje (forzando, aunque estuviera editado, porque cambió
+            // un dato estructural: el nº de páginas)
+            clientMessageEdited = false;
+            if (typeof updateClientMessage === 'function') updateClientMessage();
+        }
+
         async function reanalyzeFromFolder() {
             const btn = document.getElementById('reanalyzeBtn');
             if (btn) {
@@ -6056,6 +6172,9 @@
                         const msg = `✓ Análisis completado · ${budgetData.id} · ${data.totalWords} palabras · ${data.totalPages} páginas`;
                         showGlobalAnalysisBanner('success', msg);
                         showSuccess(`Análisis completado · ${data.totalWords} palabras · ${data.totalPages} páginas`, budgetData.id);
+                        // v3.7.44: actualizar el presupuesto (páginas/importe/mensaje)
+                        // con los nuevos datos antes de mostrar el paso 4.
+                        refreshQuoteAfterFileChange();
                         setTimeout(() => { hideSuccess(); showCard(4); }, 1800);
                     }
                 } else {
@@ -8246,9 +8365,14 @@
             
             let message;
             
+            // v3.7.44: parsear urgencia como número. "0" o vacío => sin recargo,
+            // y por tanto NO incluir ninguna frase sobre recargo en el presupuesto.
+            const urgencyNum = parseFloat(urgency);
+            const hasUrgency = !isNaN(urgencyNum) && urgencyNum > 0;
+
             if (messageLang === 'es') {
                 // Texto de urgencia
-                const urgencyText = urgency ? ` (si lo necesitas antes, es posible, con un recargo por urgencia de ${urgency} EUR)` : '';
+                const urgencyText = hasUrgency ? ` (si lo necesitas antes, es posible, con un recargo por urgencia de ${urgency} EUR)` : '';
                 
                 message = `Hola,
 
@@ -8273,7 +8397,7 @@ info@tradutema.com
 Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI`;
             } else {
                 // Texto de urgencia en inglés
-                const urgencyTextEn = urgency ? ` (if you need it sooner, it's possible with an urgency surcharge of ${urgency} EUR)` : '';
+                const urgencyTextEn = hasUrgency ? ` (if you need it sooner, it's possible with an urgency surcharge of ${urgency} EUR)` : '';
                 
                 message = `Hello,
 
