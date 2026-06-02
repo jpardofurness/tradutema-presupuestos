@@ -570,6 +570,18 @@
     </script>
 </head>
 <body>
+    <!-- v3.7.49: panel de log en pantalla (estilo Tradutema PRODUCTION) -->
+    <div id="prodLogPanel" style="display:none; position:fixed; bottom:14px; right:14px; width:380px; max-width:92vw; max-height:55vh; z-index:9999; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; overflow:hidden;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#1e293b; border-bottom:1px solid #334155;">
+            <span style="font-weight:700; letter-spacing:.3px;">📋 Tradutema · Proceso</span>
+            <span>
+                <button onclick="prodLogClear()" title="Limpiar" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;margin-right:6px;">limpiar</button>
+                <button onclick="document.getElementById('prodLogPanel').style.display='none'" title="Cerrar" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;">✕</button>
+            </span>
+        </div>
+        <div id="prodLogBody" style="padding:8px 10px; overflow-y:auto; max-height:calc(55vh - 38px); line-height:1.5;"></div>
+    </div>
+
     <header class="header">
         <div class="header-content">
             <div class="logo" onclick="showHomeScreen()" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
@@ -1794,7 +1806,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.48';
+        const HTML_VERSION = '3.7.49';
         const HTML_DATE = '02/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6242,6 +6254,78 @@
             pendingInternalComments: ''
         };
 
+        // ====== v3.7.49: LOG DE PROCESO EN PANTALLA ======
+        // Muestra cada etapa del flujo (crear carpeta, subir, analizar, guardar)
+        // con estado (⏳ en curso / ✓ completado / ✗ error) y cronómetro. Permite
+        // ver en directo en qué paso se cuelga (p. ej. el análisis colgado 6 min
+        // contra el límite de Apps Script).
+        const prodLog = { entries: [], _timer: null };
+
+        function prodLogShow() {
+            const p = document.getElementById('prodLogPanel');
+            if (p) p.style.display = 'block';
+        }
+        function prodLogClear() {
+            prodLog.entries = [];
+            prodLogRender();
+        }
+        function prodLogStart(id, text) {
+            prodLogShow();
+            const existing = prodLog.entries.find(e => e.id === id);
+            if (existing) {
+                existing.text = text; existing.status = 'running'; existing.t0 = performance.now(); existing.t1 = 0; existing.detail = '';
+            } else {
+                prodLog.entries.push({ id, text, status: 'running', t0: performance.now(), t1: 0, detail: '' });
+            }
+            if (!prodLog._timer) {
+                prodLog._timer = setInterval(prodLogRender, 1000); // refresca cronómetros
+            }
+            prodLogRender();
+        }
+        function prodLogDone(id, detail) {
+            const e = prodLog.entries.find(x => x.id === id);
+            if (e) { e.status = 'done'; e.t1 = performance.now(); if (detail) e.detail = detail; }
+            prodLogMaybeStopTimer();
+            prodLogRender();
+        }
+        function prodLogError(id, detail) {
+            const e = prodLog.entries.find(x => x.id === id);
+            if (e) { e.status = 'error'; e.t1 = performance.now(); if (detail) e.detail = detail; }
+            prodLogMaybeStopTimer();
+            prodLogRender();
+        }
+        function prodLogMaybeStopTimer() {
+            const anyRunning = prodLog.entries.some(e => e.status === 'running');
+            if (!anyRunning && prodLog._timer) { clearInterval(prodLog._timer); prodLog._timer = null; }
+        }
+        function prodLogRender() {
+            const body = document.getElementById('prodLogBody');
+            if (!body) return;
+            const now = performance.now();
+            const fmt = (ms) => {
+                const s = ms / 1000;
+                if (s < 60) return s.toFixed(1) + 's';
+                const m = Math.floor(s / 60); const r = Math.round(s % 60);
+                return m + 'm ' + (r < 10 ? '0' : '') + r + 's';
+            };
+            body.innerHTML = prodLog.entries.map(e => {
+                const elapsed = (e.t1 ? e.t1 : now) - e.t0;
+                let icon, color;
+                if (e.status === 'running') { icon = '⏳'; color = '#fbbf24'; }
+                else if (e.status === 'done') { icon = '✓'; color = '#4ade80'; }
+                else { icon = '✗'; color = '#f87171'; }
+                // aviso visual si una etapa en curso se acerca al límite de 6 min
+                const warn = (e.status === 'running' && elapsed > 270000) ? ' style="color:#f87171;font-weight:700;"' : '';
+                const detail = e.detail ? ` <span style="color:#64748b;">— ${e.detail}</span>` : '';
+                return `<div style="margin:2px 0;">
+                    <span style="color:${color};">${icon}</span>
+                    <span>${e.text}</span>
+                    <span${warn}> · ${fmt(elapsed)}${e.status === 'running' ? '…' : ''}</span>${detail}
+                </div>`;
+            }).join('') || '<span style="color:#64748b;">Sin actividad.</span>';
+            body.scrollTop = body.scrollHeight;
+        }
+
         function showBgBanner(state, text, retry) {
             const banner = document.getElementById('bgStatusBanner');
             const icon = document.getElementById('bgStatusIcon');
@@ -6356,7 +6440,14 @@
 
             try {
                 const totalPages = files.reduce((sum, f) => sum + (f.pages || 1), 0);
-                
+
+                // v3.7.49: log de proceso en pantalla
+                prodLogClear();
+                prodLogStart('folder', `Creando carpeta + subiendo ${files.length} archivo(s) a Drive`);
+                if (withAnalysis) {
+                    prodLogStart('analyze', `Analizando documento con iLovePDF + Claude (${totalPages} pág.)`);
+                }
+
                 // Lanzar carpeta y, si procede, análisis en paralelo
                 const promises = [
                     fetch(apiUrl, {
@@ -6393,17 +6484,47 @@
                     }).then(r => r.json()));
                 }
                 
-                const results = await Promise.all(promises);
+                // v3.7.49 FIX: allSettled en vez de all. Antes, si el análisis
+                // (countWordsParallel) reventaba por timeout de Apps Script (>6 min),
+                // Promise.all RECHAZABA y descartaba el resultado de la carpeta
+                // AUNQUE se hubiera creado bien → el ID quedaba "Sin crear" y se
+                // mostraba error, como si nada hubiera funcionado. Con allSettled
+                // cada resultado se respeta por separado: la carpeta se queda
+                // creada y, si el análisis falló, se avisa "análisis pendiente".
+                const settled = await Promise.allSettled(promises);
                 stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
-                const folderResult = results[0];
-                const claudeResult = withAnalysis ? results[1] : null;
+
+                const folderSettled = settled[0];
+                const folderResult = (folderSettled.status === 'fulfilled') ? folderSettled.value : null;
+
+                let claudeResult = null;
+                let claudeFailedHard = false;
+                let claudeHardError = '';
+                if (withAnalysis) {
+                    const cs = settled[1];
+                    if (cs.status === 'fulfilled') {
+                        claudeResult = cs.value;
+                    } else {
+                        claudeFailedHard = true;
+                        claudeHardError = (cs.reason && cs.reason.message) ? cs.reason.message : 'Failed to fetch';
+                    }
+                }
+
                 // v3.7.32: capturar tiempos backend
-                stageTimings.backendCreateFolderMs = (folderResult._timings && folderResult._timings.totalMs) || 0;
+                stageTimings.backendCreateFolderMs = (folderResult && folderResult._timings && folderResult._timings.totalMs) || 0;
                 stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
                 
-                if (!folderResult.success) {
-                    throw new Error(folderResult.error || 'Error creando carpeta');
+                if (!folderResult || !folderResult.success) {
+                    // La carpeta SÍ falló de verdad → log + rescate por huella
+                    prodLogError('folder', folderResult ? (folderResult.error || 'error') : 'sin respuesta');
+                    if (withAnalysis) prodLogError('analyze', 'cancelado (carpeta falló)');
+                    const errMsg = folderResult ? (folderResult.error || 'Error creando carpeta')
+                                                : ((folderSettled.reason && folderSettled.reason.message) || 'Failed to fetch');
+                    throw new Error(errMsg);
                 }
+
+                // v3.7.49: carpeta OK
+                prodLogDone('folder', folderResult.budgetId || '');
                 
                 // Guardar datos de carpeta
                 budgetData.id = folderResult.budgetId;
@@ -6447,7 +6568,19 @@
                 if (extractBtn) extractBtn.disabled = false;
                 
                 // Procesar resultado del análisis si lo hubo
-                if (withAnalysis && claudeResult) {
+                if (withAnalysis && claudeFailedHard) {
+                    // v3.7.49: la carpeta se creó pero el análisis reventó (timeout
+                    // de Apps Script >6 min, o red). NO perdemos la carpeta.
+                    prodLogError('analyze', claudeHardError);
+                    bgState.analysisError = claudeHardError;
+                    const isTimeout = /failed to fetch|networkerror|load failed/i.test(claudeHardError);
+                    const msg = isTimeout
+                        ? `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis superó el límite de 6 min de Apps Script (documento largo). Pulsa "Analizar" en el paso 2 para reintentarlo.`
+                        : `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis falló: ${claudeHardError}. Pulsa "Analizar" en el paso 2.`;
+                    showBgBanner('warning', msg, false);
+                    showGlobalAnalysisBanner('warning', msg);
+                } else if (withAnalysis && claudeResult) {
+                    prodLogDone('analyze', claudeResult.success ? `${claudeResult.totalWords || 0} palabras` : (claudeResult.error || 'sin éxito'));
                     if (claudeResult._debug) console.log('[Tradutema DEBUG]', claudeResult._debug);
                     if (claudeResult._perf) logPerfToConsole(claudeResult._perf, 'Crear y Analizar');
                     // v3.7.31: registrar en hoja Performance con budgetId real
@@ -6489,6 +6622,7 @@
                         // sin generar en Drive. Ahora esperamos y damos feedback al usuario.
                         showBgBanner('loading', '💾 Guardando análisis en Drive (TXTs + _RECUENTO.txt)...', false);
                         showGlobalAnalysisBanner('loading', `⏳ ${budgetData.id} · Guardando análisis en Drive...`);
+                        prodLogStart('save', 'Guardando recuento + TXTs en Drive');
                         stageTimings.t_saveResultsStart = performance.now();  // v3.7.32
                         try {
                             const saveResp = await fetch(apiUrl, {
@@ -6507,6 +6641,9 @@
                             const saveData = await saveResp.json();
                             if (!saveData.success) {
                                 console.warn('saveWordCountResults: el backend reportó fallo', saveData);
+                                prodLogError('save', saveData.error || 'el backend reportó fallo');
+                            } else {
+                                prodLogDone('save', 'OK');
                             }
                             // v3.7.32: capturar timing backend de saveResults
                             if (saveData._timings && saveData._timings.totalMs) {
@@ -6514,6 +6651,7 @@
                             }
                         } catch(saveErr) {
                             console.error('saveWordCountResults: fallo en la llamada', saveErr);
+                            prodLogError('save', (saveErr && saveErr.message) || 'fallo en la llamada');
                             // No es bloqueante: la hoja Presupuestos quizá tampoco se actualizó,
                             // pero el usuario verá el resultado en pantalla y podrá reanalizar
                             // desde el paso 2 si los TXTs no están en Drive.
