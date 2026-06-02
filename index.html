@@ -575,6 +575,7 @@
         <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#1e293b; border-bottom:1px solid #334155;">
             <span style="font-weight:700; letter-spacing:.3px;">📋 Tradutema · Proceso</span>
             <span>
+                <button id="prodLogCopyBtn" onclick="prodLogCopy()" title="Copiar log" style="background:none;border:1px solid #334155;color:#cbd5e1;cursor:pointer;font-size:11px;border-radius:5px;padding:1px 6px;margin-right:6px;">📋 copiar</button>
                 <button onclick="prodLogClear()" title="Limpiar" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;margin-right:6px;">limpiar</button>
                 <button onclick="document.getElementById('prodLogPanel').style.display='none'" title="Cerrar" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;">✕</button>
             </span>
@@ -1806,7 +1807,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.49';
+        const HTML_VERSION = '3.7.50';
         const HTML_DATE = '02/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6144,22 +6145,36 @@
             // v3.7.32: instrumentación global
             const t_start = performance.now();
 
+            // v3.7.50: log de proceso en pantalla (se reinicia en cada análisis)
+            prodLogClear();
+
             try {
                 // Si hay archivos nuevos pendientes de subir, subirlos primero
+                prodLogStart('sync', 'Sincronizando archivos pendientes con Drive');
                 await syncPendingUploads();
+                prodLogDone('sync', 'OK');
 
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'reanalyzeFolder',
-                        folderId: budgetData.folderId,
-                        budgetId: budgetData.id,
-                        sourceLang: budgetData.sourceLang,
-                        internalComments: budgetData.internalComments || '',
-                        fileSettings: budgetData.fileSettings || {}  // v3.7.19
-                    })
-                });
-                const data = await resp.json();
+                prodLogStart('reanalyze', `Analizando documento con Claude (${numFiles} archivo(s))`);
+                let data;
+                try {
+                    const resp = await fetch(apiUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'reanalyzeFolder',
+                            folderId: budgetData.folderId,
+                            budgetId: budgetData.id,
+                            sourceLang: budgetData.sourceLang,
+                            internalComments: budgetData.internalComments || '',
+                            fileSettings: budgetData.fileSettings || {}  // v3.7.19
+                        })
+                    });
+                    data = await resp.json();
+                } catch (fetchErr) {
+                    const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
+                    prodLogError('reanalyze', isTimeout ? 'timeout >6 min (Apps Script) o red' : (fetchErr.message || 'error'));
+                    throw fetchErr;
+                }
+                prodLogDone('reanalyze', data && data.success ? `${data.totalWords || 0} palabras · ${data.totalPages || 0} pág.` : ((data && data.error) || 'sin éxito'));
                 if (data._perf) logPerfToConsole(data._perf, 'Reanalizar');  // v3.7.27
                 // v3.7.32: log etapas (en reanalyzeFolder el backend hace TODO,
                 // no hay etapa de upload de archivos ni saveResults separada)
@@ -6271,11 +6286,12 @@
         }
         function prodLogStart(id, text) {
             prodLogShow();
+            const nowClock = new Date();
             const existing = prodLog.entries.find(e => e.id === id);
             if (existing) {
-                existing.text = text; existing.status = 'running'; existing.t0 = performance.now(); existing.t1 = 0; existing.detail = '';
+                existing.text = text; existing.status = 'running'; existing.t0 = performance.now(); existing.t1 = 0; existing.detail = ''; existing.clock0 = nowClock; existing.clock1 = null;
             } else {
-                prodLog.entries.push({ id, text, status: 'running', t0: performance.now(), t1: 0, detail: '' });
+                prodLog.entries.push({ id, text, status: 'running', t0: performance.now(), t1: 0, detail: '', clock0: nowClock, clock1: null });
             }
             if (!prodLog._timer) {
                 prodLog._timer = setInterval(prodLogRender, 1000); // refresca cronómetros
@@ -6284,13 +6300,13 @@
         }
         function prodLogDone(id, detail) {
             const e = prodLog.entries.find(x => x.id === id);
-            if (e) { e.status = 'done'; e.t1 = performance.now(); if (detail) e.detail = detail; }
+            if (e) { e.status = 'done'; e.t1 = performance.now(); e.clock1 = new Date(); if (detail) e.detail = detail; }
             prodLogMaybeStopTimer();
             prodLogRender();
         }
         function prodLogError(id, detail) {
             const e = prodLog.entries.find(x => x.id === id);
-            if (e) { e.status = 'error'; e.t1 = performance.now(); if (detail) e.detail = detail; }
+            if (e) { e.status = 'error'; e.t1 = performance.now(); e.clock1 = new Date(); if (detail) e.detail = detail; }
             prodLogMaybeStopTimer();
             prodLogRender();
         }
@@ -6298,16 +6314,38 @@
             const anyRunning = prodLog.entries.some(e => e.status === 'running');
             if (!anyRunning && prodLog._timer) { clearInterval(prodLog._timer); prodLog._timer = null; }
         }
+        const _hhmmss = (d) => d ? d.toLocaleTimeString('es-ES', { hour12: false }) : '';
+        function prodLogFmtElapsed(ms) {
+            const s = ms / 1000;
+            if (s < 60) return s.toFixed(1) + 's';
+            const m = Math.floor(s / 60); const r = Math.round(s % 60);
+            return m + 'm ' + (r < 10 ? '0' : '') + r + 's';
+        }
+        // v3.7.50: copiar log como texto plano para diagnóstico
+        function prodLogCopy() {
+            const lines = prodLog.entries.map(e => {
+                const elapsed = (e.t1 ? e.t1 : performance.now()) - e.t0;
+                const ic = e.status === 'done' ? 'OK ' : (e.status === 'error' ? 'ERR' : '...');
+                let l = `[${ic}] ${_hhmmss(e.clock0)}`;
+                if (e.clock1) l += `→${_hhmmss(e.clock1)}`;
+                l += ` (${prodLogFmtElapsed(elapsed)})  ${e.text}`;
+                if (e.detail) l += `  — ${e.detail}`;
+                return l;
+            });
+            const header = `Tradutema QUOTES · log de proceso\nFecha: ${new Date().toLocaleString('es-ES')}\nHTML ${typeof HTML_VERSION !== 'undefined' ? HTML_VERSION : '?'}\n` + '-'.repeat(40);
+            const text = header + '\n' + (lines.join('\n') || '(sin actividad)');
+            const btn = document.getElementById('prodLogCopyBtn');
+            const done = () => { if (btn) { const o = btn.textContent; btn.textContent = '✓ copiado'; setTimeout(() => btn.textContent = o, 1500); } };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => { window.prompt('Copia el log:', text); });
+            } else {
+                window.prompt('Copia el log:', text);
+            }
+        }
         function prodLogRender() {
             const body = document.getElementById('prodLogBody');
             if (!body) return;
             const now = performance.now();
-            const fmt = (ms) => {
-                const s = ms / 1000;
-                if (s < 60) return s.toFixed(1) + 's';
-                const m = Math.floor(s / 60); const r = Math.round(s % 60);
-                return m + 'm ' + (r < 10 ? '0' : '') + r + 's';
-            };
             body.innerHTML = prodLog.entries.map(e => {
                 const elapsed = (e.t1 ? e.t1 : now) - e.t0;
                 let icon, color;
@@ -6317,10 +6355,11 @@
                 // aviso visual si una etapa en curso se acerca al límite de 6 min
                 const warn = (e.status === 'running' && elapsed > 270000) ? ' style="color:#f87171;font-weight:700;"' : '';
                 const detail = e.detail ? ` <span style="color:#64748b;">— ${e.detail}</span>` : '';
-                return `<div style="margin:2px 0;">
-                    <span style="color:${color};">${icon}</span>
+                const clock = `<span style="color:#64748b;">${_hhmmss(e.clock0)}${e.clock1 ? '→' + _hhmmss(e.clock1) : ''}</span> `;
+                return `<div style="margin:3px 0;">
+                    <span style="color:${color};">${icon}</span> ${clock}
                     <span>${e.text}</span>
-                    <span${warn}> · ${fmt(elapsed)}${e.status === 'running' ? '…' : ''}</span>${detail}
+                    <span${warn}> · ${prodLogFmtElapsed(elapsed)}${e.status === 'running' ? '…' : ''}</span>${detail}
                 </div>`;
             }).join('') || '<span style="color:#64748b;">Sin actividad.</span>';
             body.scrollTop = body.scrollHeight;
@@ -6444,13 +6483,17 @@
                 // v3.7.49: log de proceso en pantalla
                 prodLogClear();
                 prodLogStart('folder', `Creando carpeta + subiendo ${files.length} archivo(s) a Drive`);
-                if (withAnalysis) {
-                    prodLogStart('analyze', `Analizando documento con iLovePDF + Claude (${totalPages} pág.)`);
-                }
 
-                // Lanzar carpeta y, si procede, análisis en paralelo
-                const promises = [
-                    fetch(apiUrl, {
+                // v3.7.50 FIX: SECUENCIAL, no en paralelo. Apps Script serializa
+                // las peticiones simultáneas del mismo usuario; al lanzar carpeta
+                // y análisis a la vez, el análisis (pesado) acaparaba el turno ~6
+                // min y la respuesta de "crear carpeta" quedaba esperando en cola
+                // hasta los 6 min, aunque la carpeta se creara en segundos. Ahora
+                // creamos la carpeta SOLA primero (vuelve en ~5s → ID inmediato) y
+                // solo después lanzamos el análisis como llamada independiente.
+                let folderResult = null;
+                try {
+                    const folderResp = await fetch(apiUrl, {
                         method: 'POST',
                         body: JSON.stringify({
                             action: 'createBudgetFolder',
@@ -6462,65 +6505,23 @@
                             internalComments: internalComments,
                             totalPages: totalPages,
                             files: files,
-                            // v3.7.4: metadatos opcionales
                             tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
                             paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
                             apostilla: !!document.getElementById('docApostille')?.checked,
-                            // v3.7.15: marcar para histórico (default true)
                             enHistorico: document.getElementById('docInHistory')?.checked !== false
                         })
-                    }).then(r => r.json())
-                ];
-                
-                if (withAnalysis) {
-                    promises.push(fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'countWordsParallel',
-                            files: files,
-                            sourceLang: budgetData.sourceLang,
-                            internalComments: internalComments
-                        })
-                    }).then(r => r.json()));
+                    });
+                    folderResult = await folderResp.json();
+                } catch (folderErr) {
+                    prodLogError('folder', (folderErr && folderErr.message) || 'sin respuesta');
+                    throw folderErr;
                 }
-                
-                // v3.7.49 FIX: allSettled en vez de all. Antes, si el análisis
-                // (countWordsParallel) reventaba por timeout de Apps Script (>6 min),
-                // Promise.all RECHAZABA y descartaba el resultado de la carpeta
-                // AUNQUE se hubiera creado bien → el ID quedaba "Sin crear" y se
-                // mostraba error, como si nada hubiera funcionado. Con allSettled
-                // cada resultado se respeta por separado: la carpeta se queda
-                // creada y, si el análisis falló, se avisa "análisis pendiente".
-                const settled = await Promise.allSettled(promises);
                 stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
-
-                const folderSettled = settled[0];
-                const folderResult = (folderSettled.status === 'fulfilled') ? folderSettled.value : null;
-
-                let claudeResult = null;
-                let claudeFailedHard = false;
-                let claudeHardError = '';
-                if (withAnalysis) {
-                    const cs = settled[1];
-                    if (cs.status === 'fulfilled') {
-                        claudeResult = cs.value;
-                    } else {
-                        claudeFailedHard = true;
-                        claudeHardError = (cs.reason && cs.reason.message) ? cs.reason.message : 'Failed to fetch';
-                    }
-                }
-
-                // v3.7.32: capturar tiempos backend
                 stageTimings.backendCreateFolderMs = (folderResult && folderResult._timings && folderResult._timings.totalMs) || 0;
-                stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
-                
+
                 if (!folderResult || !folderResult.success) {
-                    // La carpeta SÍ falló de verdad → log + rescate por huella
                     prodLogError('folder', folderResult ? (folderResult.error || 'error') : 'sin respuesta');
-                    if (withAnalysis) prodLogError('analyze', 'cancelado (carpeta falló)');
-                    const errMsg = folderResult ? (folderResult.error || 'Error creando carpeta')
-                                                : ((folderSettled.reason && folderSettled.reason.message) || 'Failed to fetch');
-                    throw new Error(errMsg);
+                    throw new Error((folderResult && folderResult.error) || 'Error creando carpeta');
                 }
 
                 // v3.7.49: carpeta OK
@@ -6566,7 +6567,31 @@
                 // Activar botón Extraer ahora que existe carpeta
                 const extractBtn = document.getElementById('step2BtnExtract');
                 if (extractBtn) extractBtn.disabled = false;
-                
+
+                // v3.7.50: análisis AHORA, como llamada independiente (secuencial)
+                let claudeResult = null;
+                let claudeFailedHard = false;
+                let claudeHardError = '';
+                if (withAnalysis) {
+                    prodLogStart('analyze', `Analizando documento con Claude (${totalPages} pág.)`);
+                    try {
+                        const claudeResp = await fetch(apiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'countWordsParallel',
+                                files: files,
+                                sourceLang: budgetData.sourceLang,
+                                internalComments: internalComments
+                            })
+                        });
+                        claudeResult = await claudeResp.json();
+                    } catch (cErr) {
+                        claudeFailedHard = true;
+                        claudeHardError = (cErr && cErr.message) ? cErr.message : 'Failed to fetch';
+                    }
+                    stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
+                }
+
                 // Procesar resultado del análisis si lo hubo
                 if (withAnalysis && claudeFailedHard) {
                     // v3.7.49: la carpeta se creó pero el análisis reventó (timeout
