@@ -612,6 +612,8 @@
         <!-- v3.7.24: resumen persistente del presupuesto (visible siempre que haya datos) -->
         <div id="budgetSummaryBar" class="hidden" style="margin:10px auto 0;max-width:1100px;padding:10px 14px;background:white;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;flex-wrap:wrap;gap:14px;font-size:0.85rem;color:#334155;align-items:center;justify-content:space-between;">
             <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
+                <span><span style="color:#64748b;">Idiomas:</span> <strong id="bsBarIdiomas" style="color:#0c4a6e;">—</strong></span>
+                <span><span style="color:#64748b;">Contacto:</span> <strong id="bsBarContacto" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Palabras:</span> <strong id="bsBarPalabras" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Páginas:</span> <strong id="bsBarPaginas" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Tarifa:</span> <strong id="bsBarTarifa" style="color:#0c4a6e;">—</strong></span>
@@ -1113,31 +1115,15 @@
                 </div>
             </div>
             
+            <!-- Contacto del cliente (v3.7.47: el canal se deduce del campo
+                 rellenado; WhatsApp si hay teléfono, si no Mail si hay email) -->
             <div class="form-group" style="margin-top: 16px;">
-                <label>Canal de contacto</label>
-                <div class="channel-selector">
-                    <button class="channel-btn whatsapp" data-channel="W" onclick="selectChannel('W')">
-                        <span class="channel-icon">📱</span>
-                        WhatsApp
-                    </button>
-                    <button class="channel-btn mail" data-channel="M" onclick="selectChannel('M')">
-                        <span class="channel-icon">📧</span>
-                        Mail
-                    </button>
-                    <button class="channel-btn form" data-channel="F" onclick="selectChannel('F')">
-                        <span class="channel-icon">📝</span>
-                        Formulario
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Contacto del cliente -->
-            <div class="form-group" style="margin-top: 16px;">
-                <label>Contacto del cliente (opcional)</label>
+                <label>Contacto del cliente</label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
-                    <input type="email" id="clientEmailStep1" placeholder="Email del cliente" oninput="onStep1Change()">
-                    <input type="tel" id="clientWhatsAppStep1" placeholder="WhatsApp (+34...)" oninput="onStep1Change()">
+                    <input type="email" id="clientEmailStep1" placeholder="📧 Email del cliente" oninput="onStep1Change()">
+                    <input type="tel" id="clientWhatsAppStep1" placeholder="📱 WhatsApp (+34...)" oninput="onStep1Change()">
                 </div>
+                <small style="color:#666;font-size:11px;">El canal se asigna solo: 📱 si hay WhatsApp, 📧 si solo hay email.</small>
             </div>
             
             <!-- Notas internas / instrucciones para el análisis -->
@@ -1801,8 +1787,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.45';
-        const HTML_DATE = '28/05/2026';
+        const HTML_VERSION = '3.7.47';
+        const HTML_DATE = '02/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2161,8 +2147,24 @@
             document.getElementById('bsBarPlazo').textContent = plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—';
             document.getElementById('bsBarEstado').textContent = estado;
 
+            // v3.7.47: idiomas y contacto del cliente en la barra de resumen
+            const idiomas = (budgetData.sourceLang && budgetData.targetLang)
+                ? (budgetData.sourceLang + ' → ' + budgetData.targetLang)
+                : '—';
+            const wa = (budgetData.clientWhatsApp || '').trim();
+            const em = (budgetData.clientEmail || '').trim();
+            const contactParts = [];
+            if (wa) contactParts.push('📱 ' + wa);
+            if (em) contactParts.push('📧 ' + em);
+            const contacto = contactParts.length ? contactParts.join('  ·  ') : '—';
+            const idiomasEl = document.getElementById('bsBarIdiomas');
+            const contactoEl = document.getElementById('bsBarContacto');
+            if (idiomasEl) idiomasEl.textContent = idiomas;
+            if (contactoEl) contactoEl.textContent = contacto;
+
             // Mostrar solo si hay al menos un dato real (no todo en —)
-            const anyData = palabras > 0 || paginas > 0 || tarifa > 0 || importe > 0 || plazo;
+            const anyData = palabras > 0 || paginas > 0 || tarifa > 0 || importe > 0 || plazo
+                || idiomas !== '—' || contacto !== '—';
             if (anyData) bar.classList.remove('hidden');
             else bar.classList.add('hidden');
         }
@@ -4832,6 +4834,18 @@
             checkStep1Complete();
         }
         
+        // v3.7.47: el canal ya no se elige a mano; se deduce del contacto.
+        // Precedencia: WhatsApp si hay teléfono; si no, Mail si hay email;
+        // por defecto WhatsApp. (Se eliminó la opción "Formulario", que no
+        // aportaba información relevante.)
+        function deriveChannelFromContact() {
+            const email = (document.getElementById('clientEmailStep1')?.value || '').trim();
+            const whatsapp = (document.getElementById('clientWhatsAppStep1')?.value || '').trim();
+            if (whatsapp) return 'W';
+            if (email) return 'M';
+            return 'W';
+        }
+
         function onStep1Change() {
             // Capturar datos del cliente del paso 1
             const emailEl = document.getElementById('clientEmailStep1');
@@ -4841,15 +4855,10 @@
             if (emailEl) budgetData.clientEmail = email;
             if (whatsappEl) budgetData.clientWhatsApp = whatsapp;
 
-            // v3.7.12: auto-marcar canal según el campo rellenado, solo si
-            // todavía no había canal elegido (respeta selección manual previa).
-            if (!budgetData.channel) {
-                if (email && !whatsapp) {
-                    selectChannel('M');
-                } else if (whatsapp && !email) {
-                    selectChannel('W');
-                }
-            }
+            // v3.7.47: canal deducido siempre del contacto (ya no hay selector).
+            budgetData.channel = deriveChannelFromContact();
+            checkStep1Complete();
+            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
         }
 
         function filterProviders() {
@@ -4869,10 +4878,9 @@
         }
 
         // ====== CHANNEL ======
+        // v3.7.47: ya no hay botones de canal. selectChannel se conserva como
+        // setter simple por compatibilidad si alguna ruta lo invoca.
         function selectChannel(channel) {
-            document.querySelectorAll('.channel-btn').forEach(btn => {
-                btn.classList.toggle('selected', btn.dataset.channel === channel);
-            });
             budgetData.channel = channel;
             checkStep1Complete();
         }
@@ -4881,9 +4889,9 @@
         function checkStep1Complete() {
             const src = document.getElementById('sourceLang').value;
             const tgt = document.getElementById('targetLang').value;
-            const channel = budgetData.channel;
-            
-            const complete = src && tgt && channel;
+            // v3.7.47: el canal ya no es requisito (se deduce solo). Basta con
+            // tener idioma origen y destino.
+            const complete = src && tgt;
             document.getElementById('step1Btn').disabled = !complete;
         }
 
@@ -4892,11 +4900,8 @@
             budgetData.sourceLang = document.getElementById('sourceLang').value;
             budgetData.targetLang = document.getElementById('targetLang').value;
             
-            // Actualizar canal desde el botón seleccionado
-            const selectedChannel = document.querySelector('.channel-btn.selected');
-            if (selectedChannel) {
-                budgetData.channel = selectedChannel.dataset.channel;
-            }
+            // v3.7.47: canal deducido del contacto (ya no hay botones de canal)
+            budgetData.channel = deriveChannelFromContact();
             
             // Actualizar datos de contacto del cliente
             const emailStep1 = document.getElementById('clientEmailStep1');
@@ -5105,6 +5110,17 @@
                 
                 // Actualizar mensaje de cliente
                 updateClientMessage();
+
+                // v3.7.46: si la lista de archivos del mensaje saldría vacía
+                // (sin archivos locales pendientes, sin análisis y sin folderFiles
+                // cargados) pero hay carpeta en Drive, pedir la lista y dejar que
+                // refreshFolderFilesFromDrive regenere el mensaje al volver.
+                const needFiles = (!uploadedFiles || uploadedFiles.length === 0)
+                    && (!budgetData.fileAnalysis || budgetData.fileAnalysis.length === 0)
+                    && (!budgetData.folderFiles || budgetData.folderFiles.length === 0);
+                if (needFiles && budgetData.folderId) {
+                    refreshFolderFilesFromDrive();
+                }
             }
             
             // Scroll to top
@@ -5802,6 +5818,13 @@
                 if (data.success && Array.isArray(data.files)) {
                     budgetData.folderFiles = data.files;
                     renderStep2Files();
+                    // v3.7.46: si estamos en el paso de envío al cliente (step 5)
+                    // y el mensaje no se ha editado a mano, regenerarlo ahora que
+                    // ya tenemos la lista de archivos. Resuelve la lista vacía que
+                    // obligaba a volver al paso 2, esperar y avanzar de nuevo.
+                    if (currentStep === 5 && !clientMessageEdited && typeof updateClientMessage === 'function') {
+                        updateClientMessage();
+                    }
                 }
             } catch(e) {
                 console.warn('refreshFolderFilesFromDrive:', e);
@@ -6239,8 +6262,64 @@
             if (banner) banner.classList.add('hidden');
         }
 
+        // v3.7.46: rescate/adopción de carpeta por huella. Comprueba si una
+        // carpeta para esta combinación (origen+destino+canal) se creó
+        // recientemente en el backend y, si existe, la adopta en budgetData.
+        // Evita carpetas duplicadas cuando un reintento (o un error que NO sea
+        // "Failed to fetch") sigue a una creación que SÍ tuvo éxito en el
+        // servidor pero cuya respuesta se perdió. Devuelve true si adoptó.
+        async function adoptBudgetByFingerprint(files, minutesBack) {
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'findBudgetByFingerprint',
+                        origen: budgetData.sourceLang,
+                        destino: budgetData.targetLang,
+                        canal: budgetData.channel || '',
+                        // v3.7.46: enviar nombres para que el backend pueda
+                        // desambiguar si los usa; inofensivo si los ignora.
+                        fileNames: (files || []).map(f => f.name),
+                        minutesBack: minutesBack || 10
+                    })
+                });
+                const fpData = await resp.json();
+                if (fpData.success && fpData.found && fpData.budget) {
+                    budgetData.id = fpData.budget.id;
+                    budgetData.folderId = fpData.budget.folderId;
+                    budgetData.folderUrl = fpData.budget.folderUrl;
+                    bgState.folderCreated = true;
+                    bgState.folderError = null;
+                    bgState.pendingFiles = null;
+                    uploadedFiles = [];
+                    const idDisplay = document.getElementById('budgetIdDisplay');
+                    if (idDisplay) { idDisplay.textContent = budgetData.id; idDisplay.classList.add('active'); }
+                    const delBtn = document.getElementById('deleteBudgetBtn');
+                    if (delBtn) delBtn.style.display = 'inline-block';
+                    const folderLink = document.getElementById('folderLink');
+                    if (folderLink && budgetData.folderUrl) { folderLink.href = budgetData.folderUrl; folderLink.classList.remove('hidden'); }
+                    if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+                    if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                    return true;
+                }
+            } catch (e) {
+                console.log('adoptBudgetByFingerprint falló:', e);
+            }
+            return false;
+        }
+
         async function retryBackgroundCreate() {
             if (!bgState.pendingFiles) return;
+            showBgBanner('loading', '🔄 Comprobando si la carpeta ya existe...', false);
+            // v3.7.46: antes de reintentar, comprobar si la carpeta YA se creó
+            // en el intento anterior (respuesta perdida) para NO duplicarla.
+            const adopted = await adoptBudgetByFingerprint(bgState.pendingFiles, 15);
+            if (adopted) {
+                const recMsg = `⚠️ Carpeta recuperada · ${budgetData.id} — ya existía del intento anterior, no se ha duplicado. Pulsa "Reanalizar" en el paso 2 si necesitas terminar el análisis.`;
+                showBgBanner('warning', recMsg, false);
+                showGlobalAnalysisBanner('warning', recMsg);
+                return;
+            }
             showBgBanner('loading', '🔄 Reintentando creación de carpeta...', false);
             await runBackgroundCreate(bgState.pendingFiles, bgState.pendingWithAnalysis, bgState.pendingInternalComments);
         }
@@ -6479,63 +6558,32 @@
                 bgState.pendingWithAnalysis = withAnalysis;
                 bgState.pendingInternalComments = internalComments;
 
-                // v3.7.28: diagnóstico mejorado
-                // "Failed to fetch" típicamente significa: timeout de Apps Script
-                // (6min duro) o caída de red. Intentamos rescatar si la carpeta
-                // se llegó a crear en backend pese al timeout.
+                // v3.7.46: el rescate por huella ahora se intenta ante CUALQUIER
+                // error (antes solo con "Failed to fetch", línea ~6489). La
+                // carpeta puede haberse creado en el backend aunque la respuesta
+                // fallara o el backend devolviera success:false en un paso
+                // posterior; en ese caso la adoptamos en lugar de permitir que
+                // un "Reintentar" la duplique (causa de 0602-02-W / 0602-03-W).
                 const isFailedToFetch = /failed to fetch|networkerror|load failed/i.test(error.message || '');
-                let diagnostic = error.message;
-                let recovered = false;
-                if (isFailedToFetch) {
-                    diagnostic = 'Sin respuesta del servidor (posible timeout de Apps Script al pasar de 6 min, o red caída). Intentando rescatar la carpeta...';
-                    showBgBanner('loading', diagnostic, false);
-                    showGlobalAnalysisBanner('loading', '⏳ ' + diagnostic);
+                const diagnostic = isFailedToFetch
+                    ? 'Sin respuesta del servidor (posible timeout de Apps Script >6 min o red caída). Comprobando si la carpeta se creó igualmente...'
+                    : 'Error al crear la carpeta. Comprobando si la carpeta se creó igualmente...';
+                showBgBanner('loading', diagnostic, false);
+                showGlobalAnalysisBanner('loading', '⏳ ' + diagnostic);
 
-                    // Esperar 4s y luego buscar la carpeta por huella (origen+destino+canal+ventana 10min)
-                    await new Promise(r => setTimeout(r, 4000));
-                    try {
-                        const fpResp = await fetch(apiUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'findBudgetByFingerprint',
-                                origen: budgetData.sourceLang,
-                                destino: budgetData.targetLang,
-                                canal: budgetData.channel || '',
-                                minutesBack: 10
-                            })
-                        });
-                        const fpData = await fpResp.json();
-                        if (fpData.success && fpData.found && fpData.budget) {
-                            // ¡Rescate! La carpeta existe.
-                            budgetData.id = fpData.budget.id;
-                            budgetData.folderId = fpData.budget.folderId;
-                            budgetData.folderUrl = fpData.budget.folderUrl;
-                            bgState.folderCreated = true;
-                            bgState.folderError = null;
-                            bgState.pendingFiles = null;
-                            uploadedFiles = [];
-                            recovered = true;
-                            // Refrescar UI
-                            const idDisplay = document.getElementById('budgetIdDisplay');
-                            if (idDisplay) { idDisplay.textContent = budgetData.id; idDisplay.classList.add('active'); }
-                            const delBtn = document.getElementById('deleteBudgetBtn');
-                            if (delBtn) delBtn.style.display = 'inline-block';
-                            if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
-                            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                // Dar margen a que el backend termine de escribir la fila en
+                // Presupuestos antes de buscar por huella, y luego adoptar.
+                await new Promise(r => setTimeout(r, 4000));
+                const recovered = await adoptBudgetByFingerprint(files, 10);
 
-                            const recMsg = `⚠️ Carpeta rescatada · ${budgetData.id} — el servidor respondió tarde pero la carpeta SÍ se creó. ${withAnalysis ? 'Pulsa "Reanalizar" en el paso 2 si necesitas terminar el análisis.' : ''}`;
-                            showBgBanner('warning', recMsg, false);
-                            showGlobalAnalysisBanner('warning', recMsg);
-                        }
-                    } catch(rescueErr) {
-                        console.log('Rescue intento falló:', rescueErr);
-                    }
-                }
-
-                if (!recovered) {
+                if (recovered) {
+                    const recMsg = `⚠️ Carpeta rescatada · ${budgetData.id} — el servidor falló al responder pero la carpeta SÍ se creó (no se ha duplicado). ${withAnalysis ? 'Pulsa "Reanalizar" en el paso 2 si necesitas terminar el análisis.' : ''}`;
+                    showBgBanner('warning', recMsg, false);
+                    showGlobalAnalysisBanner('warning', recMsg);
+                } else {
                     const msg = isFailedToFetch
-                        ? `⚠️ No se obtuvo respuesta del servidor. Probable timeout (>6 min) o red caída. La carpeta puede haberse creado igual — pulsa "Reintentar" o revisa el listado de presupuestos. Detalle: ${error.message}`
-                        : '⚠️ No se pudo crear la carpeta: ' + error.message;
+                        ? `⚠️ No se obtuvo respuesta del servidor y no se encontró carpeta creada. Probable timeout (>6 min) o red caída. Pulsa "Reintentar". Detalle: ${error.message}`
+                        : `⚠️ No se pudo crear la carpeta: ${error.message}. Pulsa "Reintentar".`;
                     showBgBanner('error', msg, true);
                     showGlobalAnalysisBanner('error', '❌ ' + (budgetData.id || '') + ' · ' + msg);
                 }
