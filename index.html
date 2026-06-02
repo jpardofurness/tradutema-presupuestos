@@ -1628,16 +1628,23 @@
                 <div class="margin-calc-header">
                     <span>📊 Histórico según Tipo de Documento</span>
                 </div>
-                <!-- v3.7.8: toggle modo de coincidencia -->
-                <div style="display:flex; gap:14px; align-items:center; margin-bottom:8px; font-size:0.85rem; color:#475569;">
-                    <span style="font-weight:500;">Coincidencia:</span>
+                <!-- v3.7.48: filtros independientes, todos activados por defecto -->
+                <div style="display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin-bottom:8px; font-size:0.85rem; color:#475569;">
+                    <span style="font-weight:500;">Filtrar por:</span>
                     <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="radio" name="historicalMode" value="exact" checked onchange="loadHistoricalQuotes()">
-                        Exacta (mismo tipo + país + apostilla)
+                        <input type="checkbox" id="histFilterSource" checked onchange="loadHistoricalQuotes()"> Idioma origen
                     </label>
                     <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="radio" name="historicalMode" value="languages" onchange="loadHistoricalQuotes()">
-                        Toda la combinación de idiomas
+                        <input type="checkbox" id="histFilterTarget" checked onchange="loadHistoricalQuotes()"> Idioma destino
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" id="histFilterTipo" checked onchange="loadHistoricalQuotes()"> Tipo
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" id="histFilterPais" checked onchange="loadHistoricalQuotes()"> País
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" id="histFilterApostilla" checked onchange="loadHistoricalQuotes()"> Apostilla
                     </label>
                 </div>
                 <div id="historicalCriteria" style="font-size:0.85rem; color:#475569; margin-bottom:10px; padding:8px 10px; background:#f1f5f9; border-radius:6px;">
@@ -1787,7 +1794,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.47';
+        const HTML_VERSION = '3.7.48';
         const HTML_DATE = '02/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2452,9 +2459,11 @@
             const quoteAmountHistorical = document.getElementById('quoteAmountHistorical');
             if (quoteAmountDirect) quoteAmountDirect.value = '';
             if (quoteAmountHistorical) quoteAmountHistorical.value = '';
-            // Modo del histórico vuelve a "exact" por defecto
-            const historicalModeExact = document.querySelector('input[name="historicalMode"][value="exact"]');
-            if (historicalModeExact) historicalModeExact.checked = true;
+            // v3.7.48: filtros del histórico vuelven a "todos activados"
+            ['histFilterSource', 'histFilterTarget', 'histFilterTipo', 'histFilterPais', 'histFilterApostilla'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = true;
+            });
             // Limpiar resultados del histórico si estaban renderizados
             const historicalResults = document.getElementById('historicalResults');
             const historicalCriteria = document.getElementById('historicalCriteria');
@@ -7750,20 +7759,27 @@
             const pais = (document.getElementById('docCountry')?.value || '').trim();
             const apostilla = !!document.getElementById('docApostille')?.checked;
 
-            // v3.7.8: modo seleccionado en los radios
-            const modeRadio = document.querySelector('input[name="historicalMode"]:checked');
-            const matchMode = modeRadio ? modeRadio.value : 'exact';
+            // v3.7.48: filtros independientes (todos activados por defecto)
+            const fSource = document.getElementById('histFilterSource')?.checked !== false;
+            const fTarget = document.getElementById('histFilterTarget')?.checked !== false;
+            const fTipo = document.getElementById('histFilterTipo')?.checked !== false;
+            const fPais = document.getElementById('histFilterPais')?.checked !== false;
+            const fApostilla = document.getElementById('histFilterApostilla')?.checked !== false;
 
             const criteria = document.getElementById('historicalCriteria');
             const loading = document.getElementById('historicalLoading');
             const results = document.getElementById('historicalResults');
 
             if (criteria) {
-                if (matchMode === 'exact') {
-                    criteria.innerHTML = `Filtros: <strong>${sourceLang}</strong> → <strong>${targetLang}</strong> · Tipo: <strong>${tipoDoc}</strong>${pais ? ' · País: <strong>' + pais + '</strong>' : ''} · Apostilla: <strong>${apostilla ? 'Sí' : 'No'}</strong>`;
-                } else {
-                    criteria.innerHTML = `Filtros: <strong>${sourceLang}</strong> → <strong>${targetLang}</strong> (cualquier tipo, país y apostilla)`;
-                }
+                const parts = [];
+                if (fSource) parts.push(`Origen: <strong>${sourceLang || '—'}</strong>`);
+                if (fTarget) parts.push(`Destino: <strong>${targetLang || '—'}</strong>`);
+                if (fTipo) parts.push(`Tipo: <strong>${tipoDoc}</strong>`);
+                if (fPais && pais) parts.push(`País: <strong>${pais}</strong>`);
+                if (fApostilla) parts.push(`Apostilla: <strong>${apostilla ? 'Sí' : 'No'}</strong>`);
+                criteria.innerHTML = parts.length
+                    ? 'Filtros activos: ' + parts.join(' · ')
+                    : '<em>Sin filtros: mostrando todo el histórico.</em>';
             }
             if (loading) loading.style.display = 'block';
             if (results) results.innerHTML = '';
@@ -7778,7 +7794,11 @@
                         tipoDocumento: tipoDoc,
                         paisOrigen: pais,
                         apostilla: apostilla,
-                        matchMode: matchMode
+                        filterSource: fSource,
+                        filterTarget: fTarget,
+                        filterTipo: fTipo,
+                        filterPais: fPais,
+                        filterApostilla: fApostilla
                     })
                 });
                 const data = await resp.json();
@@ -7792,8 +7812,9 @@
                 const quotes = data.quotes || [];
                 if (quotes.length === 0) {
                     let empty = `<div style="padding:14px; color:#64748b; font-size:0.9rem; text-align:center;">No se encontraron presupuestos pasados con estos criterios.`;
-                    if (matchMode === 'exact') {
-                        empty += `<br><br><a href="javascript:void(0)" onclick="document.querySelector('input[name=&quot;historicalMode&quot;][value=&quot;languages&quot;]').click()" style="color:#7c3aed; font-weight:500;">↗ Ver toda la combinación de idiomas</a>`;
+                    // Si hay filtros restrictivos activos, ofrecer aflojarlos
+                    if (fTipo || fPais || fApostilla) {
+                        empty += `<br><br><a href="javascript:void(0)" onclick="relaxHistoricalFilters()" style="color:#7c3aed; font-weight:500;">↗ Quitar filtros de tipo, país y apostilla</a>`;
                     }
                     empty += `</div>`;
                     if (results) results.innerHTML = empty;
@@ -7812,8 +7833,9 @@
                     return s;
                 };
 
-                // Construir tabla. Si modo "languages", añadimos columna "Tipo" para distinguir entradas.
-                const showTipoCol = (matchMode === 'languages');
+                // Mostrar columna "Tipo" cuando el filtro de tipo está apagado
+                // (puede haber tipos mezclados que conviene distinguir).
+                const showTipoCol = !fTipo;
                 let html = `
                     <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
                         <thead>
@@ -7860,7 +7882,15 @@
             }
         }
 
-        // Click en importe pasado → copiar al input
+        // v3.7.48: desactivar los filtros restrictivos (tipo/país/apostilla)
+        // y recargar, dejando solo los de idioma.
+        function relaxHistoricalFilters() {
+            ['histFilterTipo', 'histFilterPais', 'histFilterApostilla'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = false;
+            });
+            loadHistoricalQuotes();
+        }
         function useHistoricalAmount(amount) {
             const inp = document.getElementById('quoteAmountHistorical');
             if (inp) {
