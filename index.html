@@ -1469,10 +1469,21 @@
                 <div class="tariff-calc-header">
                     <span>📄 Cálculo por páginas (<span id="step5LangPair">-</span>)</span>
                 </div>
+                <!-- v3.7.53: tres conceptos de páginas diferenciados -->
                 <div class="tariff-calc-row">
-                    <label>Nº páginas a traducir:</label>
-                    <input type="number" id="quotePagesCount" min="1" value="1" onchange="recalculateQuoteFromPages()" style="width: 80px;">
-                    <span class="tariff-calc-hint">(editable si el cliente excluye páginas)</span>
+                    <label>Páginas totales:</label>
+                    <input type="number" id="quoteTotalPages" min="1" value="1" onchange="onTotalPagesChange()" style="width: 80px;">
+                    <span class="tariff-calc-hint">(las de los archivos; aparece al cliente)</span>
+                </div>
+                <div class="tariff-calc-row">
+                    <label>Páginas a traducir:</label>
+                    <input type="number" id="quotePagesToTranslate" min="0" value="1" onchange="onPagesToTranslateChange()" style="width: 80px;">
+                    <span class="tariff-calc-hint">(las que traduces; aparece al cliente)</span>
+                </div>
+                <div class="tariff-calc-row">
+                    <label>Páginas contabilizadas:</label>
+                    <input type="number" id="quotePagesCount" min="0" value="1" onchange="recalculateQuoteFromPages()" style="width: 80px;">
+                    <span class="tariff-calc-hint">(base del precio; NO aparece al cliente)</span>
                 </div>
                 <div class="tariff-calc-detail" id="step5TariffDetail">
                     <!-- Se rellena con JS -->
@@ -1814,7 +1825,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.52';
+        const HTML_VERSION = '3.7.53';
         const HTML_DATE = '02/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6125,10 +6136,16 @@
         // campo de páginas del paso 4, recalcula el importe por páginas si ese es
         // el método activo, y regenera el mensaje del cliente.
         function refreshQuoteAfterFileChange() {
+            // v3.7.53: al cambiar los archivos, los tres campos vuelven al nuevo
+            // total (se descartan ediciones previas de a-traducir/contabilizadas).
+            budgetData.pagesToTranslate = null;
+            budgetData.quotePagesCount = budgetData.pageCount || null;
+            const quoteTotalPages = document.getElementById('quoteTotalPages');
+            const quotePagesToTranslate = document.getElementById('quotePagesToTranslate');
             const quotePagesCount = document.getElementById('quotePagesCount');
-            if (quotePagesCount && budgetData.pageCount) {
-                quotePagesCount.value = budgetData.pageCount;
-            }
+            if (quoteTotalPages && budgetData.pageCount) quoteTotalPages.value = budgetData.pageCount;
+            if (quotePagesToTranslate && budgetData.pageCount) quotePagesToTranslate.value = budgetData.pageCount;
+            if (quotePagesCount && budgetData.pageCount) quotePagesCount.value = budgetData.pageCount;
             // Si el método de cálculo por páginas está activo, recalcular importe
             if (typeof recalculateQuoteFromPages === 'function') {
                 const pagesMethod = document.querySelector('input[name="calcMethod"]:checked');
@@ -8413,10 +8430,16 @@
                 langPairSpan.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
             }
             
-            // Pre-rellenar número de páginas
+            // Pre-rellenar número de páginas (v3.7.53: tres campos diferenciados,
+            // por defecto los tres = total de páginas de los archivos; se
+            // restauran ediciones previas si las hubo en esta sesión)
             const pages = budgetData.pageCount || 1;
+            const quoteTotalPages = document.getElementById('quoteTotalPages');
+            const quotePagesToTranslate = document.getElementById('quotePagesToTranslate');
+            if (quoteTotalPages) quoteTotalPages.value = pages;
+            if (quotePagesToTranslate) quotePagesToTranslate.value = (budgetData.pagesToTranslate != null ? budgetData.pagesToTranslate : pages);
             if (quotePagesCount) {
-                quotePagesCount.value = pages;
+                quotePagesCount.value = (budgetData.quotePagesCount != null ? budgetData.quotePagesCount : pages);
             }
             
             // Pre-rellenar número de palabras (del análisis si existe)
@@ -8517,10 +8540,29 @@
                 quoteAmountPages.value = priceByPages.toFixed(2);
             }
             
-            // Guardar páginas editadas
+            // Guardar páginas contabilizadas (base del precio)
             budgetData.quotePagesCount = pages;
             
             // Actualizar mensaje
+            updateClientMessage();
+        }
+
+        // v3.7.53: editar "Páginas totales" actualiza el total real (pageCount),
+        // que es lo que aparece al cliente y en la barra de resumen.
+        function onTotalPagesChange() {
+            const el = document.getElementById('quoteTotalPages');
+            const v = parseInt(el && el.value) || 0;
+            if (v > 0) budgetData.pageCount = v;
+            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+            updateClientMessage();
+        }
+
+        // v3.7.53: "Páginas a traducir" es su propio dato; aparece al cliente
+        // pero NO altera el total ni la tarifa.
+        function onPagesToTranslateChange() {
+            const el = document.getElementById('quotePagesToTranslate');
+            budgetData.pagesToTranslate = parseInt(el && el.value);
+            if (isNaN(budgetData.pagesToTranslate)) budgetData.pagesToTranslate = null;
             updateClientMessage();
         }
         
@@ -8537,8 +8579,16 @@
             const numDocs = uploadedFiles.length || budgetData.numArchivos || 1;
             
             // Obtener páginas y lista de archivos
-            const quotePagesField = document.getElementById('quotePagesCount');
-            const totalPages = quotePagesField ? quotePagesField.value : (budgetData.pageCount || 0);
+            // v3.7.53: páginas totales y a traducir son campos distintos; la
+            // contabilizada (quotePagesCount) NO se muestra al cliente.
+            const totalPagesField = document.getElementById('quoteTotalPages');
+            const totalPages = totalPagesField && totalPagesField.value
+                ? parseInt(totalPagesField.value)
+                : (budgetData.pageCount || 0);
+            const pagesToTranslateField = document.getElementById('quotePagesToTranslate');
+            const pagesToTranslate = pagesToTranslateField && pagesToTranslateField.value !== ''
+                ? parseInt(pagesToTranslateField.value)
+                : totalPages;
             
             // Lista de nombres de archivos
             let fileNames = [];
@@ -8615,9 +8665,12 @@
                 } else if (hasFiles && !incFileNames && !incFileCount) {
                     // ninguno de los dos: no añadir encabezado de docs
                 }
-                // Páginas
+                // Páginas (v3.7.53: totales + a traducir; nunca la contabilizada)
                 if (incPages && totalPages > 0) {
                     lines.push(isEs ? `Páginas totales: ${totalPages}` : `Total pages: ${totalPages}`);
+                    if (pagesToTranslate > 0) {
+                        lines.push(isEs ? `Páginas a traducir: ${pagesToTranslate}` : `Pages to translate: ${pagesToTranslate}`);
+                    }
                 }
                 // Palabras (solo si hay análisis)
                 if (incWords && totalWords > 0) {
