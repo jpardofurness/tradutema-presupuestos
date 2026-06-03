@@ -1698,6 +1698,13 @@
                 <input type="tel" id="clientWhatsApp" placeholder="">
             </div>
             
+            <!-- v3.7.52: asunto del email editable (se rellena solo; puedes añadir
+                 p. ej. la referencia del cliente) -->
+            <div class="form-group">
+                <label>Asunto del email</label>
+                <input type="text" id="clientSubject" placeholder="Asunto del email al cliente" oninput="onClientSubjectEdit()">
+            </div>
+            
             <div class="form-group">
                 <label style="font-weight: 600;">Mensaje al cliente (editable):</label>
                 <!-- v3.7.35: toggles de información a incluir en el presupuesto -->
@@ -1807,7 +1814,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.50';
+        const HTML_VERSION = '3.7.52';
         const HTML_DATE = '02/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1863,6 +1870,7 @@
         let deadlineType = 'open';
         let messageLang = 'es';
         let clientMessageEdited = false;  // Para rastrear si el usuario editó el mensaje
+        let clientSubjectEdited = false;  // v3.7.52: rastrear si editó el asunto
 
         // ====== INIT ======
         document.addEventListener('DOMContentLoaded', () => {
@@ -2349,6 +2357,9 @@
             currentStep = 1;
             isResuming = false;
             clientMessageEdited = false;  // Reset flag de mensaje editado
+            clientSubjectEdited = false;  // v3.7.52: reset flag de asunto editado
+            const _clientSubjectReset = document.getElementById('clientSubject');
+            if (_clientSubjectReset) _clientSubjectReset.value = '';
             if (window.openSettingsPanels) window.openSettingsPanels.clear();
             if (window.openQuickSettingsPanels) window.openQuickSettingsPanels.clear();
             
@@ -5114,6 +5125,12 @@
                 if (clientWhatsApp && !clientWhatsApp.value && budgetData.clientWhatsApp) {
                     clientWhatsApp.value = budgetData.clientWhatsApp;
                 }
+
+                // v3.7.52: asunto por defecto (no sobrescribir si el usuario lo editó)
+                const clientSubjectEl = document.getElementById('clientSubject');
+                if (clientSubjectEl && !clientSubjectEdited) {
+                    clientSubjectEl.value = buildDefaultClientSubject();
+                }
                 
                 // Pre-rellenar número de páginas y calcular tarifa
                 initStep5TariffCalc();
@@ -6764,10 +6781,13 @@
         
         // Refrescar el resumen de palabras en paso 4 si está visible
         function refreshWordCountSummary() {
-            const summaryBox = document.getElementById('wordCountSummaryBox');
-            if (!summaryBox || summaryBox.classList.contains('hidden')) return;
-            // Re-disparar el render del paso 4
-            if (typeof showCard === 'function' && currentStep === 4) showCard(4);
+            // v3.7.51: re-renderizar el paso actual si es el de tasación (card 4)
+            // o el de cliente (card 5). Antes abortaba si la caja del recuento
+            // estaba oculta, por lo que al terminar el análisis el recuento no
+            // aparecía hasta ir al paso 2 y volver. Ahora, como showCard ya
+            // muestra la caja cuando hay datos, basta con re-renderizar.
+            if (typeof showCard !== 'function') return;
+            if (currentStep === 4 || currentStep === 5) showCard(currentStep);
         }
 
         async function createFolderAndContinue(withAnalysis = true, foreground = false) {
@@ -8338,6 +8358,17 @@
         function onClientMessageEdit() {
             clientMessageEdited = true;
         }
+
+        // v3.7.52: asunto del email al cliente (mismo formato que el backend)
+        function buildDefaultClientSubject() {
+            const src = budgetData.sourceLang || '';
+            const tgt = budgetData.targetLang || '';
+            const id = budgetData.id || '';
+            return `Presupuesto Traducción Jurada ${src} > ${tgt}${id ? ' [' + id + ']' : ''}`;
+        }
+        function onClientSubjectEdit() {
+            clientSubjectEdited = true;
+        }
         
         // Forzar regeneración del mensaje (resetea clientMessageEdited)
         function regenerateMessage() {
@@ -9066,6 +9097,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 
                 const customMessage = document.getElementById('clientMessageEdit').value;
                 const quoteDaysValue = getQuoteDays();
+                const subjectEl = document.getElementById('clientSubject');
+                const clientSubject = (subjectEl && subjectEl.value.trim()) ? subjectEl.value.trim() : '';
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -9078,6 +9111,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         sourceLang: budgetData.sourceLang,
                         targetLang: budgetData.targetLang,
                         customMessage: customMessage,
+                        clientSubject: clientSubject,
                         quoteDays: quoteDaysValue
                     })
                 });
