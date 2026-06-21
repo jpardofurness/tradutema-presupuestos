@@ -1825,8 +1825,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.53';
-        const HTML_DATE = '02/06/2026';
+        const HTML_VERSION = '3.7.54';
+        const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -8701,7 +8701,7 @@
                 
                 message = `Hola,
 
-La tarifa para la traducción jurada de ${srcLang} a ${tgtLang} ${docTextEs} es de ${amount} EUR (IVA incluido).
+La tarifa para la traducción jurada de ${srcLang} a ${tgtLang} ${docTextEs} es de ${amount} EUR (Impuestos incluidos, si corresponden)*.
 
 Plazo aproximado: ${daysTextEs}, si realiza el pedido ahora${urgencyText}.
 
@@ -8710,6 +8710,8 @@ Para realizar el pedido:
 2. Selecciona los idiomas. En Referencia Cotización, introduce ${refId}. En Importe indica ${amount} EUR, indica Cómo quieres recibir la traducción, en plazo indica la fecha de ${deliveryDateEs} y Carga los documentos.
 3. Carrito situado arriba a la derecha de la página.
 4. Haz clic en AÑADIR AL CARRITO y ve al carrito para finalizar la compra.
+
+*El IVA se descontará automáticamente durante el pago si el cliente está establecido fuera de la UE, en Canarias, Ceuta o Melilla, o si es una empresa de la UE con NIF-IVA intracomunitario válido.
 ${pagesTextEs}
 Muchas gracias,
 
@@ -8726,7 +8728,7 @@ Miembro de las Asociaciones de Traductores Profesionales: APTIJ, ASETRAD e IAPTI
                 
                 message = `Hello,
 
-The fee for the sworn translation from ${srcLangEn} to ${tgtLangEn} ${docTextEn} is ${amount} EUR (VAT included).
+The fee for the sworn translation from ${srcLangEn} to ${tgtLangEn} ${docTextEn} is ${amount} EUR (Taxes included, if applicable)*.
 
 Estimated delivery: ${daysTextEn}, if you place the order now${urgencyTextEn}.
 
@@ -8735,6 +8737,8 @@ To place your order:
 2. Select the languages. In Quote Reference, enter ${refId}. In Amount enter ${amount} EUR, indicate how you want to receive the translation, in deadline enter the date ${deliveryDateEn} and upload the documents.
 3. Shopping cart located at the top right of the page.
 4. Click ADD TO CART and go to cart to complete your purchase.
+
+*VAT will be automatically deducted during payment if the client is established outside the EU, in the Canary Islands, Ceuta or Melilla, or if it is an EU company with a valid intra-community VAT number.
 ${pagesTextEn}
 Thank you very much,
 
