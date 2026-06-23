@@ -633,7 +633,7 @@
                 <span><span style="color:#64748b;">Importe:</span> <strong id="bsBarImporte" style="color:#15803d;">—</strong></span>
                 <span><span style="color:#64748b;">Plazo:</span> <strong id="bsBarPlazo" style="color:#0c4a6e;">—</strong></span>
             </div>
-            <span id="bsBarEstado" style="font-size:0.78rem;color:#64748b;"></span>
+            <span id="bsBarEstado" style="font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;background:#e2e8f0;color:#475569;"></span>
         </div>
         <!-- v3.7.24: banner GLOBAL de progreso/resultado de análisis, persiste entre pestañas -->
         <div id="globalAnalysisBanner" class="hidden" style="margin:6px auto 0;max-width:1100px;padding:10px 14px;border-radius:8px;font-size:0.88rem;display:flex;align-items:center;gap:10px;border:1px solid;">
@@ -1825,7 +1825,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.54';
+        const HTML_VERSION = '3.7.55';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2184,7 +2184,20 @@
             document.getElementById('bsBarTarifa').textContent = fmtTarifa(tarifa);
             document.getElementById('bsBarImporte').textContent = fmtEuros(importe);
             document.getElementById('bsBarPlazo').textContent = plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—';
-            document.getElementById('bsBarEstado').textContent = estado;
+
+            // v3.7.55: estado como chip con color según fase del flujo
+            const estadoEl = document.getElementById('bsBarEstado');
+            if (estadoEl) {
+                const estadoShown = estado || '0-Pendiente';
+                estadoEl.textContent = estadoShown;
+                let bg = '#e2e8f0', fg = '#475569';  // gris por defecto
+                if (estadoShown.startsWith('0')) { bg = '#fef3c7'; fg = '#92400e'; }       // pendiente: ámbar
+                else if (estadoShown.startsWith('1')) { bg = '#dbeafe'; fg = '#1e40af'; }  // tasación: azul
+                else if (estadoShown.startsWith('2')) { bg = '#dcfce7'; fg = '#166534'; }  // enviado: verde
+                else if (estadoShown.startsWith('3')) { bg = '#ede9fe'; fg = '#5b21b6'; }  // pedido: violeta
+                estadoEl.style.background = bg;
+                estadoEl.style.color = fg;
+            }
 
             // v3.7.47: idiomas y contacto del cliente en la barra de resumen
             const idiomas = (budgetData.sourceLang && budgetData.targetLang)
@@ -2201,9 +2214,10 @@
             if (idiomasEl) idiomasEl.textContent = idiomas;
             if (contactoEl) contactoEl.textContent = contacto;
 
-            // Mostrar solo si hay al menos un dato real (no todo en —)
+            // Mostrar si hay al menos un dato real o un estado (siempre hay
+            // estado cuando existe el presupuesto)
             const anyData = palabras > 0 || paginas > 0 || tarifa > 0 || importe > 0 || plazo
-                || idiomas !== '—' || contacto !== '—';
+                || idiomas !== '—' || contacto !== '—' || !!budgetData.id;
             if (anyData) bar.classList.remove('hidden');
             else bar.classList.add('hidden');
         }
@@ -6566,6 +6580,8 @@
                 budgetData.folderId = folderResult.folderId;
                 budgetData.folderUrl = folderResult.folderUrl;
                 budgetData.numArchivos = files.length;
+                // v3.7.55: estado inicial visible en la barra
+                if (!budgetData.estado) budgetData.estado = '0-Pendiente';
                 bgState.folderCreated = true;
                 bgState.folderError = null;
                 bgState.pendingFiles = null;
@@ -7724,6 +7740,13 @@
                     });
                     
                     showSuccess('Emails enviados', `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`);
+                    
+                    // v3.7.55: marcar "1-Tasación Solicitada" salvo que ya esté
+                    // en un estado más avanzado (2-Enviado / 3-Pedido).
+                    const est = budgetData.estado || '';
+                    if (!est || est.startsWith('0')) {
+                        try { await updateBudgetStatusFE('1-Tasación Solicitada'); } catch(e) { console.warn('estado tasación:', e); }
+                    }
                     
                     completedSteps.add(4);
                     updateProgressSteps();
@@ -9124,6 +9147,10 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 if (!result.success) {
                     throw new Error(result.error || 'Error desconocido');
                 }
+                
+                // v3.7.55: reflejar el estado en local y en la barra de resumen
+                budgetData.estado = status;
+                if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
                 
                 return result;
             } catch (error) {
