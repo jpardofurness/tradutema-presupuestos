@@ -1796,16 +1796,19 @@
                 <div style="margin-bottom: 16px;">
                     <label style="font-weight: 500; display: block; margin-bottom: 6px;">Tarifa Mínima (€)</label>
                     <input type="text" id="editTarifaMinima" class="form-control" placeholder="Ej: 20">
+                    <small style="color:#64748b;font-size:11px;">Se aplica a todos los pares de idiomas del proveedor.</small>
                 </div>
                 
                 <div style="margin-bottom: 16px;">
                     <label style="font-weight: 500; display: block; margin-bottom: 6px;">Tarifa por Palabra (€)</label>
                     <input type="text" id="editTarifaPalabra" class="form-control" placeholder="Ej: 0.08">
+                    <small style="color:#64748b;font-size:11px;">Solo para este par de idiomas (puede variar por dirección).</small>
                 </div>
                 
                 <div style="margin-bottom: 8px;">
                     <label style="font-weight: 500; display: block; margin-bottom: 6px;">Comentarios</label>
                     <textarea id="editComentarios" class="form-control" rows="3" placeholder="Notas sobre este proveedor..."></textarea>
+                    <small style="color:#64748b;font-size:11px;">Se aplican a todos los pares de idiomas del proveedor.</small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1825,7 +1828,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.55';
+        const HTML_VERSION = '3.7.56';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -7462,22 +7465,20 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Actualizar datos locales en el proveedor actual
-                    p.tarifaMinima = tarifaMinima;
-                    p.tarifaPalabra = tarifaPalabra;
-                    p.comentarios = comentarios;
-                    
-                    // También actualizar en allProviders (la fuente principal)
-                    const allIndex = allProviders.findIndex(ap => 
-                        ap.email === p.email && 
-                        ap.idiomaOrigen === p.idiomaOrigen && 
-                        ap.idiomaDestino === p.idiomaDestino
-                    );
-                    if (allIndex >= 0) {
-                        allProviders[allIndex].tarifaMinima = tarifaMinima;
-                        allProviders[allIndex].tarifaPalabra = tarifaPalabra;
-                        allProviders[allIndex].comentarios = comentarios;
-                    }
+                    // v3.7.56: mínimo y comentarios son del proveedor (email) →
+                    // propagar a TODAS sus fichas; tarifa/palabra solo a la del
+                    // par de idiomas editado.
+                    const applyToEntry = (entry) => {
+                        if (!entry || entry.email !== p.email) return;
+                        entry.tarifaMinima = tarifaMinima;
+                        entry.comentarios = comentarios;
+                        if (entry.idiomaOrigen === p.idiomaOrigen && entry.idiomaDestino === p.idiomaDestino) {
+                            entry.tarifaPalabra = tarifaPalabra;
+                        }
+                    };
+                    [allProviders, filteredProviders, consultFilteredProviders].forEach(arr => {
+                        if (Array.isArray(arr)) arr.forEach(applyToEntry);
+                    });
                     
                     // Re-renderizar la lista correcta según el contexto
                     if (editingFromConsult) {
@@ -7487,8 +7488,8 @@
                     }
                     
                     closeEditProviderModal();
-                    showStatus('✓ Tarifas actualizadas', 'success');
-                    setTimeout(hideStatus, 2000);
+                    showStatus('✓ Guardado (mínimo y comentarios aplicados a todos los pares del proveedor)', 'success');
+                    setTimeout(hideStatus, 2500);
                 } else {
                     throw new Error(data.error || 'Error desconocido');
                 }
