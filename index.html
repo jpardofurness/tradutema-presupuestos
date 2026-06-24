@@ -825,8 +825,28 @@
                 </div>
             </div>
             
-            <div class="consult-stats" style="display: flex; gap: 16px; margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-md);">
+            <div class="consult-stats" style="display: flex; gap: 16px; align-items:center; margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-md);">
                 <span style="color: var(--text-secondary);">Mostrando: <strong id="consultProviderCount">0</strong> proveedores</span>
+                <button onclick="showAddProviderForm()" style="margin-left:auto;background:var(--tradutema-blue,#2563eb);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.85rem;cursor:pointer;">➕ Añadir proveedor</button>
+            </div>
+            
+            <!-- v3.7.57: formulario de alta de proveedor -->
+            <div id="addProviderForm" class="hidden" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin-bottom:16px;background:#f8fafc;">
+                <div style="font-weight:600;margin-bottom:12px;color:#0c4a6e;">➕ Nuevo proveedor</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div><label style="font-size:0.8rem;color:#475569;">Nombre</label><input type="text" id="addProvNombre" class="form-control" placeholder="Nombre"></div>
+                    <div><label style="font-size:0.8rem;color:#475569;">Email (id único)</label><input type="email" id="addProvEmail" class="form-control" placeholder="email@dominio.com"></div>
+                    <div><label style="font-size:0.8rem;color:#475569;">Idioma origen</label><select id="addProvOrigen" class="form-control"></select></div>
+                    <div><label style="font-size:0.8rem;color:#475569;">Idioma destino</label><select id="addProvDestino" class="form-control"></select></div>
+                    <div><label style="font-size:0.8rem;color:#475569;">Tarifa mínima (€)</label><input type="text" id="addProvMin" class="form-control" placeholder="Ej: 20"></div>
+                    <div><label style="font-size:0.8rem;color:#475569;">Tarifa por palabra (€)</label><input type="text" id="addProvPalabra" class="form-control" placeholder="Ej: 0.08"></div>
+                    <div style="grid-column:1 / -1;"><label style="font-size:0.8rem;color:#475569;">Comentarios</label><textarea id="addProvComentarios" class="form-control" rows="2" placeholder="Notas sobre el proveedor..."></textarea></div>
+                </div>
+                <small style="color:#64748b;font-size:11px;display:block;margin-top:6px;">Si el email ya existe, el mínimo y los comentarios se heredan del proveedor (campos compartidos). Para otro par de idiomas del mismo proveedor, añádelo de nuevo cambiando los idiomas.</small>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button onclick="submitAddProvider()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Guardar</button>
+                    <button onclick="document.getElementById('addProviderForm').classList.add('hidden')" style="background:#e2e8f0;color:#475569;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Cancelar</button>
+                </div>
             </div>
             
             <div class="providers-consult-list" id="providersConsultList">
@@ -1828,7 +1848,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.56';
+        const HTML_VERSION = '3.7.57';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2674,9 +2694,17 @@
                 const matchSource = !sourceLang || p.idiomaOrigen === sourceLang;
                 const matchTarget = !targetLang || p.idiomaDestino === targetLang;
                 return matchSource && matchTarget;
-            });
+            }).sort(compareByOrden);
             
             renderConsultProviders();
+        }
+
+        // v3.7.57: orden por preferencia (1,2,3...); sin orden → al final; empate → por nombre
+        function compareByOrden(a, b) {
+            const oa = (a.orden == null || a.orden === '') ? Infinity : Number(a.orden);
+            const ob = (b.orden == null || b.orden === '') ? Infinity : Number(b.orden);
+            if (oa !== ob) return oa - ob;
+            return (a.nombre || '').localeCompare(b.nombre || '', 'es');
         }
         
         function renderConsultProviders() {
@@ -2717,23 +2745,168 @@
                     comentarioHtml = `<div class="provider-consult-comment">💬 ${p.comentarios}</div>`;
                 }
                 
+                // v3.7.57: controles de activo / orden / eliminar
+                const activo = p.activo !== false;
+                const ordenVal = (p.orden == null || p.orden === '') ? '' : p.orden;
+                const dimStyle = activo ? '' : 'opacity:0.55;';
+                const inactivoBadge = activo ? '' : ' <span style="font-size:0.72rem;color:#b91c1c;font-weight:600;">(inactivo)</span>';
+                
                 html += `
-                    <div class="provider-consult-item">
+                    <div class="provider-consult-item" style="${dimStyle}">
                         <div class="provider-consult-info">
-                            <div class="provider-consult-name">${p.nombre}</div>
+                            <div class="provider-consult-name">${p.nombre}${inactivoBadge}</div>
                             <div class="provider-consult-email">📧 ${p.email}</div>
                             <div class="provider-consult-langs">${p.idiomaOrigen} → ${p.idiomaDestino}</div>
                             ${tarifasHtml}
                             ${comentarioHtml}
+                            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:0.82rem;color:#475569;">
+                                <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
+                                    <input type="checkbox" ${activo ? 'checked' : ''} onchange="toggleProviderActive(${index}, this.checked)"> Activo
+                                </label>
+                                <label style="display:inline-flex;align-items:center;gap:5px;" title="Orden de preferencia para este par (menor = primero)">
+                                    Orden: <input type="number" min="1" value="${ordenVal}" style="width:60px;" onchange="changeProviderOrder(${index}, this.value)">
+                                </label>
+                            </div>
                         </div>
-                        <button class="provider-consult-edit" onclick="openEditConsultProvider(${index})">✏️ Editar</button>
+                        <div style="display:flex;flex-direction:column;gap:6px;">
+                            <button class="provider-consult-edit" onclick="openEditConsultProvider(${index})">✏️ Editar</button>
+                            <button onclick="deleteProviderFE(${index})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;font-size:0.82rem;cursor:pointer;">🗑️ Eliminar</button>
+                        </div>
                     </div>
                 `;
             });
             
             list.innerHTML = html;
         }
-        
+
+        // ====== v3.7.57: gestión de proveedores (activo / orden / añadir / eliminar) ======
+        async function providerApi(payload) {
+            const resp = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            return resp.json();
+        }
+
+        // Activo es del proveedor (email) → propaga a todas sus fichas
+        async function toggleProviderActive(index, checked) {
+            const p = consultFilteredProviders[index];
+            if (!p) return;
+            try {
+                const data = await providerApi({ action: 'setProviderActive', email: p.email, activo: checked });
+                if (!data.success) throw new Error(data.error || 'Error');
+                [allProviders, filteredProviders, consultFilteredProviders].forEach(arr => {
+                    if (Array.isArray(arr)) arr.forEach(e => { if (e.email === p.email) e.activo = checked; });
+                });
+                renderConsultProviders();
+                showStatus(checked ? '✓ Proveedor activado' : '✓ Proveedor desactivado (no aparecerá al solicitar tasación)', 'success');
+                setTimeout(hideStatus, 2500);
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
+        }
+
+        // Orden es por par de idiomas → solo esta ficha
+        async function changeProviderOrder(index, value) {
+            const p = consultFilteredProviders[index];
+            if (!p) return;
+            const orden = value === '' ? '' : parseInt(value);
+            try {
+                const data = await providerApi({
+                    action: 'setProviderOrder',
+                    email: p.email, idiomaOrigen: p.idiomaOrigen, idiomaDestino: p.idiomaDestino,
+                    orden: orden
+                });
+                if (!data.success) throw new Error(data.error || 'Error');
+                const apply = (e) => { if (e.email === p.email && e.idiomaOrigen === p.idiomaOrigen && e.idiomaDestino === p.idiomaDestino) e.orden = (orden === '' ? null : orden); };
+                [allProviders, filteredProviders, consultFilteredProviders].forEach(arr => { if (Array.isArray(arr)) arr.forEach(apply); });
+                filterConsultProviders(); // re-filtra y re-ordena
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
+        }
+
+        // Eliminar proveedor ENTERO (todos sus pares)
+        async function deleteProviderFE(index) {
+            const p = consultFilteredProviders[index];
+            if (!p) return;
+            const pares = allProviders.filter(e => e.email === p.email).length;
+            if (!confirm(`¿Eliminar a ${p.nombre} (${p.email}) por completo?\nSe borrarán sus ${pares} par(es) de idiomas. Esta acción no se puede deshacer.`)) return;
+            try {
+                const data = await providerApi({ action: 'deleteProvider', email: p.email });
+                if (!data.success) throw new Error(data.error || 'Error');
+                allProviders = allProviders.filter(e => e.email !== p.email);
+                filterConsultProviders();
+                showStatus(`✓ Proveedor eliminado (${data.deleted} fila/s)`, 'success');
+                setTimeout(hideStatus, 2500);
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+                setTimeout(hideStatus, 3000);
+            }
+        }
+
+        function showAddProviderForm() {
+            const form = document.getElementById('addProviderForm');
+            // poblar selects de idioma clonando opciones del filtro de consulta
+            ['addProvOrigen', 'addProvDestino'].forEach((id, idx) => {
+                const sel = document.getElementById(id);
+                const src = document.getElementById(idx === 0 ? 'consultSourceLang' : 'consultTargetLang');
+                sel.innerHTML = '';
+                Array.from(src.options).forEach(o => {
+                    if (o.value) { // saltar "Todos"
+                        const opt = document.createElement('option');
+                        opt.value = o.value; opt.textContent = o.textContent;
+                        sel.appendChild(opt);
+                    }
+                });
+            });
+            // limpiar campos
+            ['addProvNombre','addProvEmail','addProvMin','addProvPalabra','addProvComentarios'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            form.classList.remove('hidden');
+            document.getElementById('addProvNombre').focus();
+        }
+
+        async function submitAddProvider() {
+            const email = document.getElementById('addProvEmail').value.trim();
+            const nombre = document.getElementById('addProvNombre').value.trim();
+            const origen = document.getElementById('addProvOrigen').value;
+            const destino = document.getElementById('addProvDestino').value;
+            if (!nombre || !email || !origen || !destino) {
+                showStatus('Faltan nombre, email u idiomas', 'warning');
+                setTimeout(hideStatus, 3000);
+                return;
+            }
+            try {
+                const data = await providerApi({
+                    action: 'addProvider',
+                    nombre: nombre, email: email,
+                    idiomaOrigen: origen, idiomaDestino: destino,
+                    tarifaMinima: document.getElementById('addProvMin').value.trim(),
+                    tarifaPalabra: document.getElementById('addProvPalabra').value.trim(),
+                    comentarios: document.getElementById('addProvComentarios').value.trim()
+                });
+                if (!data.success) throw new Error(data.error || 'Error');
+                // añadir en local
+                allProviders.push({
+                    nombre: nombre, idiomaOrigen: origen, idiomaDestino: destino, email: email,
+                    tarifaMinima: document.getElementById('addProvMin').value.trim(),
+                    tarifaPalabra: document.getElementById('addProvPalabra').value.trim(),
+                    comentarios: document.getElementById('addProvComentarios').value.trim(),
+                    activo: true, orden: null
+                });
+                document.getElementById('addProviderForm').classList.add('hidden');
+                filterConsultProviders();
+                showStatus('✓ Proveedor añadido', 'success');
+                setTimeout(hideStatus, 2500);
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+                setTimeout(hideStatus, 3500);
+            }
+        }
+
         function openEditConsultProvider(index) {
             const p = consultFilteredProviders[index];
             if (!p) return;
@@ -4929,9 +5102,10 @@
             if (!src || !tgt) {
                 filteredProviders = [];
             } else {
-                filteredProviders = allProviders.filter(p => 
-                    p.idiomaOrigen === src && p.idiomaDestino === tgt
-                );
+                // v3.7.57: solo proveedores activos, ordenados por preferencia (orden asc, sin orden al final)
+                filteredProviders = allProviders
+                    .filter(p => p.idiomaOrigen === src && p.idiomaDestino === tgt && p.activo !== false)
+                    .sort(compareByOrden);
             }
             
             selectedProviders.clear();
