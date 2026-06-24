@@ -828,6 +828,24 @@
             <div class="consult-stats" style="display: flex; gap: 16px; align-items:center; margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-md);">
                 <span style="color: var(--text-secondary);">Mostrando: <strong id="consultProviderCount">0</strong> proveedores</span>
                 <button onclick="showAddProviderForm()" style="margin-left:auto;background:var(--tradutema-blue,#2563eb);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.85rem;cursor:pointer;">➕ Añadir proveedor</button>
+                <button onclick="toggleDirectorioPanel()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.85rem;cursor:pointer;">🔎 Buscar nuevos (MAEC)</button>
+            </div>
+
+            <!-- v3.7.58: buscador del directorio oficial MAEC (bajo demanda) -->
+            <div id="directorioPanel" class="hidden" style="border:1px solid #c4b5fd;border-radius:10px;padding:16px;margin-bottom:16px;background:#faf5ff;">
+                <div style="font-weight:600;margin-bottom:4px;color:#5b21b6;">🔎 Buscar nuevos traductores (directorio oficial MAEC)</div>
+                <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Filtra el listado oficial. Los que añadas entran en tus Traductores como <strong>Inactivo</strong>; pides cotización y luego los pones Activo si te convienen.</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end;">
+                    <div><label style="font-size:0.8rem;color:#475569;">Idioma</label><select id="dirIdioma" class="form-control"></select></div>
+                    <div><label style="font-size:0.8rem;color:#475569;">Provincia / País</label><input type="text" id="dirProvincia" class="form-control" placeholder="Ej: SEVILLA, MADRID, ALEMANIA..."></div>
+                    <div><label style="font-size:0.8rem;color:#475569;">Texto (nombre/email)</label><input type="text" id="dirQuery" class="form-control" placeholder="opcional"></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap;">
+                    <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;color:#475569;cursor:pointer;"><input type="checkbox" id="dirSoloEmail" checked> Solo con email</label>
+                    <button onclick="runDirectorioSearch()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Buscar</button>
+                    <span id="dirCount" style="font-size:0.82rem;color:#64748b;"></span>
+                </div>
+                <div id="directorioResults" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;"></div>
             </div>
             
             <!-- v3.7.57: formulario de alta de proveedor -->
@@ -1848,7 +1866,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.57';
+        const HTML_VERSION = '3.7.58';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2901,6 +2919,98 @@
                 filterConsultProviders();
                 showStatus('✓ Proveedor añadido', 'success');
                 setTimeout(hideStatus, 2500);
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+                setTimeout(hideStatus, 3500);
+            }
+        }
+
+        // ====== v3.7.58: directorio MAEC (búsqueda bajo demanda) ======
+        const MAEC_LANGS = ["ALEMÁN","ÁRABE","BENGALÍ","BIELORRUSO","BÚLGARO","CATALÁN","CHECO","CHINO","COREANO","CROATA","DANÉS","ESLOVACO","ESLOVENO","ESTONIO","EUSKERA","FINÉS","FRANCÉS","GALLEGO","GRIEGO","HEBREO","HÚNGARO","INGLÉS","ITALIANO","JAPONÉS","LATÍN","LETÓN","LITUANO","MACEDONIO","NEERLANDÉS","NORUEGO","PERSA","POLACO","PORTUGUÉS","RUMANO","RUSO","SERBIO","SUECO","TURCO","UCRANIANO","URDU"];
+        let directorioResultsCache = [];
+
+        function toggleDirectorioPanel() {
+            const p = document.getElementById('directorioPanel');
+            if (!p) return;
+            const willShow = p.classList.contains('hidden');
+            p.classList.toggle('hidden');
+            if (willShow) {
+                const sel = document.getElementById('dirIdioma');
+                if (sel && !sel.options.length) {
+                    sel.innerHTML = '<option value="">(todos)</option>' + MAEC_LANGS.map(l => `<option value="${l}">${l}</option>`).join('');
+                }
+            }
+        }
+
+        async function runDirectorioSearch() {
+            const idioma = document.getElementById('dirIdioma').value;
+            const provincia = document.getElementById('dirProvincia').value.trim();
+            const query = document.getElementById('dirQuery').value.trim();
+            const soloConEmail = document.getElementById('dirSoloEmail').checked;
+            const resBox = document.getElementById('directorioResults');
+            const countEl = document.getElementById('dirCount');
+            if (!idioma && !provincia && !query) {
+                countEl.textContent = 'Indica al menos idioma, provincia o texto.';
+                return;
+            }
+            countEl.textContent = 'Buscando...';
+            resBox.innerHTML = '';
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'searchDirectorio', idioma, provincia, query, soloConEmail })
+                });
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Error');
+                directorioResultsCache = data.results || [];
+                countEl.textContent = `${data.total} encontrados${data.capped ? ' (mostrando los primeros ' + data.results.length + ')' : ''}`;
+                renderDirectorioResults();
+            } catch (e) {
+                countEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        function renderDirectorioResults() {
+            const box = document.getElementById('directorioResults');
+            if (!directorioResultsCache.length) { box.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Sin resultados.</div>'; return; }
+            box.innerHTML = directorioResultsCache.map((r, i) => {
+                const ya = r.yaEsTuyo
+                    ? '<span style="font-size:0.72rem;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:999px;">✓ ya es tuyo</span>'
+                    : `<button onclick="promoteDirectorioEntry(${i})" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:0.8rem;cursor:pointer;">➕ Añadir (Inactivo)</button>`;
+                const tel = r.telefono ? ` · 📞 ${r.telefono}` : '';
+                const em = r.email ? ` · 📧 ${r.email}` : ' · <span style="color:#b91c1c;">sin email</span>';
+                return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;">
+                    <div style="font-size:0.85rem;">
+                        <div style="font-weight:600;">${r.nombre} <span style="font-weight:400;color:#64748b;">· TIJ ${r.numTIJ}</span></div>
+                        <div style="color:#475569;">${r.idioma} · ${r.provincia} · nombr. ${r.anio || '—'}</div>
+                        <div style="color:#475569;">${em}${tel}</div>
+                    </div>
+                    <div style="flex-shrink:0;">${ya}</div>
+                </div>`;
+            }).join('');
+        }
+
+        async function promoteDirectorioEntry(index) {
+            const r = directorioResultsCache[index];
+            if (!r) return;
+            try {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: 'promoteFromDirectorio',
+                        nombre: r.nombre, idioma: r.idioma, provincia: r.provincia,
+                        numTIJ: r.numTIJ, email: r.email, telefono: r.telefono, anio: r.anio
+                    })
+                });
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'No se añadió (¿ya existía?)');
+                r.yaEsTuyo = true;
+                renderDirectorioResults();
+                // refrescar lista local de proveedores si está cargada
+                showStatus(`✓ Añadido a Traductores como Inactivo (${data.added} sentido/s, ${data.idiomaHis})`, 'success');
+                setTimeout(hideStatus, 3000);
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
                 setTimeout(hideStatus, 3500);
