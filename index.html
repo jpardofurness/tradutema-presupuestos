@@ -1866,7 +1866,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.58';
+        const HTML_VERSION = '3.7.60';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2763,6 +2763,17 @@
                     comentarioHtml = `<div class="provider-consult-comment">💬 ${p.comentarios}</div>`;
                 }
                 
+                // v3.7.59: datos del MAEC (si se importaron)
+                let maecHtml = '';
+                const maecBits = [];
+                if (p.numTIJ) maecBits.push(`Nº TIJ ${p.numTIJ}`);
+                if (p.provincia) maecBits.push(p.provincia);
+                if (p.anio) maecBits.push(`nombr. ${p.anio}`);
+                if (p.telefono) maecBits.push(`📞 ${p.telefono}`);
+                if (maecBits.length) {
+                    maecHtml = `<div style="font-size:0.78rem;color:#64748b;margin-top:2px;">${maecBits.join(' · ')}</div>`;
+                }
+                
                 // v3.7.57: controles de activo / orden / eliminar
                 const activo = p.activo !== false;
                 const ordenVal = (p.orden == null || p.orden === '') ? '' : p.orden;
@@ -2777,6 +2788,7 @@
                             <div class="provider-consult-langs">${p.idiomaOrigen} → ${p.idiomaDestino}</div>
                             ${tarifasHtml}
                             ${comentarioHtml}
+                            ${maecHtml}
                             <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:0.82rem;color:#475569;">
                                 <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
                                     <input type="checkbox" ${activo ? 'checked' : ''} onchange="toggleProviderActive(${index}, this.checked)"> Activo
@@ -2964,7 +2976,8 @@
                 const data = await resp.json();
                 if (!data.success) throw new Error(data.error || 'Error');
                 directorioResultsCache = data.results || [];
-                countEl.textContent = `${data.total} encontrados${data.capped ? ' (mostrando los primeros ' + data.results.length + ')' : ''}`;
+                const ocultos = data.ocultosTuyos ? ` · ${data.ocultosTuyos} ya en tu lista (ocultos)` : '';
+                countEl.textContent = `${data.total} nuevos${data.capped ? ' (mostrando ' + data.results.length + ')' : ''}${ocultos}`;
                 renderDirectorioResults();
             } catch (e) {
                 countEl.textContent = 'Error: ' + e.message;
@@ -2975,18 +2988,18 @@
             const box = document.getElementById('directorioResults');
             if (!directorioResultsCache.length) { box.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Sin resultados.</div>'; return; }
             box.innerHTML = directorioResultsCache.map((r, i) => {
-                const ya = r.yaEsTuyo
-                    ? '<span style="font-size:0.72rem;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:999px;">✓ ya es tuyo</span>'
+                const add = r._added
+                    ? '<span style="font-size:0.72rem;color:#166534;background:#dcfce7;padding:4px 10px;border-radius:999px;">✓ añadido (Inactivo)</span>'
                     : `<button onclick="promoteDirectorioEntry(${i})" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:0.8rem;cursor:pointer;">➕ Añadir (Inactivo)</button>`;
                 const tel = r.telefono ? ` · 📞 ${r.telefono}` : '';
                 const em = r.email ? ` · 📧 ${r.email}` : ' · <span style="color:#b91c1c;">sin email</span>';
-                return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;">
+                return `<div id="dirRes${i}" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;">
                     <div style="font-size:0.85rem;">
                         <div style="font-weight:600;">${r.nombre} <span style="font-weight:400;color:#64748b;">· TIJ ${r.numTIJ}</span></div>
                         <div style="color:#475569;">${r.idioma} · ${r.provincia} · nombr. ${r.anio || '—'}</div>
                         <div style="color:#475569;">${em}${tel}</div>
                     </div>
-                    <div style="flex-shrink:0;">${ya}</div>
+                    <div style="flex-shrink:0;">${add}</div>
                 </div>`;
             }).join('');
         }
@@ -3006,7 +3019,7 @@
                 });
                 const data = await resp.json();
                 if (!data.success) throw new Error(data.error || 'No se añadió (¿ya existía?)');
-                r.yaEsTuyo = true;
+                r._added = true;
                 renderDirectorioResults();
                 // refrescar lista local de proveedores si está cargada
                 showStatus(`✓ Añadido a Traductores como Inactivo (${data.added} sentido/s, ${data.idiomaHis})`, 'success');
@@ -9117,18 +9130,63 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             updateClientMessage();
         }
 
-        function validateClientFields() {
-            const amount = getQuoteAmount();
-            const days = getQuoteDays();
-            
-            if (!amount) {
-                showStatus('Introduce el importe del presupuesto', 'warning');
-                setTimeout(hideStatus, 3000);
-                return false;
+        // v3.7.60: validación de envío al cliente. channel = 'whatsapp' | 'email' | 'email_enviar'
+        // Comprueba que estén todos los datos antes de guardar/copiar/enviar y avisa
+        // claramente si falta algo o si el mensaje aún contiene marcadores sin rellenar.
+        function validateClientFields(channel) {
+            const faltan = [];      // datos que faltan
+            const marcadores = [];  // placeholders sin sustituir en el mensaje
+
+            // 1. Presupuesto creado (referencia) y carpeta creada en Drive
+            if (!budgetData.id) {
+                faltan.push('la referencia del presupuesto (créalo primero)');
             }
-            if (!days) {
-                showStatus('Introduce el plazo en días laborables', 'warning');
-                setTimeout(hideStatus, 3000);
+            if (!budgetData.folderId && !budgetData.folderUrl) {
+                faltan.push('la carpeta del proyecto (aún no se ha creado)');
+            }
+
+            // 2. Importe
+            if (!getQuoteAmount()) {
+                faltan.push('el importe del presupuesto');
+            }
+
+            // 3. Plazo
+            if (!getQuoteDays()) {
+                faltan.push('el plazo en días laborables');
+            }
+
+            // 4. Datos del canal de envío
+            if (channel === 'email' || channel === 'email_enviar') {
+                const emailRaw = (document.getElementById('clientEmail') ? document.getElementById('clientEmail').value : '').trim();
+                const email = extractEmail(emailRaw);
+                const emailOk = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+                if (!emailOk) {
+                    faltan.push('un email de cliente válido');
+                }
+            }
+            if (channel === 'whatsapp') {
+                const wa = (document.getElementById('clientWhatsApp') ? document.getElementById('clientWhatsApp').value : '').trim();
+                if (!wa) {
+                    faltan.push('un número de WhatsApp del cliente');
+                }
+            }
+
+            // 5. Control final: marcadores sin rellenar en el cuerpo del mensaje
+            const msg = (document.getElementById('clientMessageEdit') ? document.getElementById('clientMessageEdit').value : '');
+            if (/\bXXX\b/.test(msg)) marcadores.push('XXX (importe)');
+            if (/\bREFERENCIA\b/.test(msg)) marcadores.push('REFERENCIA (carpeta)');
+            if (/\bX días laborables\b/.test(msg) || /\bX working days\b/.test(msg)) marcadores.push('X (plazo)');
+
+            if (faltan.length || marcadores.length) {
+                let m = '';
+                if (faltan.length) {
+                    m += 'No se puede enviar. Falta: ' + faltan.join('; ') + '.';
+                }
+                if (marcadores.length) {
+                    m += (m ? ' ' : '') + 'El mensaje todavía contiene ' + marcadores.join(', ') + '. Revísalo antes de enviar.';
+                }
+                showStatus('⚠️ ' + m, 'error');
+                setTimeout(hideStatus, 7000);
                 return false;
             }
             return true;
@@ -9226,7 +9284,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         async function copyForWhatsApp() {
-            if (!validateClientFields()) return;
+            if (!validateClientFields('whatsapp')) return;
             
             const message = document.getElementById('clientMessageEdit').value;
             const whatsapp = document.getElementById('clientWhatsApp').value.trim();
@@ -9265,7 +9323,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         async function copyForEmail() {
-            if (!validateClientFields()) return;
+            if (!validateClientFields('email')) return;
             
             const message = document.getElementById('clientMessageEdit').value;
             const emailRaw = document.getElementById('clientEmail').value.trim();
@@ -9449,13 +9507,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const email = extractEmail(emailRaw);
             const whatsapp = document.getElementById('clientWhatsApp').value.trim();
             
-            if (!email) {
-                showStatus('Introduce el email del cliente', 'warning');
-                setTimeout(hideStatus, 3000);
-                return;
-            }
-            
-            if (!validateClientFields()) return;
+            if (!validateClientFields('email_enviar')) return;
             
             const btn = document.getElementById('sendClientBtn');
             btn.disabled = true;
