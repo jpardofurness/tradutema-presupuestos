@@ -833,7 +833,10 @@
 
             <!-- v3.7.58: buscador del directorio oficial MAEC (bajo demanda) -->
             <div id="directorioPanel" class="hidden" style="border:1px solid #c4b5fd;border-radius:10px;padding:16px;margin-bottom:16px;background:#faf5ff;">
-                <div style="font-weight:600;margin-bottom:4px;color:#5b21b6;">🔎 Buscar nuevos traductores (directorio oficial MAEC)</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px;">
+                    <div style="font-weight:600;color:#5b21b6;">🔎 Buscar nuevos traductores (directorio oficial MAEC)</div>
+                    <button onclick="backToProviders()" style="background:#fff;color:#5b21b6;border:1px solid #c4b5fd;border-radius:6px;padding:6px 12px;font-size:0.82rem;cursor:pointer;white-space:nowrap;">← Volver a proveedores</button>
+                </div>
                 <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Filtra el listado oficial. Los que añadas entran en tus Traductores como <strong>Inactivo</strong>; pides cotización y luego los pones Activo si te convienen.</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end;">
                     <div><label style="font-size:0.8rem;color:#475569;">Idioma</label><select id="dirIdioma" class="form-control"></select></div>
@@ -1851,7 +1854,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeEditProviderModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveProviderTariffs()">💾 Guardar</button>
+                <button class="btn btn-primary" onclick="saveProviderTariffs()">💾 Guardar y volver</button>
             </div>
         </div>
     </div>
@@ -1866,7 +1869,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.61';
+        const HTML_VERSION = '3.7.62';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2971,6 +2974,16 @@
             }
         }
 
+        // v3.7.62: cierra el panel MAEC, refresca la lista de proveedores y
+        // sube a la vista normal para poder editar lo recién añadido.
+        function backToProviders() {
+            const p = document.getElementById('directorioPanel');
+            if (p) p.classList.add('hidden');
+            if (typeof filterConsultProviders === 'function') filterConsultProviders();
+            const list = document.getElementById('providersConsultList');
+            if (list && list.scrollIntoView) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         async function runDirectorioSearch() {
             const idioma = document.getElementById('dirIdioma').value;
             const provincia = document.getElementById('dirProvincia').value.trim();
@@ -3038,9 +3051,27 @@
                 if (!data.success) throw new Error(data.error || 'No se añadió (¿ya existía?)');
                 r._added = true;
                 renderDirectorioResults();
-                // refrescar lista local de proveedores si está cargada
-                showStatus(`✓ Añadido a Traductores como Inactivo (${data.added} sentido/s, ${data.idiomaHis})`, 'success');
-                setTimeout(hideStatus, 3000);
+                // v3.7.62: añadir el nuevo proveedor a la lista LOCAL (ambos sentidos,
+                // Inactivo) para poder editarlo sin recargar la página.
+                const idiomaHis = data.idiomaHis || r.idioma;
+                [['Español', idiomaHis], [idiomaHis, 'Español']].forEach(pair => {
+                    const o = pair[0], d = pair[1];
+                    const yaEsta = allProviders.some(e =>
+                        e.email && r.email && e.email.toLowerCase() === r.email.toLowerCase()
+                        && e.idiomaOrigen === o && e.idiomaDestino === d);
+                    if (!yaEsta) {
+                        allProviders.push({
+                            nombre: r.nombre, idiomaOrigen: o, idiomaDestino: d, email: r.email,
+                            tarifaMinima: '', tarifaPalabra: '', comentarios: '',
+                            activo: false, orden: null,
+                            numTIJ: r.numTIJ, provincia: r.provincia, anio: r.anio, telefono: r.telefono
+                        });
+                    }
+                });
+                // refrescar la lista de proveedores (debajo) para que aparezca ya
+                if (typeof filterConsultProviders === 'function') filterConsultProviders();
+                showStatus(`✓ Añadido como Inactivo. Pulsa "← Volver a proveedores" para editarlo.`, 'success');
+                setTimeout(hideStatus, 4000);
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
                 setTimeout(hideStatus, 3500);
