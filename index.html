@@ -1866,7 +1866,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.60';
+        const HTML_VERSION = '3.7.61';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2724,6 +2724,23 @@
             if (oa !== ob) return oa - ob;
             return (a.nombre || '').localeCompare(b.nombre || '', 'es');
         }
+
+        // v3.7.61: formatea el año de nombramiento a dd/mm/aaaa (el backend puede
+        // devolverlo como objeto fecha "Sat Jan 07 1978 00:00:00 GMT+0100").
+        function formatAnio(v) {
+            if (!v) return '';
+            const s = String(v).trim();
+            if (!s) return '';
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return s; // ya en dd/mm/aaaa
+            const d = new Date(s);
+            if (!isNaN(d.getTime())) {
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                return `${dd}/${mm}/${d.getFullYear()}`;
+            }
+            const ym = s.match(/\b(19|20)\d{2}\b/); // año suelto
+            return ym ? ym[0] : s;
+        }
         
         function renderConsultProviders() {
             const list = document.getElementById('providersConsultList');
@@ -2768,7 +2785,7 @@
                 const maecBits = [];
                 if (p.numTIJ) maecBits.push(`Nº TIJ ${p.numTIJ}`);
                 if (p.provincia) maecBits.push(p.provincia);
-                if (p.anio) maecBits.push(`nombr. ${p.anio}`);
+                if (p.anio) maecBits.push(`nombr. ${formatAnio(p.anio)}`);
                 if (p.telefono) maecBits.push(`📞 ${p.telefono}`);
                 if (maecBits.length) {
                     maecHtml = `<div style="font-size:0.78rem;color:#64748b;margin-top:2px;">${maecBits.join(' · ')}</div>`;
@@ -2996,7 +3013,7 @@
                 return `<div id="dirRes${i}" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;">
                     <div style="font-size:0.85rem;">
                         <div style="font-weight:600;">${r.nombre} <span style="font-weight:400;color:#64748b;">· TIJ ${r.numTIJ}</span></div>
-                        <div style="color:#475569;">${r.idioma} · ${r.provincia} · nombr. ${r.anio || '—'}</div>
+                        <div style="color:#475569;">${r.idioma} · ${r.provincia} · nombr. ${formatAnio(r.anio) || '—'}</div>
                         <div style="color:#475569;">${em}${tel}</div>
                     </div>
                     <div style="flex-shrink:0;">${add}</div>
