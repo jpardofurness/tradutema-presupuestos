@@ -565,6 +565,8 @@
     </style>
     <!-- PDF.js para contar páginas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- jsPDF para comprimir/reconstruir PDFs antes de subir (v3.7.64) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
@@ -1869,7 +1871,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.62';
+        const HTML_VERSION = '3.7.65';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -5770,19 +5772,52 @@
                 // Leer archivo como base64
                 const base64 = await readFileAsBase64(file);
 
-                // Contar páginas
+                // v3.7.64/65: comprimir PDFs e imágenes grandes en el navegador antes de subir.
+                let content = base64;
+                let finalSize = file.size;
+                let finalType = file.type || 'application/octet-stream';
+                let wasCompressed = false;
+                if (file.type === 'application/pdf') {
+                    const comp = await compressPdfBase64(base64, file.name, (pg, total) => {
+                        showStatus(`Optimizando ${file.name} (pág. ${pg}/${total})...`, 'loading');
+                    });
+                    content = comp.base64;
+                    finalSize = comp.newSize || file.size;
+                    wasCompressed = comp.compressed;
+                    if (comp.compressed) {
+                        console.log(`Comprimido ${file.name}: ${(comp.origSize/1048576).toFixed(2)}MB → ${(comp.newSize/1048576).toFixed(2)}MB`);
+                        showStatus(`✓ ${file.name} optimizado (${(comp.origSize/1048576).toFixed(1)}→${(comp.newSize/1048576).toFixed(1)} MB)`, 'success');
+                        setTimeout(hideStatus, 2000);
+                    }
+                } else if (file.type && file.type.startsWith('image/')) {
+                    const comp = await compressImageBase64(base64, file.type, file.name, () => {
+                        showStatus(`Optimizando ${file.name}...`, 'loading');
+                    });
+                    content = comp.base64;
+                    finalSize = comp.newSize || file.size;
+                    finalType = comp.mimeType || finalType;
+                    wasCompressed = comp.compressed;
+                    if (comp.compressed) {
+                        console.log(`Comprimida ${file.name}: ${(comp.origSize/1048576).toFixed(2)}MB → ${(comp.newSize/1048576).toFixed(2)}MB`);
+                        showStatus(`✓ ${file.name} optimizada (${(comp.origSize/1048576).toFixed(1)}→${(comp.newSize/1048576).toFixed(1)} MB)`, 'success');
+                        setTimeout(hideStatus, 2000);
+                    }
+                }
+
+                // Contar páginas (sobre el contenido final)
                 let pages = 1;
                 if (file.type === 'application/pdf') {
-                    pages = await countPdfPages(base64);
+                    pages = await countPdfPages(content);
                 } else if (file.type.startsWith('image/')) {
                     pages = 1;
                 }
 
                 uploadedFiles.push({
                     name: file.name,
-                    size: file.size,
-                    type: file.type || 'application/octet-stream',
-                    content: base64,
+                    size: finalSize,
+                    type: finalType,
+                    content: content,
+                    compressed: wasCompressed,
                     pages: pages,
                     pagesFilter: '',     // v3.7.19
                     instructions: ''     // v3.7.19
@@ -5815,6 +5850,130 @@
                 };
                 reader.readAsDataURL(file);
             });
+        }
+
+        // ====== v3.7.64: compresión de PDF en el navegador antes de subir ======
+        // Para presupuestar solo contamos palabras, así que la calidad es
+        // irrelevante: rasterizamos cada página a JPEG gris ~150 ppp. Páginas de
+        // varios MB pasan a ~100-200 KB → subida a Drive fiable y, como el
+        // reanálisis lee desde Drive, también aligera el conteo (sin saturar la API).
+        const PDF_COMPRESS_THRESHOLD = 1.2 * 1024 * 1024; // solo PDFs > 1,2 MB
+        const PDF_COMPRESS_DPI = 150;                       // resolución objetivo
+        const PDF_COMPRESS_QUALITY = 0.6;                  // calidad JPEG
+
+        function _b64ToUint8(b64) {
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return arr;
+        }
+        function _grayscaleCanvas(ctx, w, h) {
+            const img = ctx.getImageData(0, 0, w, h);
+            const d = img.data;
+            for (let i = 0; i < d.length; i += 4) {
+                const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+                d[i] = d[i + 1] = d[i + 2] = g;
+            }
+            ctx.putImageData(img, 0, 0);
+        }
+
+        // v3.7.65: comprime imágenes grandes (PNG/JPG/etc) antes de subir.
+        // Un certificado escaneado a 17-20 MB se reduce a ~200 KB: redimensiona
+        // el lado largo a IMG_MAX_DIM, gris y JPEG. Devuelve original si falla
+        // o si no reduce. Para presupuestar la calidad es irrelevante.
+        const IMG_COMPRESS_THRESHOLD = 1.0 * 1024 * 1024; // imágenes > 1 MB
+        const IMG_MAX_DIM = 2200;                          // px del lado largo
+        async function compressImageBase64(base64, mimeType, fileName, onProgress) {
+            const origSize = Math.floor(base64.length * 3 / 4);
+            try {
+                if (origSize < IMG_COMPRESS_THRESHOLD) {
+                    return { base64, mimeType, compressed: false, origSize, newSize: origSize };
+                }
+                if (onProgress) onProgress();
+                const img = await new Promise((resolve, reject) => {
+                    const im = new Image();
+                    im.onload = () => resolve(im);
+                    im.onerror = reject;
+                    im.src = `data:${mimeType};base64,${base64}`;
+                });
+                let w = img.naturalWidth || img.width;
+                let h = img.naturalHeight || img.height;
+                const longest = Math.max(w, h);
+                const scale = longest > IMG_MAX_DIM ? IMG_MAX_DIM / longest : 1;
+                w = Math.max(1, Math.round(w * scale));
+                h = Math.max(1, Math.round(h * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                _grayscaleCanvas(ctx, w, h);
+                const jpeg = canvas.toDataURL('image/jpeg', PDF_COMPRESS_QUALITY);
+                const outB64 = jpeg.split(',')[1];
+                canvas.width = 0; canvas.height = 0;
+                const newSize = Math.floor(outB64.length * 3 / 4);
+                if (newSize >= origSize) {
+                    return { base64, mimeType, compressed: false, origSize, newSize: origSize };
+                }
+                return { base64: outB64, mimeType: 'image/jpeg', compressed: true, origSize, newSize };
+            } catch (e) {
+                console.error('compressImageBase64 error en ' + fileName + ':', e);
+                return { base64, mimeType, compressed: false, origSize, newSize: origSize, error: true };
+            }
+        }
+
+        // Devuelve { base64, compressed, origSize, newSize }. Ante cualquier
+        // problema (PDF cifrado, error de render, no reduce...) devuelve el original.
+        async function compressPdfBase64(base64, fileName, onProgress) {
+            const origSize = Math.floor(base64.length * 3 / 4);
+            try {
+                if (origSize < PDF_COMPRESS_THRESHOLD) {
+                    return { base64, compressed: false, origSize, newSize: origSize };
+                }
+                if (!window.jspdf || !window.jspdf.jsPDF) {
+                    return { base64, compressed: false, origSize, newSize: origSize };
+                }
+                const bytes = _b64ToUint8(base64);
+                const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                const { jsPDF } = window.jspdf;
+                const scale = PDF_COMPRESS_DPI / 72; // pdf.js: scale 1 = 72 ppp
+                let outDoc = null;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    if (onProgress) onProgress(i, pdf.numPages);
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.floor(viewport.width));
+                    canvas.height = Math.max(1, Math.floor(viewport.height));
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    _grayscaleCanvas(ctx, canvas.width, canvas.height);
+                    const jpeg = canvas.toDataURL('image/jpeg', PDF_COMPRESS_QUALITY);
+                    const wMm = canvas.width / PDF_COMPRESS_DPI * 25.4;
+                    const hMm = canvas.height / PDF_COMPRESS_DPI * 25.4;
+                    const orient = wMm > hMm ? 'l' : 'p';
+                    if (!outDoc) {
+                        outDoc = new jsPDF({ orientation: orient, unit: 'mm', format: [wMm, hMm] });
+                    } else {
+                        outDoc.addPage([wMm, hMm], orient);
+                    }
+                    outDoc.addImage(jpeg, 'JPEG', 0, 0, wMm, hMm);
+                    canvas.width = 0; canvas.height = 0; // liberar memoria
+                }
+                if (!outDoc) return { base64, compressed: false, origSize, newSize: origSize };
+                const outB64 = outDoc.output('datauristring').split(',')[1];
+                const newSize = Math.floor(outB64.length * 3 / 4);
+                if (newSize >= origSize) { // no merece la pena
+                    return { base64, compressed: false, origSize, newSize: origSize };
+                }
+                return { base64: outB64, compressed: true, origSize, newSize };
+            } catch (e) {
+                console.error('compressPdfBase64 error en ' + fileName + ':', e);
+                return { base64, compressed: false, origSize, newSize: origSize, error: true };
+            }
         }
         
         async function countPdfPages(base64) {
@@ -8732,6 +8891,13 @@
             return document.getElementById('quoteDays').value || '';
         }
 
+        // v3.7.63: el importe al cliente SIEMPRE en euros enteros (sin céntimos).
+        function roundEuroStr(v) {
+            const n = parseFloat(String(v).replace(',', '.'));
+            if (isNaN(n)) return '';
+            return String(Math.round(n));
+        }
+
         // ====== CLIENT MESSAGE ======
         function setMessageLang(lang) {
             messageLang = lang;
@@ -8879,7 +9045,7 @@
             const total = rate * wordCount;
             const amountInput = document.getElementById('quoteAmountDirect');
             if (rate > 0 && wordCount > 0) {
-                amountInput.value = total.toFixed(2);
+                amountInput.value = Math.round(total); // v3.7.63: euros enteros
             }
             updateClientMessage();
         }
@@ -8900,13 +9066,13 @@
             if (detailDiv) {
                 detailDiv.innerHTML = `
                     Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pages - 1)} págs resto) = 
-                    <span class="tariff-calc-result">${priceByPages.toFixed(2).replace('.', ',')} €</span>
+                    <span class="tariff-calc-result">${Math.round(priceByPages)} €</span>
                 `;
             }
             
             // Actualizar campo de tarifa por páginas
             if (quoteAmountPages) {
-                quoteAmountPages.value = priceByPages.toFixed(2);
+                quoteAmountPages.value = Math.round(priceByPages); // v3.7.63: euros enteros
             }
             
             // Guardar páginas contabilizadas (base del precio)
@@ -8939,7 +9105,7 @@
             // Si el usuario ya editó el mensaje, no sobrescribir
             if (clientMessageEdited) return;
             
-            const amount = getQuoteAmount() || 'XXX';
+            const amount = roundEuroStr(getQuoteAmount()) || 'XXX';
             const days = getQuoteDays() || 'X';
             const urgency = document.getElementById('quoteUrgency').value || '';
             const refId = budgetData.id || 'REFERENCIA';
