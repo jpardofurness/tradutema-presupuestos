@@ -1871,7 +1871,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.65';
+        const HTML_VERSION = '3.7.67';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6184,7 +6184,11 @@
                         : '';
                     const isPdfOrImg = (f.mimeType === 'application/pdf') || (f.mimeType && f.mimeType.indexOf('image/') === 0);
                     const an = analysisByName[f.name];
-                    const pStr = an && an.pages ? `${an.pages} pág${an.pages > 1 ? 's' : ''}` : '';
+                    // v3.7.67: si no hay análisis previo, usar el nº de páginas
+                    // que cuenta el backend al listar la carpeta (necesario para
+                    // los ficheros copiados a mano desde el explorador).
+                    const pagesShown = (an && an.pages) ? an.pages : (f.pages || 0);
+                    const pStr = pagesShown ? `${pagesShown} pág${pagesShown > 1 ? 's' : ''}` : '';
                     const wStr = an && an.words != null
                         ? `${(an.words || 0).toLocaleString('es-ES')} palabras`
                         : '';
@@ -6236,13 +6240,36 @@
             }
 
             const totalCount = driveFiles.length + pendingFiles.length;
+
+            // v3.7.67: el backend ya cuenta las páginas reales de los PDF que
+            // están en Drive (incluidos los copiados a mano en la carpeta
+            // sincronizada). Si las conocemos, mandan sobre el valor antiguo:
+            // antes se quedaba en el pageCount viejo y salía "1 página".
+            const analysisByNameP = {};
+            (budgetData.fileAnalysis || []).forEach(a => {
+                if (a && a.fileName) analysisByNameP[a.fileName] = a;
+            });
+            const drivePagesKnown = driveFiles.length > 0 &&
+                driveFiles.every(f => ((analysisByNameP[f.name] && analysisByNameP[f.name].pages) || f.pages || 0) > 0);
+            const drivePages = driveFiles.reduce((s, f) => {
+                const an = analysisByNameP[f.name];
+                return s + ((an && an.pages) ? parseInt(an.pages) : (f.pages || 0));
+            }, 0);
+
             let displayPages;
             if (driveFiles.length > 0 && pendingFiles.length > 0) {
-                displayPages = (budgetData.pageCount || driveFiles.length) + pendingPages;
+                displayPages = (drivePagesKnown ? drivePages : (budgetData.pageCount || driveFiles.length)) + pendingPages;
             } else if (driveFiles.length > 0) {
-                displayPages = budgetData.pageCount || driveFiles.length;
+                displayPages = drivePagesKnown ? drivePages : (budgetData.pageCount || driveFiles.length);
             } else {
                 displayPages = pendingPages;
+            }
+
+            // Con carpeta y páginas reales conocidas, actualizar el dato que
+            // usan la barra de resumen y el cálculo por páginas.
+            if (budgetData.folderId && drivePagesKnown && budgetData.pageCount !== displayPages) {
+                budgetData.pageCount = displayPages;
+                if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
             }
             // v3.7.24: si hay análisis, añadir total de palabras al pie
             const totalWords = (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.words) || 0), 0);
@@ -6324,6 +6351,45 @@
                     const container = btnCreateAndAnalyze.parentNode;
                     if (container) container.appendChild(btnReanalyze);
                 }
+                // v3.7.66: botón para releer la carpeta de Drive. Necesario cuando
+                // los documentos se copian a mano en la carpeta sincronizada desde
+                // el explorador: la app no se entera hasta que relee el listado.
+                let btnSync = document.getElementById('syncDriveBtn');
+                if (!btnSync) {
+                    btnSync = document.createElement('button');
+                    btnSync.id = 'syncDriveBtn';
+                    btnSync.type = 'button';
+                    btnSync.className = 'btn btn-secondary action-btn';
+                    btnSync.style.cssText = 'flex:1;min-width:150px;';
+                    btnSync.title = 'Vuelve a leer la carpeta de Drive para detectar los archivos que hayas copiado a mano desde el explorador';
+                    btnSync.innerHTML = '🔄 Actualizar desde Drive';
+                    btnSync.onclick = async () => {
+                        btnSync.disabled = true;
+                        const prev = btnSync.innerHTML;
+                        btnSync.innerHTML = '⏳ Leyendo Drive...';
+                        try {
+                            const antes = (budgetData.folderFiles || []).length;
+                            await refreshFolderFilesFromDrive();
+                            const ahora = (budgetData.folderFiles || []).length;
+                            const nuevos = ahora - antes;
+                            showStatus(nuevos > 0
+                                ? `✓ ${nuevos} archivo(s) nuevo(s) detectado(s) en la carpeta (${ahora} en total)`
+                                : `Carpeta leída: ${ahora} archivo(s). Si acabas de copiarlos, espera a que Drive termine de sincronizar y vuelve a pulsar.`,
+                                nuevos > 0 ? 'success' : 'warning');
+                            setTimeout(hideStatus, 5000);
+                        } catch (e) {
+                            showStatus('Error leyendo la carpeta: ' + e.message, 'error');
+                            setTimeout(hideStatus, 4000);
+                        } finally {
+                            btnSync.innerHTML = prev;
+                            btnSync.disabled = false;
+                        }
+                    };
+                    const containerSync = btnCreateAndAnalyze.parentNode;
+                    if (containerSync) containerSync.appendChild(btnSync);
+                }
+                btnSync.style.display = '';
+
                 btnReanalyze.style.display = '';
                 // No machacar el botón si está en modo "Analizando..." (data-busy)
                 if (btnReanalyze.dataset.busy !== 'true') {
@@ -6347,7 +6413,15 @@
                 // habilitados sólo si hay pendientes
                 btnCreateOnly.style.display = '';
                 btnCreateAndAnalyze.style.display = '';
-                btnCreateOnly.disabled = !hasPendingFiles;
+                // v3.7.66: "Crear Carpeta" SIEMPRE disponible, aunque no haya
+                // archivos adjuntos: permite crear el presupuesto + su carpeta y
+                // luego copiar los documentos a mano desde el explorador (Drive
+                // los sincroniza) y pulsar "Actualizar desde Drive".
+                btnCreateOnly.disabled = false;
+                btnCreateOnly.title = hasPendingFiles
+                    ? 'Crea la carpeta y sube los documentos adjuntos, sin analizar'
+                    : 'Crea el presupuesto y su carpeta vacía. Luego puedes copiar los archivos a la carpeta desde el explorador y pulsar "Actualizar desde Drive"';
+                // Analizar sí necesita documentos
                 btnCreateAndAnalyze.disabled = !hasPendingFiles;
 
                 // v3.7.44: ocultar botón Solo subir cuando no hay carpeta
@@ -6361,6 +6435,10 @@
                     btnReanalyze.style.display = 'none';
                     btnReanalyze.disabled = true;
                 }
+
+                // v3.7.66: sin carpeta todavía, no hay nada que releer
+                const btnSync = document.getElementById('syncDriveBtn');
+                if (btnSync) btnSync.style.display = 'none';
 
                 if (btnExtract) {
                     btnExtract.style.display = '';
@@ -6389,6 +6467,20 @@
                 if (data.success && Array.isArray(data.files)) {
                     budgetData.folderFiles = data.files;
                     renderStep2Files();
+                    // v3.7.67: guardar en la hoja el nº de páginas/archivos real
+                    // tras releer la carpeta (los ficheros añadidos a mano desde
+                    // el explorador no habían actualizado nunca estos datos).
+                    if (budgetData.id && budgetData.pageCount > 0) {
+                        fetch(apiUrl, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                action: 'updateBudgetBasicData',
+                                budgetId: budgetData.id,
+                                pages: budgetData.pageCount,
+                                numArchivos: data.files.length
+                            })
+                        }).catch(e => console.warn('Persist páginas tras refresco:', e));
+                    }
                     // v3.7.46: si estamos en el paso de envío al cliente (step 5)
                     // y el mensaje no se ha editado a mano, regenerarlo ahora que
                     // ya tenemos la lista de archivos. Resuelve la lista vacía que
@@ -7331,8 +7423,11 @@
         }
 
         async function createFolderAndContinue(withAnalysis = true, foreground = false) {
-            if (uploadedFiles.length === 0) {
-                showStatus('Adjunta al menos un archivo', 'warning');
+            // v3.7.66: se permite crear la carpeta VACÍA (sin adjuntos). Solo el
+            // análisis exige documentos, porque no hay nada que analizar.
+            if (withAnalysis && uploadedFiles.length === 0) {
+                showStatus('Adjunta al menos un archivo para analizar (o usa "Crear Carpeta")', 'warning');
+                setTimeout(hideStatus, 4000);
                 return;
             }
             
@@ -7371,7 +7466,9 @@
             showGlobalAnalysisBanner('loading',
                 withAnalysis
                     ? `⏳ Creando carpeta y analizando ${filesSnapshot.length} archivo(s)... Puedes navegar; este aviso se mantendrá visible.`
-                    : `⏳ Creando carpeta con ${filesSnapshot.length} archivo(s)...`
+                    : (filesSnapshot.length === 0
+                        ? '⏳ Creando presupuesto y carpeta vacía en Drive...'
+                        : `⏳ Creando carpeta con ${filesSnapshot.length} archivo(s)...`)
             );
             
             // Marcar paso 2 como completado y avanzar
