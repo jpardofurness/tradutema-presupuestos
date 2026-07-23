@@ -1742,12 +1742,12 @@
             
             <div class="form-group">
                 <label>Email del cliente (opcional, para envío directo)</label>
-                <input type="email" id="clientEmail" placeholder="">
+                <input type="email" id="clientEmail" placeholder="" oninput="updateClientChannelButtons()">
             </div>
             
             <div class="form-group">
                 <label>WhatsApp del cliente (opcional)</label>
-                <input type="tel" id="clientWhatsApp" placeholder="">
+                <input type="tel" id="clientWhatsApp" placeholder="" oninput="updateClientChannelButtons()">
             </div>
             
             <!-- v3.7.52: asunto del email editable (se rellena solo; puedes añadir
@@ -1782,10 +1782,10 @@
             </div>
             
             <div class="copy-buttons">
-                <button class="btn copy-btn whatsapp" onclick="copyForWhatsApp()">
+                <button class="btn copy-btn whatsapp" id="waCopyBtn" onclick="copyForWhatsApp()">
                     💾 Guardar y Copiar WhatsApp
                 </button>
-                <button class="btn copy-btn email" onclick="copyForEmail()">
+                <button class="btn copy-btn email" id="emailCopyBtn" onclick="copyForEmail()">
                     💾 Guardar y Copiar Email
                 </button>
             </div>
@@ -1869,7 +1869,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.68';
+        const HTML_VERSION = '3.7.71';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -5523,6 +5523,9 @@
                 // Actualizar mensaje de cliente
                 updateClientMessage();
 
+                // v3.7.70: atenuar botones según el contacto disponible
+                if (typeof updateClientChannelButtons === 'function') updateClientChannelButtons();
+
                 // v3.7.46: si la lista de archivos del mensaje saldría vacía
                 // (sin archivos locales pendientes, sin análisis y sin folderFiles
                 // cargados) pero hay carpeta en Drive, pedir la lista y dejar que
@@ -7056,6 +7059,13 @@
                 if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
                 // v3.7.24: refrescar banner de resumen
                 if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+
+                // v3.7.69: regenerar el mensaje al cliente ahora que ya existe
+                // la referencia (budgetData.id). Sin esto, el mensaje se quedaba
+                // con el marcador "REFERENCIA" y la validación bloqueaba la copia.
+                if (!clientMessageEdited && typeof updateClientMessage === 'function') {
+                    updateClientMessage();
+                }
                 
                 // Activar botón Extraer ahora que existe carpeta
                 const extractBtn = document.getElementById('step2BtnExtract');
@@ -8846,6 +8856,12 @@
                 btn.classList.toggle('active', btn.textContent.toLowerCase().includes(lang === 'es' ? 'español' : 'english'));
             });
             updateClientMessage();
+            // v3.7.71: refrescar también el asunto para que siga el idioma
+            // elegido (salvo que el usuario lo haya editado a mano).
+            const subjEl = document.getElementById('clientSubject');
+            if (subjEl && !clientSubjectEdited) {
+                subjEl.value = buildDefaultClientSubject();
+            }
         }
 
         function onClientMessageEdit() {
@@ -8854,10 +8870,18 @@
 
         // v3.7.52: asunto del email al cliente (mismo formato que el backend)
         function buildDefaultClientSubject() {
+            const id = budgetData.id || '';
+            const idPart = id ? ' [' + id + ']' : '';
+            // v3.7.71: el asunto sigue el idioma del mensaje (toggle ES/EN),
+            // para que no quede el cuerpo en inglés y el asunto en español.
+            if (messageLang === 'en') {
+                const src = translateLanguageToEnglish(budgetData.sourceLang || '') || (budgetData.sourceLang || '');
+                const tgt = translateLanguageToEnglish(budgetData.targetLang || '') || (budgetData.targetLang || '');
+                return `Sworn Translation Quote ${src} > ${tgt}${idPart}`;
+            }
             const src = budgetData.sourceLang || '';
             const tgt = budgetData.targetLang || '';
-            const id = budgetData.id || '';
-            return `Presupuesto Traducción Jurada ${src} > ${tgt}${id ? ' [' + id + ']' : ''}`;
+            return `Presupuesto Traducción Jurada ${src} > ${tgt}${idPart}`;
         }
         function onClientSubjectEdit() {
             clientSubjectEdited = true;
@@ -9311,18 +9335,16 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             }
 
             // 4. Datos del canal de envío
-            if (channel === 'email' || channel === 'email_enviar') {
+            // v3.7.69: el destinatario SOLO es obligatorio al ENVIAR de verdad
+            // (email_enviar). Para COPIAR el texto (WhatsApp o email) no hace
+            // falta: copias y lo pegas donde quieras. Antes, "Copiar WhatsApp"
+            // se bloqueaba si el cliente solo tenía email y no un número.
+            if (channel === 'email_enviar') {
                 const emailRaw = (document.getElementById('clientEmail') ? document.getElementById('clientEmail').value : '').trim();
                 const email = extractEmail(emailRaw);
                 const emailOk = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
                 if (!emailOk) {
-                    faltan.push('un email de cliente válido');
-                }
-            }
-            if (channel === 'whatsapp') {
-                const wa = (document.getElementById('clientWhatsApp') ? document.getElementById('clientWhatsApp').value : '').trim();
-                if (!wa) {
-                    faltan.push('un número de WhatsApp del cliente');
+                    faltan.push('un email de cliente válido para enviarlo por correo');
                 }
             }
 
@@ -9438,7 +9460,34 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             }
         }
 
+        // v3.7.70: habilita/atenúa los botones de cliente según el contacto que
+        // haya. WhatsApp requiere un número; Email (copiar y enviar) requiere
+        // un email. El canal sin contacto se muestra en gris y deshabilitado,
+        // más claro que un aviso al pulsar.
+        function updateClientChannelButtons() {
+            const email = (document.getElementById('clientEmail') || {}).value || '';
+            const wa = (document.getElementById('clientWhatsApp') || {}).value || '';
+            const hasEmail = email.trim().length > 0 && email.indexOf('@') > -1;
+            const hasWa = wa.trim().length > 0;
+
+            const setBtn = (id, enabled, motivo) => {
+                const b = document.getElementById(id);
+                if (!b) return;
+                b.disabled = !enabled;
+                b.style.opacity = enabled ? '' : '0.45';
+                b.style.cursor = enabled ? '' : 'not-allowed';
+                b.title = enabled ? '' : motivo;
+            };
+            setBtn('waCopyBtn', hasWa, 'Añade un número de WhatsApp del cliente para usar este botón');
+            setBtn('emailCopyBtn', hasEmail, 'Añade un email del cliente para usar este botón');
+            setBtn('sendClientBtn', hasEmail, 'Añade un email del cliente para enviarlo por correo');
+        }
+
         async function copyForWhatsApp() {
+            // v3.7.70: atenúa botones según el contacto disponible
+            if (typeof updateClientChannelButtons === 'function') updateClientChannelButtons();
+            // v3.7.69: asegurar mensaje al día (salvo edición manual) antes de validar
+            if (!clientMessageEdited && typeof updateClientMessage === 'function') updateClientMessage();
             if (!validateClientFields('whatsapp')) return;
             
             const message = document.getElementById('clientMessageEdit').value;
@@ -9478,6 +9527,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         async function copyForEmail() {
+            if (!clientMessageEdited && typeof updateClientMessage === 'function') updateClientMessage();
             if (!validateClientFields('email')) return;
             
             const message = document.getElementById('clientMessageEdit').value;
@@ -9662,6 +9712,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const email = extractEmail(emailRaw);
             const whatsapp = document.getElementById('clientWhatsApp').value.trim();
             
+            if (!clientMessageEdited && typeof updateClientMessage === 'function') updateClientMessage();
             if (!validateClientFields('email_enviar')) return;
             
             const btn = document.getElementById('sendClientBtn');
