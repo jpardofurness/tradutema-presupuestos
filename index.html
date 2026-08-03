@@ -1876,7 +1876,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.74';
+        const HTML_VERSION = '3.7.76';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2096,12 +2096,16 @@
         }
 
         function openDriveFolder() {
-            if (!budgetData.folderUrl) {
+            // v3.7.76: si no tenemos la URL pero sí el ID de la carpeta, la
+            // construimos (pasaba con respuestas incompletas del backend).
+            const url = budgetData.folderUrl ||
+                (budgetData.folderId ? 'https://drive.google.com/drive/folders/' + budgetData.folderId : '');
+            if (!url) {
                 showStatus('Aún no hay carpeta de Drive para este presupuesto', 'warning');
                 setTimeout(hideStatus, 2500);
                 return;
             }
-            window.open(budgetData.folderUrl, '_blank');
+            window.open(url, '_blank');
         }
 
         function openSpreadsheet() {
@@ -2214,7 +2218,12 @@
             const hdrDrive = document.getElementById('hdrBtnDriveFolder');
             const hdrLocal = document.getElementById('hdrBtnLocalFolder');
             const hdrSave = document.getElementById('hdrBtnSave');
-            if (hdrDrive) hdrDrive.style.display = budgetData.folderUrl ? '' : 'none';
+            // v3.7.76: el botón de Drive se muestra si hay carpeta, aunque no
+            // haya llegado folderUrl (se reconstruye desde folderId). Antes, si
+            // la respuesta del backend venía incompleta, el botón desaparecía
+            // pese a existir la carpeta.
+            const tieneCarpeta = !!(budgetData.folderUrl || budgetData.folderId);
+            if (hdrDrive) hdrDrive.style.display = tieneCarpeta ? '' : 'none';
             if (hdrLocal) hdrLocal.style.display = budgetData.id ? '' : 'none';
             // v3.7.34: botón Guardar visible siempre que haya un presupuesto cargado
             if (hdrSave) hdrSave.style.display = budgetData.id ? '' : 'none';
@@ -7105,10 +7114,11 @@
                 const f = files[i];
                 try {
                     const blob = base64ToBlob(f.content, f.type);
-                    await gdriveUploadFile(token, folderId, f.name, f.type, blob, (loaded, total) => {
+                    const created = await gdriveUploadFile(token, folderId, f.name, f.type, blob, (loaded, total) => {
                         const pct = total ? Math.round(loaded / total * 100) : 0;
                         showStatus(`Subiendo a Drive: ${f.name} (${i + 1}/${files.length}) ${pct}%`, 'loading');
                     });
+                    if (created && created.id) f.driveId = created.id;   // v3.7.75
                     subidos++;
                     if (onFileDone) onFileDone(f, i, files.length);
                 } catch (e) {
@@ -7182,9 +7192,11 @@
                 }
 
                 // v3.7.72: subida directa navegador → Drive
+                let directUploadResults = null;   // v3.7.75
                 if (useDirectUpload && folderResult && folderResult.success && folderResult.folderId) {
                     try {
                         const res = await uploadFilesDirectToDrive(files, folderResult.folderId);
+                        directUploadResults = res;
                         if (res.fallidos.length) {
                             showStatus(`⚠️ ${res.subidos} subido(s), ${res.fallidos.length} fallaron: ` +
                                 res.fallidos.map(f => f.name).join(', '), 'error');
@@ -7207,6 +7219,17 @@
                 // v3.7.49: carpeta OK
                 prodLogDone('folder', folderResult.budgetId || '');
                 
+                // v3.7.75: si el backend no devolvió el código (respuesta
+                // incompleta), no seguir con "undefined": intentar recuperarlo.
+                if (!folderResult.budgetId) {
+                    prodLogError('folder', 'respuesta sin código de presupuesto');
+                    const adoptado = await adoptBudgetByFingerprint(files, 10).catch(() => false);
+                    if (!adoptado) {
+                        throw new Error('La carpeta se creó pero no se recibió su código. Pulsa "Reintentar" o recarga para recuperarla.');
+                    }
+                    return;
+                }
+                
                 // Guardar datos de carpeta
                 budgetData.id = folderResult.budgetId;
                 budgetData.folderId = folderResult.folderId;
@@ -7226,6 +7249,28 @@
                 uploadedFiles = [];
                 if (folderResult.uploadedFiles) {
                     budgetData.folderFiles = folderResult.uploadedFiles;
+                } else if (directUploadResults) {
+                    // v3.7.75: con subida directa el backend no devuelve la lista
+                    // (los archivos no pasaron por él). Reconstruirla aquí para
+                    // que los archivos NO desaparezcan de la pantalla.
+                    const fallidos = new Set((directUploadResults.fallidos || []).map(f => f.name));
+                    budgetData.folderFiles = files
+                        .filter(f => !fallidos.has(f.name))
+                        .map(f => ({
+                            id: f.driveId || '',
+                            name: f.name,
+                            mimeType: f.type,
+                            size: f.size,
+                            pages: f.pages || 0,
+                            url: ''
+                        }));
+                    budgetData.numArchivos = budgetData.folderFiles.length;
+                    // releer la carpeta en segundo plano para obtener ids/urls reales
+                    setTimeout(() => {
+                        if (typeof refreshFolderFilesFromDrive === 'function') {
+                            refreshFolderFilesFromDrive().catch(() => {});
+                        }
+                    }, 800);
                 }
                 
                 // Actualizar UI con ID de presupuesto
