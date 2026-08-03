@@ -1876,7 +1876,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.76';
+        const HTML_VERSION = '3.7.78';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1942,17 +1942,13 @@
             }
             updateClientMessage();
 
-            // v3.7.72: estado de Drive; si ya autorizaste antes, reconectar en
-            // silencio (sin diálogo) para que la subida directa esté lista.
+            // v3.7.78: solo actualizar el indicador. NO se intenta reconectar
+            // automáticamente al cargar: Google abría el selector de cuenta en
+            // cada recarga (molesto y podía interferir con la carga inicial).
+            // La conexión se pide solo cuando el usuario pulsa el botón, o
+            // automáticamente en el momento de subir archivos (gdriveEnsureToken).
             setTimeout(() => {
                 if (typeof updateGDriveStatusUI === 'function') updateGDriveStatusUI();
-                let yaConectado = false;
-                try { yaConectado = localStorage.getItem('gdriveConnected') === '1'; } catch (e) {}
-                if (yaConectado && window.google && google.accounts && google.accounts.oauth2) {
-                    gdriveRequestToken(false).catch(() => {
-                        // si Google pide consentimiento, el usuario pulsará el botón
-                    });
-                }
             }, 1200);
 
             // v3.7.4: listeners para metadatos. Si hay budgetId ya creado, persistir cambio.
@@ -5045,11 +5041,28 @@
         async function loadData() {
             showStatus('Conectando...', 'loading');
             try {
-                const response = await fetch(apiUrl);
-                // v3.7.73: si Apps Script devuelve una página HTML, avisar claro
-                const _txt = (await response.text() || '').trim();
-                if (_txt.startsWith('<') || !_txt) {
-                    throw new Error('El servidor no respondió correctamente al cargar los datos. Suele ser un corte temporal de Google: espera unos segundos y recarga.');
+                // v3.7.77: la respuesta de doGet es muy grande (proveedores +
+                // tarifas + configuración) y Apps Script la sirve vía redirección,
+                // por lo que a veces se pierde y llega HTML o vacío. Reintentamos
+                // hasta 3 veces con pausa creciente antes de dar error: así los
+                // cortes puntuales se resuelven solos, sin que el usuario vea nada.
+                let _txt = '';
+                let _ultimoFallo = '';
+                for (let intento = 1; intento <= 3; intento++) {
+                    try {
+                        if (intento > 1) showStatus(`Conectando... (reintento ${intento - 1}/2)`, 'loading');
+                        const response = await fetch(apiUrl);
+                        _txt = (await response.text() || '').trim();
+                        if (_txt && !_txt.startsWith('<')) break;   // respuesta buena
+                        _ultimoFallo = _txt.startsWith('<') ? 'respuesta HTML' : 'respuesta vacía';
+                    } catch (netErr) {
+                        _ultimoFallo = netErr.message || 'fallo de red';
+                        _txt = '';
+                    }
+                    if (intento < 3) await new Promise(r => setTimeout(r, intento * 1500));
+                }
+                if (!_txt || _txt.startsWith('<')) {
+                    throw new Error('El servidor no respondió correctamente al cargar los datos (' + _ultimoFallo + '). Suele ser un corte temporal de Google: espera unos segundos y recarga.');
                 }
                 const data = JSON.parse(_txt);
                 
@@ -7168,7 +7181,12 @@
                 // (petición ligera, sin base64) y los archivos se suben después
                 // directos desde el navegador. Si no, se mantiene el método
                 // anterior (archivos dentro del POST a Apps Script).
-                const useDirectUpload = gdriveIsConnected() && files.length > 0;
+                // v3.7.78: usar subida directa si ya hay token válido O si el
+                // usuario conectó Drive alguna vez (en ese caso se pedirá el
+                // token justo antes de subir, no al cargar la página).
+                let _drivePrevio = false;
+                try { _drivePrevio = localStorage.getItem('gdriveConnected') === '1'; } catch (e) {}
+                const useDirectUpload = (gdriveIsConnected() || _drivePrevio) && files.length > 0;
                 try {
                     folderResult = await apiPost({
                         action: 'createBudgetFolder',
@@ -7203,9 +7221,25 @@
                             setTimeout(hideStatus, 8000);
                         }
                     } catch (upErr) {
+                        // v3.7.78: si no se pudo obtener permiso o falló la
+                        // subida directa, no perder los archivos: se suben por
+                        // el método antiguo (a través de Apps Script).
                         prodLogError('folder', 'Subida directa: ' + (upErr.message || upErr));
-                        showStatus('Error subiendo a Drive: ' + (upErr.message || upErr), 'error');
-                        setTimeout(hideStatus, 6000);
+                        showStatus('Subida directa no disponible, usando el método estándar...', 'warning');
+                        try {
+                            const resp2 = await apiPost({
+                                action: 'uploadFilesToFolder',
+                                folderId: folderResult.folderId,
+                                budgetId: folderResult.budgetId,
+                                files: files
+                            });
+                            if (!resp2 || !resp2.success) throw new Error((resp2 && resp2.error) || 'fallo al subir');
+                            setTimeout(hideStatus, 2000);
+                        } catch (e2) {
+                            showStatus('Error subiendo los archivos: ' + (e2.message || e2) +
+                                '. La carpeta está creada: puedes arrastrarlos en Drive y pulsar "Actualizar desde Drive".', 'error');
+                            setTimeout(hideStatus, 9000);
+                        }
                     }
                 }
                 stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
