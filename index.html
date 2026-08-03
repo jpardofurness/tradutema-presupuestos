@@ -565,6 +565,8 @@
     </style>
     <!-- PDF.js para contar páginas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- v3.7.72: Google Identity Services (subida directa navegador → Drive) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
@@ -1208,6 +1210,11 @@
             </div>
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
+
+            <!-- v3.7.72: estado de conexión con Google Drive (subida directa) -->
+            <div id="gdriveStatusBar" style="display:flex; align-items:center; gap:10px; margin-top:10px; font-size:0.8rem; color:#475569;">
+                <span id="gdriveStatus"></span>
+            </div>
 
             <!-- v3.7.4 (UX fix v3.7.5): Metadatos opcionales del presupuesto -->
             <div id="docMetaSection" style="margin-top:12px; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
@@ -1869,7 +1876,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.71';
+        const HTML_VERSION = '3.7.73';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -1934,6 +1941,19 @@
                 loadData();
             }
             updateClientMessage();
+
+            // v3.7.72: estado de Drive; si ya autorizaste antes, reconectar en
+            // silencio (sin diálogo) para que la subida directa esté lista.
+            setTimeout(() => {
+                if (typeof updateGDriveStatusUI === 'function') updateGDriveStatusUI();
+                let yaConectado = false;
+                try { yaConectado = localStorage.getItem('gdriveConnected') === '1'; } catch (e) {}
+                if (yaConectado && window.google && google.accounts && google.accounts.oauth2) {
+                    gdriveRequestToken(false).catch(() => {
+                        // si Google pide consentimiento, el usuario pulsará el botón
+                    });
+                }
+            }, 1200);
 
             // v3.7.4: listeners para metadatos. Si hay budgetId ya creado, persistir cambio.
             const docTypeEl = document.getElementById('docType');
@@ -2382,16 +2402,11 @@
             showStatus('Eliminando presupuesto...', 'loading');
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'deleteBudget',
                         budgetId: budgetData.id,
                         folderId: budgetData.folderId
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     showStatus('✓ Presupuesto eliminado correctamente', 'success');
@@ -2604,11 +2619,7 @@
             if (statusEl) statusEl.textContent = 'Sincronizando...';
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'syncWooOrders', days: days })
-                });
-                const data = await response.json();
+                const data = await apiPost({ action: 'syncWooOrders', days: days });
                 
                 if (data.success) {
                     const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -2998,12 +3009,7 @@
             countEl.textContent = 'Buscando...';
             resBox.innerHTML = '';
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'searchDirectorio', idioma, provincia, query, soloConEmail })
-                });
-                const data = await resp.json();
+                const data = await apiPost({ action: 'searchDirectorio', idioma, provincia, query, soloConEmail });
                 if (!data.success) throw new Error(data.error || 'Error');
                 directorioResultsCache = data.results || [];
                 const ocultos = data.ocultosTuyos ? ` · ${data.ocultosTuyos} ya en tu lista (ocultos)` : '';
@@ -3038,16 +3044,11 @@
             const r = directorioResultsCache[index];
             if (!r) return;
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'promoteFromDirectorio',
                         nombre: r.nombre, idioma: r.idioma, provincia: r.provincia,
                         numTIJ: r.numTIJ, email: r.email, telefono: r.telefono, anio: r.anio
-                    })
-                });
-                const data = await resp.json();
+                    });
                 if (!data.success) throw new Error(data.error || 'No se añadió (¿ya existía?)');
                 r._added = true;
                 renderDirectorioResults();
@@ -3140,11 +3141,7 @@
         async function refreshWooCacheStatus() {
             const el = document.getElementById('wooCacheStatusText');
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'wooCacheStatus' })
-                });
-                const data = await resp.json();
+                const data = await apiPost({ action: 'wooCacheStatus' });
                 if (data.success) {
                     if (data.total > 0) {
                         const fecha = data.latestDate ? new Date(data.latestDate).toLocaleDateString('es-ES') : '?';
@@ -3165,11 +3162,7 @@
             const el = document.getElementById('wooCacheStatusText');
             try {
                 if (el) el.textContent = 'Cargando caché en memoria...';
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'getWooCache' })
-                });
-                const data = await resp.json();
+                const data = await apiPost({ action: 'getWooCache' });
                 if (data.success && data.orders) {
                     window.wooCacheHeaders = data.headers || [];
                     const H = window.wooCacheHeaders;
@@ -3375,17 +3368,13 @@
                         ? `Descargando histórico... ${totalProcessed.toLocaleString('es-ES')} pedidos procesados`
                         : `Actualizando... ${totalProcessed} pedidos nuevos/modificados`;
 
-                    const resp = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
+                    const data = await apiPost({
                             action: 'wooSyncCache',
                             startPage: startPage,
                             maxPages: 8,
                             reset: reset,
                             after: afterISO
-                        })
-                    });
-                    const data = await resp.json();
+                        });
                     if (!data.success) throw new Error(data.error || 'Error en sync');
 
                     reset = false;  // solo resetear en la primera llamada
@@ -4005,15 +3994,10 @@
             btn.innerHTML = '<span class="spinner"></span> Contando páginas...';
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'getFilesPages',
                         files: quickFiles
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     // Actualizar páginas en quickFiles
@@ -4151,17 +4135,12 @@
             try {
                 showStatus('Analizando documentos...', 'loading');
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'quickCount',
                         files: quickFiles,
                         sourceLang: document.getElementById('quickSourceLang').value || '',
                         internalComments: document.getElementById('quickInternalComments').value.trim() || ''
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     hideStatus();
@@ -4247,16 +4226,11 @@
             try {
                 showStatus('Extrayendo texto de los documentos...', 'loading');
 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'quickExtract',
                         files: quickFiles,
                         sourceLang: document.getElementById('quickSourceLang').value || ''
-                    })
-                });
-
-                const data = await response.json();
+                    });
                 if (data._perf) logPerfToConsole(data._perf, 'Recuento rápido');  // v3.7.27
                 if (!data.success) throw new Error(data.error || 'Error desconocido');
 
@@ -4547,11 +4521,7 @@
             document.getElementById('budgetList').innerHTML = '<div class="no-budgets"><span class="spinner dark"></span> Cargando...</div>';
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'getBudgets' })
-                });
-                const data = await response.json();
+                const data = await apiPost({ action: 'getBudgets' });
                 
                 if (data.success) {
                     allBudgets = data.budgets || [];
@@ -4739,15 +4709,11 @@
         async function saveOrderNumberForBudget(budgetId, orderNumber) {
             showStatus('Guardando número de pedido...', 'loading');
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'saveOrderNumber',
                         budgetId: budgetId,
                         orderNumber: orderNumber
-                    })
-                });
-                const data = await response.json();
+                    });
                 if (data.success) {
                     showStatus('✓ Pedido #' + orderNumber + ' vinculado', 'success');
                     await loadBudgets();
@@ -4774,14 +4740,10 @@
             showStatus('Borrando presupuesto...', 'loading');
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'deleteBudget',
                         budgetId: budgetId
-                    })
-                });
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     showStatus('✓ Presupuesto borrado', 'success');
@@ -4824,11 +4786,7 @@
             });
 
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'getBudget', budgetId: budgetId })
-                });
-                const data = await response.json();
+                const data = await apiPost({ action: 'getBudget', budgetId: budgetId });
                 
                 if (data.success) {
                     const b = data.budget;
@@ -5071,7 +5029,12 @@
             showStatus('Conectando...', 'loading');
             try {
                 const response = await fetch(apiUrl);
-                const data = await response.json();
+                // v3.7.73: si Apps Script devuelve una página HTML, avisar claro
+                const _txt = (await response.text() || '').trim();
+                if (_txt.startsWith('<') || !_txt) {
+                    throw new Error('El servidor no respondió correctamente al cargar los datos. Suele ser un corte temporal de Google: espera unos segundos y recarga.');
+                }
+                const data = JSON.parse(_txt);
                 
                 if (data.success) {
                     allProviders = data.providers || [];
@@ -5385,9 +5348,7 @@
             if (!budgetData.id) return;  // Solo si existe el presupuesto
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const result = await apiPost({
                         action: 'updateBudgetBasicData',
                         budgetId: budgetData.id,
                         sourceLang: budgetData.sourceLang,
@@ -5398,9 +5359,7 @@
                         clientEmail: budgetData.clientEmail,
                         clientWhatsApp: budgetData.clientWhatsApp,
                         internalComments: budgetData.internalComments || ''
-                    })
-                });
-                const result = await response.json();
+                    });
                 console.log('Datos básicos guardados:', result);
             } catch (error) {
                 console.error('Error guardando datos básicos:', error);
@@ -6306,11 +6265,7 @@
         async function refreshFolderFilesFromDrive() {
             if (!budgetData.folderId) return;
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'listFolderFiles', folderId: budgetData.folderId })
-                });
-                const data = await resp.json();
+                const data = await apiPost({ action: 'listFolderFiles', folderId: budgetData.folderId });
                 if (data.success && Array.isArray(data.files)) {
                     budgetData.folderFiles = data.files;
                     renderStep2Files();
@@ -6443,11 +6398,7 @@
             const removedName = removed ? removed.name : '';
             showStatus('Eliminando archivo...', 'loading');
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'removeFileFromFolder', fileId: fileId })
-                });
-                const data = await resp.json();
+                const data = await apiPost({ action: 'removeFileFromFolder', fileId: fileId });
                 if (data.success) {
                     budgetData.folderFiles = budgetData.folderFiles.filter(f => f.id !== fileId);
                     // v3.7.19: limpiar settings asociadas al archivo eliminado
@@ -6492,15 +6443,11 @@
                     const filesToUpload = uploadedFiles.slice();
                     uploadedFiles = [];
 
-                    const uploadResp = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
+                    const uploadData = await apiPost({
                             action: 'uploadFilesToFolder',
                             folderId: budgetData.folderId,
                             files: filesToUpload
-                        })
-                    });
-                    const uploadData = await uploadResp.json();
+                        });
                     if (uploadData.success) {
                         if (!budgetData.folderFiles) budgetData.folderFiles = [];
                         (uploadData.uploaded || []).forEach(f => budgetData.folderFiles.push(f));
@@ -6651,18 +6598,14 @@
                 prodLogStart('reanalyze', `Analizando documento con Claude (${numFiles} archivo(s))`);
                 let data;
                 try {
-                    const resp = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'reanalyzeFolder',
-                            folderId: budgetData.folderId,
-                            budgetId: budgetData.id,
-                            sourceLang: budgetData.sourceLang,
-                            internalComments: budgetData.internalComments || '',
-                            fileSettings: budgetData.fileSettings || {}  // v3.7.19
-                        })
-                    });
-                    data = await resp.json();
+                    data = await apiPost({
+                        action: 'reanalyzeFolder',
+                        folderId: budgetData.folderId,
+                        budgetId: budgetData.id,
+                        sourceLang: budgetData.sourceLang,
+                        internalComments: budgetData.internalComments || '',
+                        fileSettings: budgetData.fileSettings || {}  // v3.7.19
+                    }, { retry: false });
                 } catch (fetchErr) {
                     const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
                     prodLogError('reanalyze', isTimeout ? 'timeout >6 min (Apps Script) o red' : (fetchErr.message || 'error'));
@@ -6896,9 +6839,7 @@
         // servidor pero cuya respuesta se perdió. Devuelve true si adoptó.
         async function adoptBudgetByFingerprint(files, minutesBack) {
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const fpData = await apiPost({
                         action: 'findBudgetByFingerprint',
                         origen: budgetData.sourceLang,
                         destino: budgetData.targetLang,
@@ -6907,9 +6848,7 @@
                         // desambiguar si los usa; inofensivo si los ignora.
                         fileNames: (files || []).map(f => f.name),
                         minutesBack: minutesBack || 10
-                    })
-                });
-                const fpData = await resp.json();
+                    });
                 if (fpData.success && fpData.found && fpData.budget) {
                     budgetData.id = fpData.budget.id;
                     budgetData.folderId = fpData.budget.folderId;
@@ -6951,6 +6890,227 @@
         }
 
         // Ejecuta la creación de carpeta (y opcionalmente análisis) en background
+        // ============ v3.7.73: LLAMADAS AL BACKEND A PRUEBA DE HTML ============
+        // Apps Script a veces responde con una PÁGINA HTML en lugar de JSON
+        // (timeout, sesión caducada, cuota, error interno). Al hacer .json()
+        // sobre eso salta el críptico: Unexpected token '<', "<!DOCTYPE"...
+        // apiPost centraliza la llamada: detecta ese caso, reintenta una vez
+        // (suele ser transitorio) y si falla lanza un error claro en castellano.
+        const API_ACTION_LABELS = {
+            createBudgetFolder: 'crear la carpeta',
+            updateBudgetBasicData: 'guardar los datos del presupuesto',
+            saveClientData: 'guardar los datos del cliente',
+            saveProviderQuote: 'guardar la cotización del proveedor',
+            listFolderFiles: 'leer la carpeta de Drive'
+        };
+
+        async function apiPost(payload, opts) {
+            const options = opts || {};
+            const accion = API_ACTION_LABELS[payload && payload.action] || (payload && payload.action) || 'la operación';
+            const intentos = options.retry === false ? 1 : 2;
+            let ultimoError = null;
+
+            for (let intento = 1; intento <= intentos; intento++) {
+                try {
+                    const resp = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(payload)
+                    });
+                    const texto = await resp.text();
+                    const limpio = (texto || '').trim();
+
+                    if (limpio.startsWith('<') || !limpio) {
+                        ultimoError = new Error(
+                            `El servidor no respondió correctamente al ${accion}. ` +
+                            `Suele ser un corte temporal de Google: espera unos segundos y reinténtalo.`
+                        );
+                        if (intento < intentos) {
+                            await new Promise(r => setTimeout(r, 1500));
+                            continue;
+                        }
+                        throw ultimoError;
+                    }
+                    try {
+                        return JSON.parse(limpio);
+                    } catch (e) {
+                        throw new Error(`Respuesta no válida del servidor al ${accion}.`);
+                    }
+                } catch (e) {
+                    ultimoError = e;
+                    if (intento < intentos && /fetch|network|Failed/i.test(e.message || '')) {
+                        await new Promise(r => setTimeout(r, 1500));
+                        continue;
+                    }
+                    throw ultimoError;
+                }
+            }
+            throw ultimoError || new Error('Error desconocido al ' + accion);
+        }
+
+        // ============ v3.7.72: SUBIDA DIRECTA NAVEGADOR → DRIVE ============
+        // Problema que resuelve: enviar los archivos en base64 dentro del POST a
+        // Apps Script hacía que el archivo viajase dos veces (navegador → Apps
+        // Script → Drive), con base64 un 33% más pesado y con el límite de 6 min
+        // de Apps Script. Con archivos grandes devolvía una página HTML de error
+        // ("Unexpected token '<', "<!DOCTYPE"... is not valid JSON").
+        // Ahora los bytes van directos del navegador a Drive (igual que cuando
+        // arrastras un archivo a Drive a mano) y Apps Script solo crea la carpeta
+        // y registra el presupuesto.
+        const GDRIVE_CLIENT_ID = '82970175641-23aqlvavg51c2fcogh3vgdu924vg8ar4.apps.googleusercontent.com';
+        const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+        let gdriveTokenClient = null;
+        let gdriveAccessToken = null;
+        let gdriveTokenExpiry = 0;
+
+        function gdriveIsConnected() {
+            return !!gdriveAccessToken && Date.now() < gdriveTokenExpiry - 60000;
+        }
+
+        // Pide (o renueva) el token de acceso. interactive=false intenta hacerlo
+        // en silencio; si Google necesita consentimiento, se abre el diálogo.
+        function gdriveRequestToken(interactive) {
+            return new Promise((resolve, reject) => {
+                if (!window.google || !google.accounts || !google.accounts.oauth2) {
+                    reject(new Error('Google Identity Services no está cargado. Recarga la página.'));
+                    return;
+                }
+                if (!gdriveTokenClient) {
+                    gdriveTokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: GDRIVE_CLIENT_ID,
+                        scope: GDRIVE_SCOPE,
+                        callback: () => {}   // se sustituye en cada petición
+                    });
+                }
+                gdriveTokenClient.callback = (resp) => {
+                    if (resp && resp.access_token) {
+                        gdriveAccessToken = resp.access_token;
+                        const secs = parseInt(resp.expires_in || 3600, 10);
+                        gdriveTokenExpiry = Date.now() + secs * 1000;
+                        try { localStorage.setItem('gdriveConnected', '1'); } catch (e) {}
+                        updateGDriveStatusUI();
+                        resolve(gdriveAccessToken);
+                    } else {
+                        reject(new Error((resp && resp.error) || 'No se obtuvo el permiso de Google'));
+                    }
+                };
+                try {
+                    gdriveTokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }
+
+        async function gdriveEnsureToken() {
+            if (gdriveIsConnected()) return gdriveAccessToken;
+            return await gdriveRequestToken(false);
+        }
+
+        async function connectGoogleDrive() {
+            try {
+                await gdriveRequestToken(true);
+                showStatus('✓ Conectado con Google Drive. Los archivos se subirán directamente.', 'success');
+                setTimeout(hideStatus, 3500);
+            } catch (e) {
+                showStatus('No se pudo conectar con Google: ' + e.message, 'error');
+                setTimeout(hideStatus, 5000);
+            }
+        }
+
+        function updateGDriveStatusUI() {
+            const el = document.getElementById('gdriveStatus');
+            if (!el) return;
+            if (gdriveIsConnected()) {
+                el.innerHTML = '<span style="color:#166534;">✓ Drive conectado (subida rápida)</span>';
+            } else {
+                el.innerHTML = '<button onclick="connectGoogleDrive()" style="background:#fff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">🔗 Conectar Google Drive (subida rápida)</button>';
+            }
+        }
+
+        // Convierte el base64 que ya tenemos en memoria a Blob, sin pasar por
+        // cadenas gigantes (evita agotar memoria con archivos grandes).
+        function base64ToBlob(base64, mimeType) {
+            const byteChars = atob(base64);
+            const slice = 8192;
+            const parts = [];
+            for (let off = 0; off < byteChars.length; off += slice) {
+                const chunk = byteChars.slice(off, off + slice);
+                const nums = new Array(chunk.length);
+                for (let i = 0; i < chunk.length; i++) nums[i] = chunk.charCodeAt(i);
+                parts.push(new Uint8Array(nums));
+            }
+            return new Blob(parts, { type: mimeType || 'application/octet-stream' });
+        }
+
+        // Sube UN archivo a una carpeta de Drive con subida reanudable.
+        function gdriveUploadFile(token, folderId, name, mimeType, blob, onProgress) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    // 1) Iniciar sesión de subida reanudable
+                    const initResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json; charset=UTF-8'
+                        },
+                        body: JSON.stringify({ name: name, parents: [folderId] })
+                    });
+                    if (!initResp.ok) {
+                        const txt = await initResp.text();
+                        reject(new Error('Drive init ' + initResp.status + ': ' + txt.slice(0, 200)));
+                        return;
+                    }
+                    const uploadUrl = initResp.headers.get('Location');
+                    if (!uploadUrl) { reject(new Error('Drive no devolvió URL de subida')); return; }
+
+                    // 2) Enviar los bytes (XHR para tener progreso)
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('PUT', uploadUrl, true);
+                    xhr.setRequestHeader('Content-Type', mimeType || 'application/octet-stream');
+                    xhr.upload.onprogress = (e) => {
+                        if (onProgress && e.lengthComputable) onProgress(e.loaded, e.total);
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try { resolve(JSON.parse(xhr.responseText)); }
+                            catch (e) { resolve({ id: null }); }
+                        } else {
+                            reject(new Error('Drive upload ' + xhr.status + ': ' + String(xhr.responseText).slice(0, 200)));
+                        }
+                    };
+                    xhr.onerror = () => reject(new Error('Fallo de red subiendo a Drive'));
+                    xhr.send(blob);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }
+
+        // Sube todos los archivos pendientes a la carpeta del presupuesto.
+        // Devuelve { subidos, fallidos: [{name, error}] }
+        async function uploadFilesDirectToDrive(files, folderId, onFileDone) {
+            const token = await gdriveEnsureToken();
+            const fallidos = [];
+            let subidos = 0;
+            for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                try {
+                    const blob = base64ToBlob(f.content, f.type);
+                    await gdriveUploadFile(token, folderId, f.name, f.type, blob, (loaded, total) => {
+                        const pct = total ? Math.round(loaded / total * 100) : 0;
+                        showStatus(`Subiendo a Drive: ${f.name} (${i + 1}/${files.length}) ${pct}%`, 'loading');
+                    });
+                    subidos++;
+                    if (onFileDone) onFileDone(f, i, files.length);
+                } catch (e) {
+                    console.error('Error subiendo ' + f.name, e);
+                    fallidos.push({ name: f.name, error: e.message });
+                }
+            }
+            return { subidos, fallidos };
+        }
+
         async function runBackgroundCreate(files, withAnalysis, internalComments) {
             // v3.7.32: instrumentación global de etapas
             const stageTimings = {
@@ -6986,29 +7146,47 @@
                 // creamos la carpeta SOLA primero (vuelve en ~5s → ID inmediato) y
                 // solo después lanzamos el análisis como llamada independiente.
                 let folderResult = null;
+                // v3.7.72: si Drive está conectado, la carpeta se crea VACÍA
+                // (petición ligera, sin base64) y los archivos se suben después
+                // directos desde el navegador. Si no, se mantiene el método
+                // anterior (archivos dentro del POST a Apps Script).
+                const useDirectUpload = gdriveIsConnected() && files.length > 0;
                 try {
-                    const folderResp = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'createBudgetFolder',
-                            channel: budgetData.channel,
-                            sourceLang: budgetData.sourceLang,
-                            targetLang: budgetData.targetLang,
-                            clientEmail: budgetData.clientEmail,
-                            clientWhatsApp: budgetData.clientWhatsApp,
-                            internalComments: internalComments,
-                            totalPages: totalPages,
-                            files: files,
-                            tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
-                            paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
-                            apostilla: !!document.getElementById('docApostille')?.checked,
-                            enHistorico: document.getElementById('docInHistory')?.checked !== false
-                        })
-                    });
-                    folderResult = await folderResp.json();
+                    folderResult = await apiPost({
+                        action: 'createBudgetFolder',
+                        channel: budgetData.channel,
+                        sourceLang: budgetData.sourceLang,
+                        targetLang: budgetData.targetLang,
+                        clientEmail: budgetData.clientEmail,
+                        clientWhatsApp: budgetData.clientWhatsApp,
+                        internalComments: internalComments,
+                        totalPages: totalPages,
+                        files: useDirectUpload ? [] : files,
+                        numArchivosPrevisto: files.length,
+                        tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
+                        paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
+                        apostilla: !!document.getElementById('docApostille')?.checked,
+                        enHistorico: document.getElementById('docInHistory')?.checked !== false
+                    }, { retry: useDirectUpload });
                 } catch (folderErr) {
                     prodLogError('folder', (folderErr && folderErr.message) || 'sin respuesta');
                     throw folderErr;
+                }
+
+                // v3.7.72: subida directa navegador → Drive
+                if (useDirectUpload && folderResult && folderResult.success && folderResult.folderId) {
+                    try {
+                        const res = await uploadFilesDirectToDrive(files, folderResult.folderId);
+                        if (res.fallidos.length) {
+                            showStatus(`⚠️ ${res.subidos} subido(s), ${res.fallidos.length} fallaron: ` +
+                                res.fallidos.map(f => f.name).join(', '), 'error');
+                            setTimeout(hideStatus, 8000);
+                        }
+                    } catch (upErr) {
+                        prodLogError('folder', 'Subida directa: ' + (upErr.message || upErr));
+                        showStatus('Error subiendo a Drive: ' + (upErr.message || upErr), 'error');
+                        setTimeout(hideStatus, 6000);
+                    }
                 }
                 stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
                 stageTimings.backendCreateFolderMs = (folderResult && folderResult._timings && folderResult._timings.totalMs) || 0;
@@ -7153,9 +7331,7 @@
                         prodLogStart('save', 'Guardando recuento + TXTs en Drive');
                         stageTimings.t_saveResultsStart = performance.now();  // v3.7.32
                         try {
-                            const saveResp = await fetch(apiUrl, {
-                                method: 'POST',
-                                body: JSON.stringify({
+                            const saveData = await apiPost({
                                     action: 'saveWordCountResults',
                                     budgetId: budgetData.id,
                                     folderId: budgetData.folderId,
@@ -7164,9 +7340,7 @@
                                     totalPages: claudeResult.totalPages,
                                     sourceLang: budgetData.sourceLang,
                                     fileSettings: initialFileSettings  // v3.7.19
-                                })
-                            });
-                            const saveData = await saveResp.json();
+                                });
                             if (!saveData.success) {
                                 console.warn('saveWordCountResults: el backend reportó fallo', saveData);
                                 prodLogError('save', saveData.error || 'el backend reportó fallo');
@@ -7364,18 +7538,14 @@
             showStatus('Extrayendo texto en paralelo (Sonnet)...', 'loading');
             
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'extractTextParallel',
                         folderId: budgetData.folderId,
                         budgetId: budgetData.id,
                         sourceLang: budgetData.sourceLang,
                         internalComments: budgetData.internalComments || '',
                         fileSettings: budgetData.fileSettings || {}  // v3.7.19
-                    })
-                });
-                const data = await resp.json();
+                    });
                 if (data._debug) console.log('[Tradutema DEBUG]', data._debug);
                 if (data._perf) logPerfToConsole(data._perf, 'Re-extraer');  // v3.7.27
                 if (data.success) {
@@ -7412,16 +7582,11 @@
             try {
                 showStatus('Contando páginas...', 'loading');
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'countPagesOnly',
                         folderId: budgetData.folderId,
                         budgetId: budgetData.id
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
@@ -7489,18 +7654,13 @@
             try {
                 showStatus('Analizando documentos (puede tardar unos segundos)...', 'loading');
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'countWords',
                         folderId: budgetData.folderId,
                         budgetId: budgetData.id,
                         sourceLang: budgetData.sourceLang,
                         internalComments: budgetData.internalComments || ''
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
@@ -7903,10 +8063,7 @@
             showStatus('Guardando...', 'loading');
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'updateProviderTariffs',
                         email: p.email,
                         idiomaOrigen: p.idiomaOrigen,
@@ -7914,10 +8071,7 @@
                         tarifaMinima: tarifaMinima,
                         tarifaPalabra: tarifaPalabra,
                         comentarios: comentarios
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     // v3.7.56: mínimo y comentarios son del proveedor (email) →
@@ -8008,11 +8162,7 @@
             // adjuntará al email (protege contra desincronizaciones previas).
             if (budgetData.folderId) {
                 try {
-                    const refreshResp = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'listFolderFiles', folderId: budgetData.folderId })
-                    });
-                    const refreshData = await refreshResp.json();
+                    const refreshData = await apiPost({ action: 'listFolderFiles', folderId: budgetData.folderId });
                     if (refreshData.success && Array.isArray(refreshData.files)) {
                         budgetData.folderFiles = refreshData.files;
                     }
@@ -8154,9 +8304,7 @@
             showStatus('Enviando emails a proveedores...', 'loading');
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'sendProviderEmails',
                         providers: providers,
                         budgetId: budgetData.id,
@@ -8165,10 +8313,7 @@
                         targetLang: budgetData.targetLang,
                         customMessage: customMessage,  // Mensaje editado por el usuario
                         additionalComments: additionalComments  // Comentarios para proveedores
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     hideStatus();
@@ -8464,9 +8609,7 @@
             if (results) results.innerHTML = '';
 
             try {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'getHistoricalQuotes',
                         sourceLang: sourceLang,
                         targetLang: targetLang,
@@ -8478,9 +8621,7 @@
                         filterTipo: fTipo,
                         filterPais: fPais,
                         filterApostilla: fApostilla
-                    })
-                });
-                const data = await resp.json();
+                    });
                 if (loading) loading.style.display = 'none';
 
                 if (!data.success) {
@@ -9572,17 +9713,12 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             if (!budgetData.id) return null;
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'saveClientSendHistory',
                         budgetId: budgetData.id,
                         tipo: tipo,
                         destinatario: destinatario
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 if (data.success) {
                     return data;
                 }
@@ -9680,16 +9816,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             console.log('Actualizando estado:', budgetData.id, '->', status);
             
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const result = await apiPost({
                         action: 'updateStatus',
                         budgetId: budgetData.id,
                         status: status
-                    })
-                });
-                
-                const result = await response.json();
+                    });
                 console.log('Respuesta updateStatus:', result);
                 
                 if (!result.success) {
@@ -9727,9 +9858,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 const subjectEl = document.getElementById('clientSubject');
                 const clientSubject = (subjectEl && subjectEl.value.trim()) ? subjectEl.value.trim() : '';
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
+                const data = await apiPost({
                         action: 'sendClientEmail',
                         clientEmail: email,
                         clientWhatsApp: whatsapp,
@@ -9740,10 +9869,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         customMessage: customMessage,
                         clientSubject: clientSubject,
                         quoteDays: quoteDaysValue
-                    })
-                });
-                
-                const data = await response.json();
+                    });
                 
                 if (data.success) {
                     // Actualizar historial local
