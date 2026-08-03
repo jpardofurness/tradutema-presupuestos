@@ -1876,7 +1876,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.73';
+        const HTML_VERSION = '3.7.74';
         const HTML_DATE = '21/06/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -4790,6 +4790,14 @@
                 
                 if (data.success) {
                     const b = data.budget;
+                    // v3.7.74: si la respuesta llega sin el objeto del presupuesto
+                    // (respuesta truncada o presupuesto borrado), avisar claro en
+                    // vez de reventar con "Cannot read properties of undefined".
+                    if (!b) {
+                        showStatus('No se pudieron cargar los datos de ese presupuesto. Vuelve a intentarlo.', 'error');
+                        setTimeout(hideStatus, 5000);
+                        return;
+                    }
                     
                     // Restore budget data
                     budgetData.id = b.id;
