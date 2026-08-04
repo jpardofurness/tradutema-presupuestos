@@ -1876,9 +1876,12 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.78';
-        const HTML_DATE = '21/06/2026';
+        const HTML_VERSION = '3.7.80';
+        const HTML_DATE = '04/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
+        // v3.7.80: por debajo de este peso total el lote se sube por Apps Script
+        // (método clásico, sin ventana de Google). Por encima, subida directa.
+        const DIRECT_UPLOAD_MIN_BYTES = 4 * 1024 * 1024;
 
         // State
         let apiUrl = localStorage.getItem('tradutema_api_url') || '';
@@ -1947,7 +1950,10 @@
             // cada recarga (molesto y podía interferir con la carga inicial).
             // La conexión se pide solo cuando el usuario pulsa el botón, o
             // automáticamente en el momento de subir archivos (gdriveEnsureToken).
+            // v3.7.79: recuperar el token guardado (solo lee localStorage, no
+            // abre ninguna ventana). Si sigue vigente, la sesión continúa.
             setTimeout(() => {
+                if (typeof gdriveRestoreToken === 'function') gdriveRestoreToken();
                 if (typeof updateGDriveStatusUI === 'function') updateGDriveStatusUI();
             }, 1200);
 
@@ -6989,12 +6995,41 @@
         // y registra el presupuesto.
         const GDRIVE_CLIENT_ID = '82970175641-23aqlvavg51c2fcogh3vgdu924vg8ar4.apps.googleusercontent.com';
         const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+        // v3.7.79: cuenta preferida. Con hint + prompt:'' Google no muestra el
+        // selector de cuentas cuando ya hay sesión activa y permiso concedido.
+        const GDRIVE_ACCOUNT_HINT = 'jpardofurness@gmail.com';
         let gdriveTokenClient = null;
         let gdriveAccessToken = null;
         let gdriveTokenExpiry = 0;
 
         function gdriveIsConnected() {
             return !!gdriveAccessToken && Date.now() < gdriveTokenExpiry - 60000;
+        }
+
+        // v3.7.79: el token de Google dura ~1 hora y hasta ahora vivía solo en
+        // memoria: al recargar la página se perdía y Google volvía a preguntar.
+        // Se guarda con su caducidad para reutilizarlo mientras siga válido.
+        function gdriveSaveToken() {
+            try {
+                localStorage.setItem('gdriveTok', JSON.stringify({
+                    t: gdriveAccessToken, e: gdriveTokenExpiry
+                }));
+            } catch (e) {}
+        }
+
+        function gdriveRestoreToken() {
+            try {
+                const raw = localStorage.getItem('gdriveTok');
+                if (!raw) return false;
+                const o = JSON.parse(raw);
+                if (o && o.t && o.e && Date.now() < o.e - 60000) {
+                    gdriveAccessToken = o.t;
+                    gdriveTokenExpiry = o.e;
+                    return true;
+                }
+                localStorage.removeItem('gdriveTok');
+            } catch (e) {}
+            return false;
         }
 
         // Pide (o renueva) el token de acceso. interactive=false intenta hacerlo
@@ -7009,6 +7044,7 @@
                     gdriveTokenClient = google.accounts.oauth2.initTokenClient({
                         client_id: GDRIVE_CLIENT_ID,
                         scope: GDRIVE_SCOPE,
+                        hint: GDRIVE_ACCOUNT_HINT,   // v3.7.79: evita el selector de cuentas
                         callback: () => {}   // se sustituye en cada petición
                     });
                 }
@@ -7018,6 +7054,7 @@
                         const secs = parseInt(resp.expires_in || 3600, 10);
                         gdriveTokenExpiry = Date.now() + secs * 1000;
                         try { localStorage.setItem('gdriveConnected', '1'); } catch (e) {}
+                        gdriveSaveToken();   // v3.7.79
                         updateGDriveStatusUI();
                         resolve(gdriveAccessToken);
                     } else {
@@ -7034,7 +7071,15 @@
 
         async function gdriveEnsureToken() {
             if (gdriveIsConnected()) return gdriveAccessToken;
-            return await gdriveRequestToken(false);
+            // v3.7.79: 1º token guardado de una sesión anterior aún vigente
+            if (gdriveRestoreToken()) return gdriveAccessToken;
+            // 2º renovación silenciosa (sin ventana si hay sesión de Google)
+            try {
+                return await gdriveRequestToken(false);
+            } catch (e) {
+                // 3º último recurso: pedirlo con diálogo
+                return await gdriveRequestToken(true);
+            }
         }
 
         async function connectGoogleDrive() {
@@ -7139,6 +7184,14 @@
                     fallidos.push({ name: f.name, error: e.message });
                 }
             }
+            // v3.7.79 FIX: el banner "Subiendo a Drive… 100%" se quedaba fijo en
+            // pantalla porque nadie lo cerraba al acabar bien (solo había aviso
+            // en el caso de fallo). Si hubo fallos, el llamador pinta su propio
+            // mensaje justo después.
+            if (!fallidos.length) {
+                showStatus(`✓ ${subidos} archivo(s) subido(s) a Drive`, 'success');
+                setTimeout(hideStatus, 2500);
+            }
             return { subidos, fallidos };
         }
 
@@ -7186,7 +7239,19 @@
                 // token justo antes de subir, no al cargar la página).
                 let _drivePrevio = false;
                 try { _drivePrevio = localStorage.getItem('gdriveConnected') === '1'; } catch (e) {}
-                const useDirectUpload = (gdriveIsConnected() || _drivePrevio) && files.length > 0;
+                // v3.7.80: la subida directa (y su ventana de Google) solo tiene
+                // sentido para lotes pesados, que eran los que reventaban el
+                // límite de 6 min de Apps Script. Para lotes pequeños se usa el
+                // método de siempre: Apps Script sube los archivos con SU propia
+                // autorización y el navegador nunca pide permiso a Google.
+                let _lotePeso = 0;
+                try {
+                    files.forEach(f => {
+                        _lotePeso += f.size || Math.round((f.content || '').length * 0.75);
+                    });
+                } catch (e) {}
+                const _loteGrande = _lotePeso >= DIRECT_UPLOAD_MIN_BYTES;
+                const useDirectUpload = _loteGrande && (gdriveIsConnected() || _drivePrevio) && files.length > 0;
                 try {
                     folderResult = await apiPost({
                         action: 'createBudgetFolder',
