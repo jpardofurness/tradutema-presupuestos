@@ -1889,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.90';
+        const HTML_VERSION = '3.7.92';
         const HTML_DATE = '04/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -4573,6 +4573,7 @@
         const BUDGETS_DEFAULT_LIMIT = 50;
         let budgetsTotal = 0;          // total real en la hoja (lo dice el backend)
         let budgetsShowingAll = false; // ¿está cargado el listado completo?
+        let budgetsLoadingAll = false; // v3.7.91: carga del completo en curso
 
         async function fetchBudgetsData(limit) {
             const data = await apiPost({ action: 'getBudgets', limit: limit || 0 });
@@ -4614,8 +4615,13 @@
         }
 
         async function loadAllBudgets() {
+            if (budgetsLoadingAll) return;   // v3.7.91: ya en curso
+            budgetsLoadingAll = true;
             const bar = document.getElementById('loadAllBudgetsBar');
-            if (bar) bar.innerHTML = '<span class="spinner dark"></span> Cargando todos los presupuestos...';
+            if (bar) {
+                bar.style.display = 'block';
+                bar.innerHTML = '<span class="spinner dark"></span> Cargando todos los presupuestos...';
+            }
             try {
                 const budgets = await fetchBudgetsData(0);   // sin límite
                 budgetsShowingAll = true;
@@ -4623,6 +4629,8 @@
             } catch (e) {
                 if (bar) bar.innerHTML = 'No se pudo cargar el listado completo: ' + e.message +
                     ' · <a href="#" onclick="loadAllBudgets(); return false;">Reintentar</a>';
+            } finally {
+                budgetsLoadingAll = false;
             }
         }
 
@@ -4689,6 +4697,15 @@
             const email = document.getElementById('filterEmail').value.toLowerCase().trim();
             const whatsapp = document.getElementById('filterWhatsApp').value.trim();
             const dateFrom = document.getElementById('filterDateFrom').value;
+
+            // v3.7.91: en cuanto se usa CUALQUIER filtro, la búsqueda debe ser
+            // sobre TODOS los presupuestos, no solo los 50 recientes. Se filtra
+            // ya lo cargado (respuesta inmediata) y en paralelo se trae el
+            // listado completo; al llegar, applyBudgets vuelve a filtrar solo.
+            const hayFiltro = !!(code || status || channel || source || target || email || whatsapp || dateFrom);
+            if (hayFiltro && !budgetsShowingAll && !budgetsLoadingAll && budgetsTotal > allBudgets.length) {
+                loadAllBudgets();
+            }
             
             filteredBudgets = allBudgets.filter(b => {
                 if (code && (!b.id || !b.id.toLowerCase().includes(code))) return false;
@@ -4713,9 +4730,11 @@
             const container = document.getElementById('budgetList');
             
             if (filteredBudgets.length === 0) {
-                // v3.7.90: si solo están cargados los recientes, el que buscas
-                // puede estar en los antiguos: ofrecer cargar el listado completo.
-                if (!budgetsShowingAll && budgetsTotal > allBudgets.length) {
+                // v3.7.90/91: si solo están cargados los recientes, el que
+                // buscas puede estar en los antiguos.
+                if (budgetsLoadingAll) {
+                    container.innerHTML = '<div class="no-budgets"><span class="spinner dark"></span> Buscando entre todos los presupuestos...</div>';
+                } else if (!budgetsShowingAll && budgetsTotal > allBudgets.length) {
                     container.innerHTML = '<div class="no-budgets">No hay resultados entre los ' + allBudgets.length +
                         ' más recientes.<br><a href="#" onclick="loadAllBudgets(); return false;" style="font-weight:600;">📥 Cargar todos los presupuestos (' + budgetsTotal + ')</a></div>';
                 } else {
@@ -6783,6 +6802,32 @@
             // v3.7.50: log de proceso en pantalla (se reinicia en cada análisis)
             prodLogClear();
 
+            // v3.7.92: RESCATE. reanalyzeFolder guarda TODO en el servidor
+            // (TXTs + _RECUENTO.txt en Drive, palabras/páginas/análisis en la
+            // hoja) ANTES de responder. Si la respuesta se pierde en la
+            // redirección de Apps Script (caso real: análisis completo en Drive
+            // y error en pantalla), el trabajo ya está hecho y pagado: en vez
+            // de dar error (o repetir el análisis con su coste en Claude), se
+            // recupera el resultado de la hoja con getBudget.
+            async function recoverAnalysisFromSheet() {
+                for (let intento = 1; intento <= 2; intento++) {
+                    // margen por si el backend aún está escribiendo la hoja
+                    await new Promise(r => setTimeout(r, intento === 1 ? 3000 : 8000));
+                    try {
+                        const resp = await apiPost({ action: 'getBudget', budgetId: budgetData.id }, { retry: false });
+                        const b = resp && resp.success && resp.budget;
+                        if (b && parseFloat(b.palabras) > 0 && Array.isArray(b.analisisDetalle) && b.analisisDetalle.length > 0) {
+                            return {
+                                analysis: b.analisisDetalle,
+                                totalWords: parseFloat(b.palabras) || 0,
+                                totalPages: parseFloat(b.paginas) || 0
+                            };
+                        }
+                    } catch (e) { /* siguiente intento */ }
+                }
+                return null;
+            }
+
             try {
                 // Si hay archivos nuevos pendientes de subir, subirlos primero
                 prodLogStart('sync', 'Sincronizando archivos pendientes con Drive');
@@ -6803,7 +6848,19 @@
                 } catch (fetchErr) {
                     const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
                     prodLogError('reanalyze', isTimeout ? 'timeout >6 min (Apps Script) o red' : (fetchErr.message || 'error'));
-                    throw fetchErr;
+                    // v3.7.92: antes de dar error, mirar si el análisis quedó
+                    // guardado en la hoja (respuesta perdida con trabajo hecho).
+                    prodLogStart('recover', 'Respuesta perdida: comprobando si el análisis quedó guardado');
+                    showStatus('La respuesta se perdió; comprobando si el análisis terminó igualmente...', 'loading');
+                    const rec = await recoverAnalysisFromSheet();
+                    if (rec) {
+                        prodLogDone('recover', `Recuperado de la hoja: ${rec.totalWords} palabras · ${rec.totalPages} pág.`);
+                        data = { success: true, analysis: rec.analysis, totalWords: rec.totalWords,
+                                 totalPages: rec.totalPages, failedPages: [], _recovered: true };
+                    } else {
+                        prodLogError('recover', 'sin datos guardados en la hoja');
+                        throw fetchErr;
+                    }
                 }
                 prodLogDone('reanalyze', data && data.success ? `${data.totalWords || 0} palabras · ${data.totalPages || 0} pág.` : ((data && data.error) || 'sin éxito'));
                 if (data._perf) logPerfToConsole(data._perf, 'Reanalizar');  // v3.7.27
