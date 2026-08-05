@@ -663,6 +663,14 @@
                 Si en este tiempo no se han subido todos los archivos a Drive, se corta la espera y se te indica cuáles faltan para subirlos a mano (📂 + "Actualizar desde Drive").
             </div>
 
+            <label for="uploadMaxMb" style="display:block; font-size:0.82rem; color:#475569; margin-top:12px; margin-bottom:4px;">
+                Peso máximo para subida automática (MB)
+            </label>
+            <input type="number" id="uploadMaxMb" class="config-input" min="1" max="20" step="1" value="8" style="max-width:140px;">
+            <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">
+                Si los archivos pesan más en total, no se intenta la subida: se crea la carpeta y se te da el enlace para arrastrarlos a Drive directamente.
+            </div>
+
             <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">💾 Guardar</button>
         </div>
 
@@ -1881,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.84';
+        const HTML_VERSION = '3.7.85';
         const HTML_DATE = '04/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2033,6 +2041,12 @@
                 try { localStorage.setItem('tradutema_upload_timeout_secs', String(tSecs)); } catch (e) {}
             }
 
+            // v3.7.85: guardar peso máximo para subida automática
+            const mMb = parseInt(document.getElementById('uploadMaxMb')?.value, 10);
+            if (mMb >= 1 && mMb <= 20) {
+                try { localStorage.setItem('tradutema_upload_max_mb', String(mMb)); } catch (e) {}
+            }
+
             document.getElementById('configSection').style.display = 'none';
             loadData();
         }
@@ -2043,6 +2057,9 @@
             // v3.7.83: precargar el ajuste de tiempo de subida
             const tEl = document.getElementById('uploadTimeoutSecs');
             if (tEl) tEl.value = Math.round(getUploadTimeoutMs() / 1000);
+            // v3.7.85: precargar peso máximo para subida automática
+            const mEl = document.getElementById('uploadMaxMb');
+            if (mEl) mEl.value = Math.round(getUploadMaxAutoBytes() / 1048576);
         }
 
         // ====== HOME SCREEN ======
@@ -7002,6 +7019,19 @@
             return secs * 1000;
         }
 
+        // v3.7.85: peso máximo del lote para intentar la subida automática.
+        // Por encima, se crea la carpeta y se pide subida manual a Drive.
+        const UPLOAD_MAX_AUTO_DEFAULT_MB = 8;
+
+        function getUploadMaxAutoBytes() {
+            let mb = UPLOAD_MAX_AUTO_DEFAULT_MB;
+            try {
+                const raw = parseInt(localStorage.getItem('tradutema_upload_max_mb'), 10);
+                if (raw >= 1 && raw <= 20) mb = raw;
+            } catch (e) {}
+            return mb * 1048576;
+        }
+
         async function uploadFilesViaAppsScript(files, folderId, budgetId) {
             const budgetMs = getUploadTimeoutMs();
             const deadline = Date.now() + budgetMs;
@@ -7131,19 +7161,40 @@
                 }
 
                 // v3.7.82: ÚNICA ruta de subida — Apps Script, archivo a
-                // archivo, con presupuesto de tiempo de 30 s. (La subida directa
-                // con OAuth de navegador se retiró en esta versión: exigía
-                // "Conectar Google Drive" cada día porque los tokens de página
-                // web caducan a la hora por diseño de Google.)
+                // archivo, con presupuesto de tiempo ajustable. (La subida
+                // directa con OAuth de navegador se retiró: exigía "Conectar
+                // Google Drive" cada día porque los tokens de página web
+                // caducan a la hora por diseño de Google.)
+                // v3.7.85: si el lote pesa más del límite de Ajustes, NI SE
+                // INTENTA subir: se crea la carpeta y se pide subida manual
+                // directamente (más rápido que esperar a que agote el tiempo).
                 let directUploadResults = null;
                 if (folderResult && folderResult.success && folderResult.folderId && files.length > 0) {
-                    const res = await uploadFilesViaAppsScript(files, folderResult.folderId, folderResult.budgetId);
-                    directUploadResults = res;
-                    if (res.fallidos.length) {
-                        showStatus(`⚠️ No se pudieron cargar: ` +
-                            res.fallidos.map(f => f.name).join(', ') +
-                            `. Súbelos a mano en Drive (botón 📂) y pulsa "🔄 Actualizar desde Drive".`, 'error');
-                        setTimeout(hideStatus, 12000);
+                    let _pesoLote = 0;
+                    try {
+                        files.forEach(f => {
+                            _pesoLote += f.size || Math.round((f.content || '').length * 0.75);
+                        });
+                    } catch (e) {}
+                    const _limiteBytes = getUploadMaxAutoBytes();
+                    if (_pesoLote > _limiteBytes) {
+                        const mbLote = (_pesoLote / 1048576).toFixed(1);
+                        const mbLim = Math.round(_limiteBytes / 1048576);
+                        directUploadResults = { subidos: 0, fallidos: files.map(f => ({ name: f.name, error: 'lote > ' + mbLim + ' MB' })) };
+                        prodLogDone('folder', (folderResult.budgetId || '') + ' · lote ' + mbLote + ' MB > ' + mbLim + ' MB: subida manual');
+                        showStatus(`⚠️ Los archivos pesan ${mbLote} MB (más de ${mbLim} MB): súbelos directamente a ` +
+                            `<a href="${folderResult.folderUrl}" target="_blank" style="font-weight:600;">📂 la carpeta de Drive</a>` +
+                            ` y pulsa "🔄 Actualizar desde Drive".`, 'warning');
+                        // sin auto-cierre: se queda hasta que el usuario actúe
+                    } else {
+                        const res = await uploadFilesViaAppsScript(files, folderResult.folderId, folderResult.budgetId);
+                        directUploadResults = res;
+                        if (res.fallidos.length) {
+                            showStatus(`⚠️ No se pudieron cargar: ` +
+                                res.fallidos.map(f => f.name).join(', ') +
+                                `. Súbelos a mano en Drive (botón 📂) y pulsa "🔄 Actualizar desde Drive".`, 'error');
+                            setTimeout(hideStatus, 12000);
+                        }
                     }
                 }
                 stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
