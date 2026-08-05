@@ -565,8 +565,6 @@
     </style>
     <!-- PDF.js para contar páginas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- v3.7.72: Google Identity Services (subida directa navegador → Drive) -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
@@ -1210,11 +1208,6 @@
             </div>
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
-
-            <!-- v3.7.72: estado de conexión con Google Drive (subida directa) -->
-            <div id="gdriveStatusBar" style="display:flex; align-items:center; gap:10px; margin-top:10px; font-size:0.8rem; color:#475569;">
-                <span id="gdriveStatus"></span>
-            </div>
 
             <!-- v3.7.4 (UX fix v3.7.5): Metadatos opcionales del presupuesto -->
             <div id="docMetaSection" style="margin-top:12px; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
@@ -1876,12 +1869,9 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.80';
+        const HTML_VERSION = '3.7.82';
         const HTML_DATE = '04/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
-        // v3.7.80: por debajo de este peso total el lote se sube por Apps Script
-        // (método clásico, sin ventana de Google). Por encima, subida directa.
-        const DIRECT_UPLOAD_MIN_BYTES = 4 * 1024 * 1024;
 
         // State
         let apiUrl = localStorage.getItem('tradutema_api_url') || '';
@@ -1944,18 +1934,6 @@
                 loadData();
             }
             updateClientMessage();
-
-            // v3.7.78: solo actualizar el indicador. NO se intenta reconectar
-            // automáticamente al cargar: Google abría el selector de cuenta en
-            // cada recarga (molesto y podía interferir con la carga inicial).
-            // La conexión se pide solo cuando el usuario pulsa el botón, o
-            // automáticamente en el momento de subir archivos (gdriveEnsureToken).
-            // v3.7.79: recuperar el token guardado (solo lee localStorage, no
-            // abre ninguna ventana). Si sigue vigente, la sesión continúa.
-            setTimeout(() => {
-                if (typeof gdriveRestoreToken === 'function') gdriveRestoreToken();
-                if (typeof updateGDriveStatusUI === 'function') updateGDriveStatusUI();
-            }, 1200);
 
             // v3.7.4: listeners para metadatos. Si hay budgetId ya creado, persistir cambio.
             const docTypeEl = document.getElementById('docType');
@@ -6984,210 +6962,61 @@
             throw ultimoError || new Error('Error desconocido al ' + accion);
         }
 
-        // ============ v3.7.72: SUBIDA DIRECTA NAVEGADOR → DRIVE ============
-        // Problema que resuelve: enviar los archivos en base64 dentro del POST a
-        // Apps Script hacía que el archivo viajase dos veces (navegador → Apps
-        // Script → Drive), con base64 un 33% más pesado y con el límite de 6 min
-        // de Apps Script. Con archivos grandes devolvía una página HTML de error
-        // ("Unexpected token '<', "<!DOCTYPE"... is not valid JSON").
-        // Ahora los bytes van directos del navegador a Drive (igual que cuando
-        // arrastras un archivo a Drive a mano) y Apps Script solo crea la carpeta
-        // y registra el presupuesto.
-        const GDRIVE_CLIENT_ID = '82970175641-23aqlvavg51c2fcogh3vgdu924vg8ar4.apps.googleusercontent.com';
-        const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
-        // v3.7.79: cuenta preferida. Con hint + prompt:'' Google no muestra el
-        // selector de cuentas cuando ya hay sesión activa y permiso concedido.
-        const GDRIVE_ACCOUNT_HINT = 'jpardofurness@gmail.com';
-        let gdriveTokenClient = null;
-        let gdriveAccessToken = null;
-        let gdriveTokenExpiry = 0;
+        // v3.7.82: subida por Apps Script, UN archivo por llamada, con un
+        // PRESUPUESTO DE TIEMPO total de 30 s (petición de Javier: si en 30 s
+        // no está, prefiere subir a mano en Drive y pulsar "Actualizar desde
+        // Drive" antes que esperar). El backend (uploadFilesToFolder) deduplica
+        // por nombre+tamaño: un archivo que llegue a Drive después de cortar la
+        // espera NO se duplicará si se reintenta o se sube a mano.
+        const UPLOAD_TIME_BUDGET_MS = 30000;
 
-        function gdriveIsConnected() {
-            return !!gdriveAccessToken && Date.now() < gdriveTokenExpiry - 60000;
-        }
-
-        // v3.7.79: el token de Google dura ~1 hora y hasta ahora vivía solo en
-        // memoria: al recargar la página se perdía y Google volvía a preguntar.
-        // Se guarda con su caducidad para reutilizarlo mientras siga válido.
-        function gdriveSaveToken() {
-            try {
-                localStorage.setItem('gdriveTok', JSON.stringify({
-                    t: gdriveAccessToken, e: gdriveTokenExpiry
-                }));
-            } catch (e) {}
-        }
-
-        function gdriveRestoreToken() {
-            try {
-                const raw = localStorage.getItem('gdriveTok');
-                if (!raw) return false;
-                const o = JSON.parse(raw);
-                if (o && o.t && o.e && Date.now() < o.e - 60000) {
-                    gdriveAccessToken = o.t;
-                    gdriveTokenExpiry = o.e;
-                    return true;
-                }
-                localStorage.removeItem('gdriveTok');
-            } catch (e) {}
-            return false;
-        }
-
-        // Pide (o renueva) el token de acceso. interactive=false intenta hacerlo
-        // en silencio; si Google necesita consentimiento, se abre el diálogo.
-        function gdriveRequestToken(interactive) {
-            return new Promise((resolve, reject) => {
-                if (!window.google || !google.accounts || !google.accounts.oauth2) {
-                    reject(new Error('Google Identity Services no está cargado. Recarga la página.'));
-                    return;
-                }
-                if (!gdriveTokenClient) {
-                    gdriveTokenClient = google.accounts.oauth2.initTokenClient({
-                        client_id: GDRIVE_CLIENT_ID,
-                        scope: GDRIVE_SCOPE,
-                        hint: GDRIVE_ACCOUNT_HINT,   // v3.7.79: evita el selector de cuentas
-                        callback: () => {}   // se sustituye en cada petición
-                    });
-                }
-                gdriveTokenClient.callback = (resp) => {
-                    if (resp && resp.access_token) {
-                        gdriveAccessToken = resp.access_token;
-                        const secs = parseInt(resp.expires_in || 3600, 10);
-                        gdriveTokenExpiry = Date.now() + secs * 1000;
-                        try { localStorage.setItem('gdriveConnected', '1'); } catch (e) {}
-                        gdriveSaveToken();   // v3.7.79
-                        updateGDriveStatusUI();
-                        resolve(gdriveAccessToken);
-                    } else {
-                        reject(new Error((resp && resp.error) || 'No se obtuvo el permiso de Google'));
-                    }
-                };
-                try {
-                    gdriveTokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
-                } catch (e) {
-                    reject(e);
-                }
-            });
-        }
-
-        async function gdriveEnsureToken() {
-            if (gdriveIsConnected()) return gdriveAccessToken;
-            // v3.7.79: 1º token guardado de una sesión anterior aún vigente
-            if (gdriveRestoreToken()) return gdriveAccessToken;
-            // 2º renovación silenciosa (sin ventana si hay sesión de Google)
-            try {
-                return await gdriveRequestToken(false);
-            } catch (e) {
-                // 3º último recurso: pedirlo con diálogo
-                return await gdriveRequestToken(true);
-            }
-        }
-
-        async function connectGoogleDrive() {
-            try {
-                await gdriveRequestToken(true);
-                showStatus('✓ Conectado con Google Drive. Los archivos se subirán directamente.', 'success');
-                setTimeout(hideStatus, 3500);
-            } catch (e) {
-                showStatus('No se pudo conectar con Google: ' + e.message, 'error');
-                setTimeout(hideStatus, 5000);
-            }
-        }
-
-        function updateGDriveStatusUI() {
-            const el = document.getElementById('gdriveStatus');
-            if (!el) return;
-            if (gdriveIsConnected()) {
-                el.innerHTML = '<span style="color:#166534;">✓ Drive conectado (subida rápida)</span>';
-            } else {
-                el.innerHTML = '<button onclick="connectGoogleDrive()" style="background:#fff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">🔗 Conectar Google Drive (subida rápida)</button>';
-            }
-        }
-
-        // Convierte el base64 que ya tenemos en memoria a Blob, sin pasar por
-        // cadenas gigantes (evita agotar memoria con archivos grandes).
-        function base64ToBlob(base64, mimeType) {
-            const byteChars = atob(base64);
-            const slice = 8192;
-            const parts = [];
-            for (let off = 0; off < byteChars.length; off += slice) {
-                const chunk = byteChars.slice(off, off + slice);
-                const nums = new Array(chunk.length);
-                for (let i = 0; i < chunk.length; i++) nums[i] = chunk.charCodeAt(i);
-                parts.push(new Uint8Array(nums));
-            }
-            return new Blob(parts, { type: mimeType || 'application/octet-stream' });
-        }
-
-        // Sube UN archivo a una carpeta de Drive con subida reanudable.
-        function gdriveUploadFile(token, folderId, name, mimeType, blob, onProgress) {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    // 1) Iniciar sesión de subida reanudable
-                    const initResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': 'Bearer ' + token,
-                            'Content-Type': 'application/json; charset=UTF-8'
-                        },
-                        body: JSON.stringify({ name: name, parents: [folderId] })
-                    });
-                    if (!initResp.ok) {
-                        const txt = await initResp.text();
-                        reject(new Error('Drive init ' + initResp.status + ': ' + txt.slice(0, 200)));
-                        return;
-                    }
-                    const uploadUrl = initResp.headers.get('Location');
-                    if (!uploadUrl) { reject(new Error('Drive no devolvió URL de subida')); return; }
-
-                    // 2) Enviar los bytes (XHR para tener progreso)
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('PUT', uploadUrl, true);
-                    xhr.setRequestHeader('Content-Type', mimeType || 'application/octet-stream');
-                    xhr.upload.onprogress = (e) => {
-                        if (onProgress && e.lengthComputable) onProgress(e.loaded, e.total);
-                    };
-                    xhr.onload = () => {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try { resolve(JSON.parse(xhr.responseText)); }
-                            catch (e) { resolve({ id: null }); }
-                        } else {
-                            reject(new Error('Drive upload ' + xhr.status + ': ' + String(xhr.responseText).slice(0, 200)));
-                        }
-                    };
-                    xhr.onerror = () => reject(new Error('Fallo de red subiendo a Drive'));
-                    xhr.send(blob);
-                } catch (e) {
-                    reject(e);
-                }
-            });
-        }
-
-        // Sube todos los archivos pendientes a la carpeta del presupuesto.
-        // Devuelve { subidos, fallidos: [{name, error}] }
-        async function uploadFilesDirectToDrive(files, folderId, onFileDone) {
-            const token = await gdriveEnsureToken();
+        async function uploadFilesViaAppsScript(files, folderId, budgetId) {
+            const deadline = Date.now() + UPLOAD_TIME_BUDGET_MS;
             const fallidos = [];
             let subidos = 0;
             for (let i = 0; i < files.length; i++) {
                 const f = files[i];
+                const restante = deadline - Date.now();
+                if (restante <= 1500) {
+                    // tiempo agotado: los que faltan se marcan sin intentarlos
+                    fallidos.push({ name: f.name, error: 'tiempo agotado (30 s)' });
+                    continue;
+                }
+                showStatus(`Subiendo a Drive: ${f.name} (${i + 1}/${files.length})`, 'loading');
                 try {
-                    const blob = base64ToBlob(f.content, f.type);
-                    const created = await gdriveUploadFile(token, folderId, f.name, f.type, blob, (loaded, total) => {
-                        const pct = total ? Math.round(loaded / total * 100) : 0;
-                        showStatus(`Subiendo a Drive: ${f.name} (${i + 1}/${files.length}) ${pct}%`, 'loading');
-                    });
-                    if (created && created.id) f.driveId = created.id;   // v3.7.75
+                    const ctrl = new AbortController();
+                    const tId = setTimeout(() => ctrl.abort(), restante);
+                    let resp;
+                    try {
+                        const r = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({
+                                action: 'uploadFilesToFolder',
+                                folderId: folderId,
+                                budgetId: budgetId,
+                                files: [f]
+                            }),
+                            signal: ctrl.signal
+                        });
+                        const texto = (await r.text() || '').trim();
+                        if (texto.startsWith('<') || !texto) throw new Error('respuesta no válida del servidor');
+                        resp = JSON.parse(texto);
+                    } finally {
+                        clearTimeout(tId);
+                    }
+                    if (!resp || !resp.success) {
+                        throw new Error((resp && resp.error) || 'fallo al subir');
+                    }
+                    const up = resp.uploaded && resp.uploaded[0];
+                    if (up) { f.driveId = up.id; f.driveUrl = up.url || ''; }
                     subidos++;
-                    if (onFileDone) onFileDone(f, i, files.length);
                 } catch (e) {
+                    const msg = (e && e.name === 'AbortError') ? 'tiempo agotado (30 s)' : (e.message || String(e));
                     console.error('Error subiendo ' + f.name, e);
-                    fallidos.push({ name: f.name, error: e.message });
+                    fallidos.push({ name: f.name, error: msg });
                 }
             }
-            // v3.7.79 FIX: el banner "Subiendo a Drive… 100%" se quedaba fijo en
-            // pantalla porque nadie lo cerraba al acabar bien (solo había aviso
-            // en el caso de fallo). Si hubo fallos, el llamador pinta su propio
-            // mensaje justo después.
             if (!fallidos.length) {
                 showStatus(`✓ ${subidos} archivo(s) subido(s) a Drive`, 'success');
                 setTimeout(hideStatus, 2500);
@@ -7237,22 +7066,15 @@
                 // v3.7.78: usar subida directa si ya hay token válido O si el
                 // usuario conectó Drive alguna vez (en ese caso se pedirá el
                 // token justo antes de subir, no al cargar la página).
-                let _drivePrevio = false;
-                try { _drivePrevio = localStorage.getItem('gdriveConnected') === '1'; } catch (e) {}
-                // v3.7.80: la subida directa (y su ventana de Google) solo tiene
-                // sentido para lotes pesados, que eran los que reventaban el
-                // límite de 6 min de Apps Script. Para lotes pequeños se usa el
-                // método de siempre: Apps Script sube los archivos con SU propia
-                // autorización y el navegador nunca pide permiso a Google.
-                let _lotePeso = 0;
                 try {
-                    files.forEach(f => {
-                        _lotePeso += f.size || Math.round((f.content || '').length * 0.75);
-                    });
-                } catch (e) {}
-                const _loteGrande = _lotePeso >= DIRECT_UPLOAD_MIN_BYTES;
-                const useDirectUpload = _loteGrande && (gdriveIsConnected() || _drivePrevio) && files.length > 0;
-                try {
+                    // v3.7.81 CAMBIO ESTRUCTURAL: la carpeta se crea SIEMPRE
+                    // vacía. Antes los archivos viajaban en base64 dentro de
+                    // ESTA petición (14 MB → ~19 MB de POST); Apps Script
+                    // tardaba >1 min y su respuesta —que llevaba el código de
+                    // presupuesto— se perdía en la redirección ("respuesta sin
+                    // código de presupuesto"). Ahora esta petición pesa unos KB,
+                    // vuelve en segundos, con reintento, y el código queda
+                    // asegurado ANTES de tocar los archivos.
                     folderResult = await apiPost({
                         action: 'createBudgetFolder',
                         channel: budgetData.channel,
@@ -7262,49 +7084,32 @@
                         clientWhatsApp: budgetData.clientWhatsApp,
                         internalComments: internalComments,
                         totalPages: totalPages,
-                        files: useDirectUpload ? [] : files,
+                        files: [],
                         numArchivosPrevisto: files.length,
                         tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
                         paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
                         apostilla: !!document.getElementById('docApostille')?.checked,
                         enHistorico: document.getElementById('docInHistory')?.checked !== false
-                    }, { retry: useDirectUpload });
+                    }, { retry: true });
                 } catch (folderErr) {
                     prodLogError('folder', (folderErr && folderErr.message) || 'sin respuesta');
                     throw folderErr;
                 }
 
-                // v3.7.72: subida directa navegador → Drive
-                let directUploadResults = null;   // v3.7.75
-                if (useDirectUpload && folderResult && folderResult.success && folderResult.folderId) {
-                    try {
-                        const res = await uploadFilesDirectToDrive(files, folderResult.folderId);
-                        directUploadResults = res;
-                        if (res.fallidos.length) {
-                            showStatus(`⚠️ ${res.subidos} subido(s), ${res.fallidos.length} fallaron: ` +
-                                res.fallidos.map(f => f.name).join(', '), 'error');
-                            setTimeout(hideStatus, 8000);
-                        }
-                    } catch (upErr) {
-                        // v3.7.78: si no se pudo obtener permiso o falló la
-                        // subida directa, no perder los archivos: se suben por
-                        // el método antiguo (a través de Apps Script).
-                        prodLogError('folder', 'Subida directa: ' + (upErr.message || upErr));
-                        showStatus('Subida directa no disponible, usando el método estándar...', 'warning');
-                        try {
-                            const resp2 = await apiPost({
-                                action: 'uploadFilesToFolder',
-                                folderId: folderResult.folderId,
-                                budgetId: folderResult.budgetId,
-                                files: files
-                            });
-                            if (!resp2 || !resp2.success) throw new Error((resp2 && resp2.error) || 'fallo al subir');
-                            setTimeout(hideStatus, 2000);
-                        } catch (e2) {
-                            showStatus('Error subiendo los archivos: ' + (e2.message || e2) +
-                                '. La carpeta está creada: puedes arrastrarlos en Drive y pulsar "Actualizar desde Drive".', 'error');
-                            setTimeout(hideStatus, 9000);
-                        }
+                // v3.7.82: ÚNICA ruta de subida — Apps Script, archivo a
+                // archivo, con presupuesto de tiempo de 30 s. (La subida directa
+                // con OAuth de navegador se retiró en esta versión: exigía
+                // "Conectar Google Drive" cada día porque los tokens de página
+                // web caducan a la hora por diseño de Google.)
+                let directUploadResults = null;
+                if (folderResult && folderResult.success && folderResult.folderId && files.length > 0) {
+                    const res = await uploadFilesViaAppsScript(files, folderResult.folderId, folderResult.budgetId);
+                    directUploadResults = res;
+                    if (res.fallidos.length) {
+                        showStatus(`⚠️ No se pudieron cargar: ` +
+                            res.fallidos.map(f => f.name).join(', ') +
+                            `. Súbelos a mano en Drive (botón 📂) y pulsa "🔄 Actualizar desde Drive".`, 'error');
+                        setTimeout(hideStatus, 12000);
                     }
                 }
                 stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
@@ -7361,7 +7166,7 @@
                             mimeType: f.type,
                             size: f.size,
                             pages: f.pages || 0,
-                            url: ''
+                            url: f.driveUrl || ''   // v3.7.81: la ruta Apps Script sí devuelve URL
                         }));
                     budgetData.numArchivos = budgetData.folderFiles.length;
                     // releer la carpeta en segundo plano para obtener ids/urls reales
