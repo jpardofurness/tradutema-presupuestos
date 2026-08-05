@@ -1889,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.85';
+        const HTML_VERSION = '3.7.87';
         const HTML_DATE = '04/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2031,6 +2031,11 @@
             if (!url || !url.includes('/exec')) {
                 showStatus('URL inválida. Debe terminar en /exec', 'error');
                 return;
+            }
+            // v3.7.86: si cambia la URL del API, la copia local del catálogo
+            // pertenece al API anterior: invalidarla.
+            if (url !== apiUrl) {
+                try { localStorage.removeItem('tradutema_boot_cache'); } catch (e) {}
             }
             apiUrl = url;
             localStorage.setItem('tradutema_api_url', url);
@@ -5060,58 +5065,90 @@
         }
 
         // ====== LOAD DATA ======
+        // v3.7.86: ARRANQUE INSTANTÁNEO. El catálogo (proveedores + tarifas +
+        // config) se guarda en localStorage al recibirse. Al abrir la app, si
+        // hay copia local se aplica al momento (la app queda usable en <1 s) y
+        // el catálogo se refresca en segundo plano sin bloquear ni molestar.
+        // Solo se bloquea con "Conectando..." la primera vez (sin caché).
+        let _wooAutoSyncLanzado = false;   // evitar doble auto-sync (caché + refresco)
+
+        function applyLoadedData(data) {
+            allProviders = data.providers || [];
+            allTariffs = data.tariffs || [];
+            if (data.marginParams) marginParams = data.marginParams;
+            // v3.7.4: catálogos
+            window.allDocumentTypes = data.documentTypes || ['Varios'];
+            window.allCountries = data.countries || [];
+            apiVersion = data.version || '?';
+            apiDate = data.versionDate || '';
+            // v3.7.20: enlaces de configuración (Sheet, carpeta general Drive)
+            window.configLinks = data.configLinks || {};
+
+            updateVersionIndicator();
+            populateLanguages();
+            populateDocMetadata();
+
+            // Auto-sync silencioso WooCommerce (última semana, en background)
+            if (!_wooAutoSyncLanzado) {
+                _wooAutoSyncLanzado = true;
+                setTimeout(() => syncWooCommerce(true), 2000);
+            }
+        }
+
+        async function fetchBootData() {
+            // Descarga el catálogo con hasta 3 intentos. Devuelve el objeto o lanza.
+            let _txt = '';
+            let _ultimoFallo = '';
+            for (let intento = 1; intento <= 3; intento++) {
+                try {
+                    const response = await fetch(apiUrl);
+                    _txt = (await response.text() || '').trim();
+                    if (_txt && !_txt.startsWith('<')) break;   // respuesta buena
+                    _ultimoFallo = _txt.startsWith('<') ? 'respuesta HTML' : 'respuesta vacía';
+                } catch (netErr) {
+                    _ultimoFallo = netErr.message || 'fallo de red';
+                    _txt = '';
+                }
+                if (intento < 3) await new Promise(r => setTimeout(r, intento * 1500));
+            }
+            if (!_txt || _txt.startsWith('<')) {
+                throw new Error('El servidor no respondió correctamente al cargar los datos (' + _ultimoFallo + '). Suele ser un corte temporal de Google: espera unos segundos y recarga.');
+            }
+            const data = JSON.parse(_txt);
+            if (!data.success) throw new Error(data.error || 'Error desconocido');
+            try { localStorage.setItem('tradutema_boot_cache', JSON.stringify(data)); } catch (e) {}
+            return data;
+        }
+
         async function loadData() {
+            // 1) Intentar arrancar desde la copia local
+            let cacheAplicada = false;
+            try {
+                const raw = localStorage.getItem('tradutema_boot_cache');
+                if (raw) {
+                    const cached = JSON.parse(raw);
+                    if (cached && cached.success) {
+                        applyLoadedData(cached);
+                        cacheAplicada = true;
+                    }
+                }
+            } catch (e) {}
+
+            if (cacheAplicada) {
+                // App ya usable. Refrescar en segundo plano, sin spinner ni errores
+                // molestos: si el refresco falla, se sigue con la copia local.
+                fetchBootData()
+                    .then(data => applyLoadedData(data))
+                    .catch(err => console.warn('Refresco de catálogo en segundo plano falló (se usa la copia local):', err.message));
+                return;
+            }
+
+            // 2) Primera vez (sin caché): carga bloqueante clásica
             showStatus('Conectando...', 'loading');
             try {
-                // v3.7.77: la respuesta de doGet es muy grande (proveedores +
-                // tarifas + configuración) y Apps Script la sirve vía redirección,
-                // por lo que a veces se pierde y llega HTML o vacío. Reintentamos
-                // hasta 3 veces con pausa creciente antes de dar error: así los
-                // cortes puntuales se resuelven solos, sin que el usuario vea nada.
-                let _txt = '';
-                let _ultimoFallo = '';
-                for (let intento = 1; intento <= 3; intento++) {
-                    try {
-                        if (intento > 1) showStatus(`Conectando... (reintento ${intento - 1}/2)`, 'loading');
-                        const response = await fetch(apiUrl);
-                        _txt = (await response.text() || '').trim();
-                        if (_txt && !_txt.startsWith('<')) break;   // respuesta buena
-                        _ultimoFallo = _txt.startsWith('<') ? 'respuesta HTML' : 'respuesta vacía';
-                    } catch (netErr) {
-                        _ultimoFallo = netErr.message || 'fallo de red';
-                        _txt = '';
-                    }
-                    if (intento < 3) await new Promise(r => setTimeout(r, intento * 1500));
-                }
-                if (!_txt || _txt.startsWith('<')) {
-                    throw new Error('El servidor no respondió correctamente al cargar los datos (' + _ultimoFallo + '). Suele ser un corte temporal de Google: espera unos segundos y recarga.');
-                }
-                const data = JSON.parse(_txt);
-                
-                if (data.success) {
-                    allProviders = data.providers || [];
-                    allTariffs = data.tariffs || [];
-                    if (data.marginParams) marginParams = data.marginParams;
-                    // v3.7.4: catálogos
-                    window.allDocumentTypes = data.documentTypes || ['Varios'];
-                    window.allCountries = data.countries || [];
-                    apiVersion = data.version || '?';
-                    apiDate = data.versionDate || '';
-                    // v3.7.20: enlaces de configuración (Sheet, carpeta general Drive)
-                    window.configLinks = data.configLinks || {};
-                    
-                    // Actualizar indicador en home
-                    updateVersionIndicator();
-                    
-                    populateLanguages();
-                    populateDocMetadata();
-                    hideStatus();
-                    
-                    // Auto-sync silencioso WooCommerce (última semana, en background)
-                    setTimeout(() => syncWooCommerce(true), 2000);
-                } else {
-                    throw new Error(data.error || 'Error desconocido');
-                }
+                const data = await fetchBootData();
+                applyLoadedData(data);
+                hideStatus();
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
                 updateVersionIndicator(true);
@@ -5201,6 +5238,13 @@
             const targetSelect = document.getElementById('targetLang');
             const quickSourceSelect = document.getElementById('quickSourceLang');
 
+            // v3.7.86: conservar lo ya seleccionado. Con el refresco del
+            // catálogo en segundo plano, esta función puede ejecutarse cuando
+            // el usuario ya ha elegido idiomas; sin esto se los borraría.
+            const prevSource = sourceSelect ? sourceSelect.value : '';
+            const prevTarget = targetSelect ? targetSelect.value : '';
+            const prevQuick = quickSourceSelect ? quickSourceSelect.value : '';
+
             sourceSelect.innerHTML = '<option value="">Seleccionar...</option>';
             targetSelect.innerHTML = '<option value="">Seleccionar...</option>';
             if (quickSourceSelect) quickSourceSelect.innerHTML = '<option value="">Seleccionar idioma...</option>';
@@ -5213,6 +5257,11 @@
             sortLanguagesFIGSFirst([...targetSet]).forEach(lang => {
                 targetSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
             });
+
+            // v3.7.86: restaurar la selección previa si sigue existiendo
+            if (prevSource && sourceSet.has(prevSource)) sourceSelect.value = prevSource;
+            if (prevTarget && targetSet.has(prevTarget)) targetSelect.value = prevTarget;
+            if (quickSourceSelect && prevQuick && sourceSet.has(prevQuick)) quickSourceSelect.value = prevQuick;
         }
 
         function onLanguageChange() {
@@ -7169,6 +7218,7 @@
                 // INTENTA subir: se crea la carpeta y se pide subida manual
                 // directamente (más rápido que esperar a que agote el tiempo).
                 let directUploadResults = null;
+                let _volverAPaso2 = false;   // v3.7.87: hay archivos sin subir → paso 2
                 if (folderResult && folderResult.success && folderResult.folderId && files.length > 0) {
                     let _pesoLote = 0;
                     try {
@@ -7186,6 +7236,9 @@
                             `<a href="${folderResult.folderUrl}" target="_blank" style="font-weight:600;">📂 la carpeta de Drive</a>` +
                             ` y pulsa "🔄 Actualizar desde Drive".`, 'warning');
                         // sin auto-cierre: se queda hasta que el usuario actúe
+                        // v3.7.87: marcar vuelta al paso 2 (Archivos); se hace
+                        // más abajo, cuando folderId/folderFiles ya están asignados.
+                        _volverAPaso2 = true;
                     } else {
                         const res = await uploadFilesViaAppsScript(files, folderResult.folderId, folderResult.budgetId);
                         directUploadResults = res;
@@ -7194,6 +7247,7 @@
                                 res.fallidos.map(f => f.name).join(', ') +
                                 `. Súbelos a mano en Drive (botón 📂) y pulsa "🔄 Actualizar desde Drive".`, 'error');
                             setTimeout(hideStatus, 12000);
+                            _volverAPaso2 = true;   // v3.7.87
                         }
                     }
                 }
@@ -7279,6 +7333,12 @@
                 if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
                 // v3.7.24: refrescar banner de resumen
                 if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+
+                // v3.7.87: si quedaron archivos sin subir, volver al paso 2
+                // (Archivos): ahí se ve el estado real y está el botón
+                // "🔄 Actualizar desde Drive". Se hace AQUÍ, con folderId y
+                // folderFiles ya asignados, para que la pantalla pinte bien.
+                if (_volverAPaso2) showCard(2);
 
                 // v3.7.69: regenerar el mensaje al cliente ahora que ya existe
                 // la referencia (budgetData.id). Sin esto, el mensaje se quedaba
