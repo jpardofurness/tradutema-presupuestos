@@ -646,14 +646,16 @@
     <main class="main">
         <div id="statusMessage" class="status-message"></div>
 
-        <!-- CONFIG (initially visible if no API) -->
+        <!-- CONFIG (initially visible if no API) · v3.7.84: renombrado a Ajustes -->
         <div class="config-section" id="configSection">
-            <div class="config-label">Configuración API (una sola vez)</div>
+            <div class="config-label">⚙️ Ajustes</div>
+
+            <label for="apiUrl" style="display:block; font-size:0.82rem; color:#475569; margin-bottom:4px;">
+                URL del API (Apps Script)
+            </label>
             <input type="text" id="apiUrl" class="config-input" placeholder="Pega la URL del Apps Script (termina en /exec)">
 
-            <!-- v3.7.83: ajustes -->
-            <div class="config-label" style="margin-top:14px;">⚙️ Ajustes</div>
-            <label for="uploadTimeoutSecs" style="display:block; font-size:0.82rem; color:#475569; margin-bottom:4px;">
+            <label for="uploadTimeoutSecs" style="display:block; font-size:0.82rem; color:#475569; margin-top:12px; margin-bottom:4px;">
                 Tiempo máximo de subida de archivos (segundos)
             </label>
             <input type="number" id="uploadTimeoutSecs" class="config-input" min="10" max="300" step="5" value="60" style="max-width:140px;">
@@ -661,7 +663,7 @@
                 Si en este tiempo no se han subido todos los archivos a Drive, se corta la espera y se te indica cuáles faltan para subirlos a mano (📂 + "Actualizar desde Drive").
             </div>
 
-            <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">Guardar y Conectar</button>
+            <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">💾 Guardar</button>
         </div>
 
         <!-- HOME SCREEN -->
@@ -1810,7 +1812,7 @@
     </main>
 
     <footer class="footer">
-        <div>Tradutema QUOTES 2026 - <a href="#" onclick="showConfig(); return false;">Cambiar API</a></div>
+        <div>Tradutema QUOTES 2026 - <a href="#" onclick="showConfig(); return false;">⚙️ Ajustes</a></div>
     </footer>
 
     <!-- Modal Preview Proveedor -->
@@ -1879,7 +1881,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.83';
+        const HTML_VERSION = '3.7.84';
         const HTML_DATE = '04/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6987,7 +6989,7 @@
         // Drive" antes que esperar). El backend (uploadFilesToFolder) deduplica
         // por nombre+tamaño: un archivo que llegue a Drive después de cortar la
         // espera NO se duplicará si se reintenta o se sube a mano.
-        // v3.7.83: ajustable en Configuración (Cambiar API → Ajustes),
+        // v3.7.83: ajustable en ⚙️ Ajustes (pie de página),
         // guardado en localStorage. Por defecto 60 s.
         const UPLOAD_TIMEOUT_DEFAULT_SECS = 60;
 
