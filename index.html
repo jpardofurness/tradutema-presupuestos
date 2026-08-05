@@ -1889,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.87';
+        const HTML_VERSION = '3.7.90';
         const HTML_DATE = '04/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2680,13 +2680,28 @@
             }
         }
 
+        // v3.7.89: limpiar los filtros del listado. Antes solo se limpiaban al
+        // CARGAR un presupuesto (v3.7.33); si salías sin cargar ninguno, el
+        // filtro (p. ej. un email escrito) se quedaba pegado para la próxima.
+        // Ahora se limpia SIEMPRE al entrar en "Retomar Tasación".
+        function resetBudgetFilters() {
+            const filterIds = ['filterCode', 'filterStatus', 'filterChannel',
+                               'filterSource', 'filterTarget', 'filterEmail',
+                               'filterWhatsApp', 'filterDateFrom'];
+            filterIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        }
+
         async function showBudgetList() {
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.remove('hidden');
             document.getElementById('quickCountScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
-            
+
+            resetBudgetFilters();   // v3.7.89
             await loadBudgets();
         }
 
@@ -4549,21 +4564,94 @@
             if (whatsapp) budgetData.clientWhatsApp = whatsapp.value.trim();
         }
 
-        async function loadBudgets() {
-            document.getElementById('budgetList').innerHTML = '<div class="no-budgets"><span class="spinner dark"></span> Cargando...</div>';
-            
+        // v3.7.88: mismo tratamiento que el arranque — el listado de
+        // presupuestos se guarda en localStorage; al entrar se pinta al
+        // instante la copia local y se refresca en segundo plano. El spinner
+        // bloqueante y el error solo aparecen si no hay copia local.
+        // v3.7.90: por defecto se piden solo los últimos 50 (respuesta ligera
+        // → casi imposible que se pierda). "Cargar todos" bajo demanda.
+        const BUDGETS_DEFAULT_LIMIT = 50;
+        let budgetsTotal = 0;          // total real en la hoja (lo dice el backend)
+        let budgetsShowingAll = false; // ¿está cargado el listado completo?
+
+        async function fetchBudgetsData(limit) {
+            const data = await apiPost({ action: 'getBudgets', limit: limit || 0 });
+            if (!data.success) throw new Error(data.error || 'Error desconocido');
+            const budgets = data.budgets || [];
+            budgetsTotal = data.total || budgets.length;
+            if (limit) {
+                // solo se cachea el listado ligero (es el que arranca rápido)
+                try { localStorage.setItem('tradutema_budgets_cache', JSON.stringify(budgets)); } catch (e) {}
+            }
+            return budgets;
+        }
+
+        function applyBudgets(budgets) {
+            allBudgets = budgets || [];
+            populateFilterLanguages();
+            filterBudgets();
+            updateLoadAllBudgetsBar();
+        }
+
+        // v3.7.90: barra "Mostrando X de Y · Cargar todos"
+        function updateLoadAllBudgetsBar() {
+            let bar = document.getElementById('loadAllBudgetsBar');
+            if (!bar) {
+                const list = document.getElementById('budgetList');
+                if (!list || !list.parentNode) return;
+                bar = document.createElement('div');
+                bar.id = 'loadAllBudgetsBar';
+                bar.style.cssText = 'text-align:center; margin:10px 0; font-size:0.82rem; color:#64748b;';
+                list.parentNode.insertBefore(bar, list);
+            }
+            if (!budgetsShowingAll && budgetsTotal > allBudgets.length) {
+                bar.innerHTML = `Mostrando los <b>${allBudgets.length}</b> más recientes de <b>${budgetsTotal}</b> · ` +
+                    `<a href="#" onclick="loadAllBudgets(); return false;" style="font-weight:600;">📥 Cargar todos</a>`;
+                bar.style.display = 'block';
+            } else {
+                bar.style.display = 'none';
+            }
+        }
+
+        async function loadAllBudgets() {
+            const bar = document.getElementById('loadAllBudgetsBar');
+            if (bar) bar.innerHTML = '<span class="spinner dark"></span> Cargando todos los presupuestos...';
             try {
-                const data = await apiPost({ action: 'getBudgets' });
-                
-                if (data.success) {
-                    allBudgets = data.budgets || [];
-                    populateFilterLanguages();
-                    filterBudgets();
-                } else {
-                    throw new Error(data.error);
+                const budgets = await fetchBudgetsData(0);   // sin límite
+                budgetsShowingAll = true;
+                applyBudgets(budgets);
+            } catch (e) {
+                if (bar) bar.innerHTML = 'No se pudo cargar el listado completo: ' + e.message +
+                    ' · <a href="#" onclick="loadAllBudgets(); return false;">Reintentar</a>';
+            }
+        }
+
+        async function loadBudgets() {
+            budgetsShowingAll = false;   // cada entrada empieza en modo ligero
+            let cacheAplicada = false;
+            try {
+                const raw = localStorage.getItem('tradutema_budgets_cache');
+                if (raw) {
+                    applyBudgets(JSON.parse(raw));
+                    cacheAplicada = true;
                 }
+            } catch (e) {}
+
+            if (cacheAplicada) {
+                // Refresco silencioso: si falla, se sigue con la copia local
+                fetchBudgetsData(BUDGETS_DEFAULT_LIMIT)
+                    .then(budgets => { if (!budgetsShowingAll) applyBudgets(budgets); })
+                    .catch(err => console.warn('Refresco de presupuestos falló (se usa la copia local):', err.message));
+                return;
+            }
+
+            document.getElementById('budgetList').innerHTML = '<div class="no-budgets"><span class="spinner dark"></span> Cargando...</div>';
+            try {
+                applyBudgets(await fetchBudgetsData(BUDGETS_DEFAULT_LIMIT));
             } catch (error) {
-                document.getElementById('budgetList').innerHTML = `<div class="no-budgets">Error: ${error.message}</div>`;
+                document.getElementById('budgetList').innerHTML =
+                    `<div class="no-budgets">Error: ${error.message}<br>` +
+                    `<button class="btn btn-secondary" style="margin-top:10px;" onclick="loadBudgets()">🔄 Reintentar</button></div>`;
             }
         }
 
@@ -4576,16 +4664,20 @@
             });
             
             const selectSource = document.getElementById('filterSource');
+            const prevSource = selectSource.value;   // v3.7.88: conservar filtro
             selectSource.innerHTML = '<option value="">Todos</option>';
             [...sourceLangs].sort().forEach(lang => {
                 selectSource.innerHTML += `<option value="${lang}">${lang}</option>`;
             });
+            if (prevSource && sourceLangs.has(prevSource)) selectSource.value = prevSource;
             
             const selectTarget = document.getElementById('filterTarget');
+            const prevTarget = selectTarget.value;   // v3.7.88
             selectTarget.innerHTML = '<option value="">Todos</option>';
             [...targetLangs].sort().forEach(lang => {
                 selectTarget.innerHTML += `<option value="${lang}">${lang}</option>`;
             });
+            if (prevTarget && targetLangs.has(prevTarget)) selectTarget.value = prevTarget;
         }
 
         function filterBudgets() {
@@ -4621,7 +4713,14 @@
             const container = document.getElementById('budgetList');
             
             if (filteredBudgets.length === 0) {
-                container.innerHTML = '<div class="no-budgets">No hay presupuestos con estos filtros</div>';
+                // v3.7.90: si solo están cargados los recientes, el que buscas
+                // puede estar en los antiguos: ofrecer cargar el listado completo.
+                if (!budgetsShowingAll && budgetsTotal > allBudgets.length) {
+                    container.innerHTML = '<div class="no-budgets">No hay resultados entre los ' + allBudgets.length +
+                        ' más recientes.<br><a href="#" onclick="loadAllBudgets(); return false;" style="font-weight:600;">📥 Cargar todos los presupuestos (' + budgetsTotal + ')</a></div>';
+                } else {
+                    container.innerHTML = '<div class="no-budgets">No hay presupuestos con estos filtros</div>';
+                }
                 return;
             }
             
@@ -4807,15 +4906,9 @@
 
             // v3.7.33: limpiar también los filtros del listado, para que la
             // próxima vez que el usuario abra "Presupuestos" vea TODOS y no
-            // los del filtro anterior (que puede ya no encajar con su nueva
-            // búsqueda).
-            const filterIds = ['filterCode', 'filterStatus', 'filterChannel',
-                               'filterSource', 'filterTarget', 'filterEmail',
-                               'filterWhatsApp', 'filterDateFrom'];
-            filterIds.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
+            // los del filtro anterior. (v3.7.89: extraído a resetBudgetFilters,
+            // que ahora también se ejecuta al entrar en la pantalla.)
+            resetBudgetFilters();
 
             try {
                 const data = await apiPost({ action: 'getBudget', budgetId: budgetId });
