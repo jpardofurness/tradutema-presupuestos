@@ -1889,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.94';
+        const HTML_VERSION = '3.7.95';
         const HTML_DATE = '06/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -8442,31 +8442,51 @@
                 hideStatus();
             }
 
-            // v3.7.9: refrescar folderFiles desde Drive en tiempo real para
-            // que la lista del modal refleje exactamente lo que el backend
-            // adjuntará al email (protege contra desincronizaciones previas).
-            if (budgetData.folderId) {
-                try {
-                    const refreshData = await apiPost({ action: 'listFolderFiles', folderId: budgetData.folderId });
-                    if (refreshData.success && Array.isArray(refreshData.files)) {
-                        budgetData.folderFiles = refreshData.files;
-                    }
-                } catch(e) {
-                    console.warn('Refresh folderFiles failed:', e);
-                }
-            }
-
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
             const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
-            
-            // Generar info de destinatarios
+
+            // v3.7.95: el modal se abre AL INSTANTE con los datos ya conocidos;
+            // la verificación de adjuntos contra Drive (listFolderFiles, la
+            // llamada que causaba la espera de varios segundos) se hace en
+            // segundo plano y actualiza la lista cuando llega.
+            renderProviderPreviewInfo(providers, '⏳ verificando adjuntos en Drive...');
+
+            // Generar mensaje editable y abrir el modal YA
+            const originalBody = generateProviderEmailBody(providers[0], includeWords, includeProposedRate);
+            document.getElementById('providerMessageEdit').value = originalBody;
+            document.getElementById('providerPreviewModal').classList.add('visible');
+
+            // v3.7.95: verificación de adjuntos en segundo plano
+            if (budgetData.folderId) {
+                apiPost({ action: 'listFolderFiles', folderId: budgetData.folderId })
+                    .then(refreshData => {
+                        if (refreshData.success && Array.isArray(refreshData.files)) {
+                            budgetData.folderFiles = refreshData.files;
+                        }
+                        renderProviderPreviewInfo(providers, '');
+                        // Regenerar el mensaje SOLO si el usuario no lo ha tocado
+                        const el = document.getElementById('providerMessageEdit');
+                        if (el && el.value === originalBody) {
+                            el.value = generateProviderEmailBody(providers[0], includeWords, includeProposedRate);
+                        }
+                    })
+                    .catch(e => {
+                        console.warn('Refresh folderFiles failed:', e);
+                        renderProviderPreviewInfo(providers, '');
+                    });
+            }
+        }
+
+        // v3.7.95: pinta el bloque de asunto/destinatarios/adjuntos del modal.
+        // Extraído de previewProviderEmail para poder repintarlo cuando llega
+        // la verificación de Drive en segundo plano.
+        function renderProviderPreviewInfo(providers, nota) {
             let recipientsHtml = `
                 <div><strong>Asunto:</strong> Nueva Tasación Traducción Jurada ${budgetData.sourceLang} > ${budgetData.targetLang} [${budgetData.id}]</div>
                 <div style="margin-top: 8px;"><strong>Destinatarios (${providers.length}):</strong> ${providers.map(p => p.nombre).join(', ')}</div>
             `;
-            
-            // v3.7.6: lista completa de archivos (Drive + pendientes de subir)
+
             const driveFiles = (budgetData.folderFiles || [])
                 .filter(f => f.name && !f.name.endsWith('.txt'))  // excluir _RECUENTO.txt y similares
                 .map(f => f.name);
@@ -8478,23 +8498,22 @@
                 const pendingNote = pendingFiles.length > 0
                     ? ` <span style="color:#7c3aed; font-weight:500;">(${pendingFiles.length} se subirán al enviar)</span>`
                     : '';
+                // v3.7.95: con varios archivos, el backend los agrupa en un ZIP
+                const zipNote = allFiles.length > 1
+                    ? ` <span style="color:#475569; font-weight:normal;">· se enviarán en un único ZIP (${budgetData.id}_documentos.zip)</span>`
+                    : '';
+                const notaHtml = nota ? `<div style="font-size:0.78rem; color:#94a3b8; margin-top:2px;">${nota}</div>` : '';
                 recipientsHtml += `
                     <div style="margin-top: 8px; color: #1e8449;">
-                        <strong>📎 Adjuntos: ${allFiles.length} archivo(s)</strong>${pendingNote}
+                        <strong>📎 Adjuntos: ${allFiles.length} archivo(s)</strong>${pendingNote}${zipNote}
+                        ${notaHtml}
                         <ul style="margin:6px 0 0 20px; padding:0; font-size:0.85rem; color:#475569; font-weight:normal;">${filesList}</ul>
                     </div>
                 `;
             } else {
                 recipientsHtml += `<div style="margin-top: 8px; color: #b91c1c;"><strong>⚠️ Sin adjuntos</strong></div>`;
             }
-            
             document.getElementById('previewRecipients').innerHTML = recipientsHtml;
-            
-            // Generar mensaje editable
-            const messageBody = generateProviderEmailBody(providers[0], includeWords, includeProposedRate);
-            document.getElementById('providerMessageEdit').value = messageBody;
-            
-            document.getElementById('providerPreviewModal').classList.add('visible');
         }
 
         function generateProviderEmailBody(provider, includeWords, includeProposedRate) {
