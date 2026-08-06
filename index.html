@@ -1837,7 +1837,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeProviderModal()">Cancelar</button>
-                <button class="btn btn-primary btn-success" onclick="sendProviderEmails()">Enviar</button>
+                <button class="btn btn-primary btn-success" id="providerSendBtn" onclick="sendProviderEmails()">Enviar</button>
             </div>
         </div>
     </div>
@@ -1889,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.95';
+        const HTML_VERSION = '3.7.96';
         const HTML_DATE = '06/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -8598,16 +8598,34 @@
             document.getElementById('providerPreviewModal').classList.remove('visible');
         }
 
+        let _sendingProviders = false;   // v3.7.96: guard anti doble clic
+
         async function sendProviderEmails() {
+            // v3.7.96: si ya hay un envío en curso, ignorar el clic
+            if (_sendingProviders) return;
+            _sendingProviders = true;
+
+            // Feedback INMEDIATO en el propio botón antes de cerrar el modal
+            const sendBtn = document.getElementById('providerSendBtn');
+            if (sendBtn) {
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<span class="spinner"></span> Enviando...';
+            }
+
             closeProviderModal();
             
             const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
             const customMessage = document.getElementById('providerMessageEdit').value;
             const additionalComments = document.getElementById('providerComments').value.trim();
             
-            showStatus('Enviando emails a proveedores...', 'loading');
+            showStatus('Enviando emails a proveedores... (con adjuntos puede tardar ~1 min; no repitas el envío)', 'loading');
             
             try {
+                // v3.7.96: SIN reintento automático. Enviar emails NO es
+                // idempotente: si la respuesta se pierde tras un envío que sí
+                // salió, el reintento duplicaba los correos (caso real:
+                // duplicados a las 11:31 y 11:32). El backend v3.7.60 añade
+                // además un candado de 2 min por proveedor.
                 const data = await apiPost({
                         action: 'sendProviderEmails',
                         providers: providers,
@@ -8617,7 +8635,7 @@
                         targetLang: budgetData.targetLang,
                         customMessage: customMessage,  // Mensaje editado por el usuario
                         additionalComments: additionalComments  // Comentarios para proveedores
-                    });
+                    }, { retry: false });
                 
                 if (data.success) {
                     hideStatus();
@@ -8665,8 +8683,16 @@
                     throw new Error(data.error);
                 }
             } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
-                setTimeout(hideStatus, 3000);
+                // v3.7.96: sin reintento automático, un fallo real llega aquí.
+                // OJO: la respuesta perdida NO implica que el envío no saliera;
+                // el candado del backend (v3.7.60) evita duplicados al reintentar.
+                showStatus('Error: ' + error.message + ' — Si vuelves a pulsar Enviar, el sistema evita duplicados automáticamente.', 'error');
+                setTimeout(hideStatus, 6000);
+            } finally {
+                // v3.7.96: restaurar botón y guard pase lo que pase
+                _sendingProviders = false;
+                const sb = document.getElementById('providerSendBtn');
+                if (sb) { sb.disabled = false; sb.innerHTML = 'Enviar'; }
             }
         }
         
