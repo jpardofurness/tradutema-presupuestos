@@ -1889,8 +1889,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.92';
-        const HTML_DATE = '04/08/2026';
+        const HTML_VERSION = '3.7.93';
+        const HTML_DATE = '06/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -7158,7 +7158,10 @@
         async function apiPost(payload, opts) {
             const options = opts || {};
             const accion = API_ACTION_LABELS[payload && payload.action] || (payload && payload.action) || 'la operación';
-            const intentos = options.retry === false ? 1 : 2;
+            // v3.7.93: intentos configurables (options.attempts) con espera
+            // creciente. Para llamadas críticas y baratas (crear carpeta) se
+            // puede subir a 4; el resto sigue en 2 como hasta ahora.
+            const intentos = options.retry === false ? 1 : (options.attempts || 2);
             let ultimoError = null;
 
             for (let intento = 1; intento <= intentos; intento++) {
@@ -7177,7 +7180,7 @@
                             `Suele ser un corte temporal de Google: espera unos segundos y reinténtalo.`
                         );
                         if (intento < intentos) {
-                            await new Promise(r => setTimeout(r, 1500));
+                            await new Promise(r => setTimeout(r, 1500 * intento));
                             continue;
                         }
                         throw ultimoError;
@@ -7329,6 +7332,14 @@
                 // v3.7.78: usar subida directa si ya hay token válido O si el
                 // usuario conectó Drive alguna vez (en ese caso se pedirá el
                 // token justo antes de subir, no al cargar la página).
+                // v3.7.93: requestId único por creación. Se guarda en bgState
+                // para que el botón "Reintentar" reutilice EL MISMO id: si la
+                // primera ejecución llegó al servidor y solo se perdió la
+                // respuesta, el backend (v3.7.57) devuelve la carpeta ya creada
+                // en vez de duplicarla. Reintentar es ahora 100% seguro.
+                if (!bgState.requestId) {
+                    bgState.requestId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                }
                 try {
                     // v3.7.81 CAMBIO ESTRUCTURAL: la carpeta se crea SIEMPRE
                     // vacía. Antes los archivos viajaban en base64 dentro de
@@ -7352,8 +7363,9 @@
                         tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
                         paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
                         apostilla: !!document.getElementById('docApostille')?.checked,
-                        enHistorico: document.getElementById('docInHistory')?.checked !== false
-                    }, { retry: true });
+                        enHistorico: document.getElementById('docInHistory')?.checked !== false,
+                        requestId: bgState.requestId   // v3.7.93: idempotencia
+                    }, { retry: true, attempts: 4 });   // v3.7.93: 4 intentos (seguro gracias al requestId)
                 } catch (folderErr) {
                     prodLogError('folder', (folderErr && folderErr.message) || 'sin respuesta');
                     throw folderErr;
@@ -7531,12 +7543,26 @@
                     // de Apps Script >6 min, o red). NO perdemos la carpeta.
                     prodLogError('analyze', claudeHardError);
                     bgState.analysisError = claudeHardError;
-                    const isTimeout = /failed to fetch|networkerror|load failed/i.test(claudeHardError);
-                    const msg = isTimeout
-                        ? `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis superó el límite de 6 min de Apps Script (documento largo). Pulsa "Analizar" en el paso 2 para reintentarlo.`
-                        : `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis falló: ${claudeHardError}. Pulsa "Analizar" en el paso 2.`;
-                    showBgBanner('warning', msg, false);
-                    showGlobalAnalysisBanner('warning', msg);
+                    // v3.7.93: los archivos YA están en Drive (desde v3.7.81 se
+                    // suben antes del análisis), así que en vez de pedirle al
+                    // usuario que pulse "Analizar", se relanza AUTOMÁTICAMENTE
+                    // por esa misma vía (reanalyzeFolder), que además tiene el
+                    // rescate desde la hoja (v3.7.92) si se pierde la respuesta.
+                    const msgAuto = `✓ Carpeta creada · ${budgetData.id} · ⚠️ el primer análisis falló; reintentando automáticamente...`;
+                    showBgBanner('warning', msgAuto, false);
+                    showGlobalAnalysisBanner('loading', '⏳ ' + msgAuto);
+                    try {
+                        await reanalyzeFromFolder();
+                        bgState.analysisError = null;
+                        bgState.analysisDone = true;
+                    } catch (e2) {
+                        const isTimeout = /failed to fetch|networkerror|load failed/i.test(claudeHardError);
+                        const msg = isTimeout
+                            ? `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis superó el límite de 6 min de Apps Script (documento largo). Pulsa "Analizar" en el paso 2 para reintentarlo.`
+                            : `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis falló: ${claudeHardError}. Pulsa "Analizar" en el paso 2.`;
+                        showBgBanner('warning', msg, false);
+                        showGlobalAnalysisBanner('warning', msg);
+                    }
                 } else if (withAnalysis && claudeResult) {
                     prodLogDone('analyze', claudeResult.success ? `${claudeResult.totalWords || 0} palabras` : (claudeResult.error || 'sin éxito'));
                     if (claudeResult._debug) console.log('[Tradutema DEBUG]', claudeResult._debug);
