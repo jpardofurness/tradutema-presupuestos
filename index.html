@@ -1889,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.93';
+        const HTML_VERSION = '3.7.94';
         const HTML_DATE = '06/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -7394,8 +7394,15 @@
                         const mbLim = Math.round(_limiteBytes / 1048576);
                         directUploadResults = { subidos: 0, fallidos: files.map(f => ({ name: f.name, error: 'lote > ' + mbLim + ' MB' })) };
                         prodLogDone('folder', (folderResult.budgetId || '') + ' · lote ' + mbLote + ' MB > ' + mbLim + ' MB: subida manual');
+                        // v3.7.94: defensa — si folderUrl no es una URL completa
+                        // (p. ej. viniera solo el ID), construirla desde el ID
+                        // para que el enlace nunca apunte a la propia web (404).
+                        let _urlCarpeta = folderResult.folderUrl || '';
+                        if (_urlCarpeta.indexOf('http') !== 0) {
+                            _urlCarpeta = 'https://drive.google.com/drive/folders/' + (folderResult.folderId || _urlCarpeta);
+                        }
                         showStatus(`⚠️ Los archivos pesan ${mbLote} MB (más de ${mbLim} MB): súbelos directamente a ` +
-                            `<a href="${folderResult.folderUrl}" target="_blank" style="font-weight:600;">📂 la carpeta de Drive</a>` +
+                            `<a href="${_urlCarpeta}" target="_blank" style="font-weight:600;">📂 la carpeta de Drive</a>` +
                             ` y pulsa "🔄 Actualizar desde Drive".`, 'warning');
                         // sin auto-cierre: se queda hasta que el usuario actúe
                         // v3.7.87: marcar vuelta al paso 2 (Archivos); se hace
