@@ -1889,7 +1889,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.96';
+        const HTML_VERSION = '3.7.99';
         const HTML_DATE = '06/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -7542,6 +7542,24 @@
                         claudeHardError = (cErr && cErr.message) ? cErr.message : 'Failed to fetch';
                     }
                     stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
+
+                    // v3.7.97: un "éxito" con análisis vacío (caso real 0806-08-W:
+                    // recuento 0 en silencio) es ilegal y se degrada a FALLO DURO,
+                    // que es la rama que relanza automáticamente por la vía
+                    // robusta (reanalyzeFolder, con rescate desde la hoja).
+                    if (claudeResult && claudeResult.success &&
+                        (!Array.isArray(claudeResult.analysis) || claudeResult.analysis.length === 0) &&
+                        files.length > 0) {
+                        // v3.7.99 TRAZADOR: dejar la respuesta cruda en el log de
+                        // proceso (botón copiar) para diagnóstico del caso 0806-08-W.
+                        try {
+                            prodLogError('analyze', 'RESPUESTA ANÓMALA (éxito sin análisis): ' +
+                                JSON.stringify(claudeResult).substring(0, 600));
+                        } catch (e) {}
+                        claudeFailedHard = true;
+                        claudeHardError = 'análisis vacío con ' + files.length + ' archivo(s)';
+                        claudeResult = null;
+                    }
                 }
 
                 // Procesar resultado del análisis si lo hubo
@@ -9954,6 +9972,43 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             setBtn('sendClientBtn', hasEmail, 'Añade un email del cliente para enviarlo por correo');
         }
 
+        // v3.7.98: guardado en segundo plano tras copiar al portapapeles.
+        // La copia es instantánea y NO depende del servidor; las tres
+        // escrituras (datos cliente → historial → estado) tardan a veces
+        // >1 min con los reintentos y bloqueaban la pantalla sin necesidad.
+        let _savingClientCopy = false;
+
+        function _saveClientCopyBackground(tipo, destinatario, labelCanal, historialKey) {
+            if (_savingClientCopy) return;   // anti doble clic: ya hay un guardado en marcha
+            _savingClientCopy = true;
+            (async () => {
+                try {
+                    await saveClientData();
+                    const historialResult = await saveClientSendHistoryFE(tipo, destinatario);
+                    await updateBudgetStatusFE('2-Presupuesto Enviado');
+
+                    completedSteps.add(5);
+                    updateProgressSteps();
+
+                    if (historialResult && historialResult.fechaEnvio) {
+                        if (!budgetData.historialCliente) budgetData.historialCliente = {};
+                        if (!budgetData.historialCliente[historialKey]) budgetData.historialCliente[historialKey] = [];
+                        budgetData.historialCliente[historialKey].push({ fecha: historialResult.fechaEnvio, destinatario: destinatario });
+                        renderClientSendHistory();
+                    }
+                    showStatus('✓ Copiado para ' + labelCanal + ' - Estado actualizado', 'success');
+                    setTimeout(hideStatus, 2500);
+                } catch (error) {
+                    console.error('Error guardando tras copiar (' + labelCanal + '):', error);
+                    showStatus('⚠️ El texto está copiado y puedes pegarlo, pero el guardado del estado falló: ' +
+                        (error.message || error) + '. Vuelve a pulsar el botón para reintentar el guardado.', 'error');
+                    setTimeout(hideStatus, 8000);
+                } finally {
+                    _savingClientCopy = false;
+                }
+            })();
+        }
+
         async function copyForWhatsApp() {
             // v3.7.70: atenúa botones según el contacto disponible
             if (typeof updateClientChannelButtons === 'function') updateClientChannelButtons();
@@ -9966,30 +10021,10 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             
             try {
                 await navigator.clipboard.writeText(message);
-                showStatus('Guardando y copiando...', 'loading');
-                
-                // Guardar datos del cliente
-                await saveClientData();
-                
-                // Guardar historial de envío
-                const historialResult = await saveClientSendHistoryFE('whatsapp', whatsapp);
-                
-                // Actualizar estado a "2-Presupuesto Enviado"
-                await updateBudgetStatusFE('2-Presupuesto Enviado');
-                
-                completedSteps.add(5);
-                updateProgressSteps();
-                
-                // Actualizar historial local y mostrar
-                if (historialResult && historialResult.fechaEnvio) {
-                    if (!budgetData.historialCliente) budgetData.historialCliente = {};
-                    if (!budgetData.historialCliente.whatsapp) budgetData.historialCliente.whatsapp = [];
-                    budgetData.historialCliente.whatsapp.push({ fecha: historialResult.fechaEnvio, destinatario: whatsapp });
-                    renderClientSendHistory();
-                }
-                
-                showStatus('✓ Copiado para WhatsApp - Estado actualizado', 'success');
-                setTimeout(hideStatus, 2500);
+                // v3.7.98: feedback INMEDIATO — el texto ya está en el
+                // portapapeles y se puede pegar; el guardado va en 2º plano.
+                showStatus('✓ Copiado (WhatsApp) — ya puedes pegarlo · guardando estado en segundo plano...', 'success');
+                _saveClientCopyBackground('whatsapp', whatsapp, 'WhatsApp', 'whatsapp');
             } catch (error) {
                 console.error('Error en copyForWhatsApp:', error);
                 showStatus('Error: ' + error.message, 'error');
@@ -10007,30 +10042,9 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             
             try {
                 await navigator.clipboard.writeText(message);
-                showStatus('Guardando y copiando...', 'loading');
-                
-                // Guardar datos del cliente
-                await saveClientData();
-                
-                // Guardar historial de envío
-                const historialResult = await saveClientSendHistoryFE('email_copiado', email);
-                
-                // Actualizar estado a "2-Presupuesto Enviado"
-                await updateBudgetStatusFE('2-Presupuesto Enviado');
-                
-                completedSteps.add(5);
-                updateProgressSteps();
-                
-                // Actualizar historial local y mostrar
-                if (historialResult && historialResult.fechaEnvio) {
-                    if (!budgetData.historialCliente) budgetData.historialCliente = {};
-                    if (!budgetData.historialCliente.email_copiado) budgetData.historialCliente.email_copiado = [];
-                    budgetData.historialCliente.email_copiado.push({ fecha: historialResult.fechaEnvio, destinatario: email });
-                    renderClientSendHistory();
-                }
-                
-                showStatus('✓ Copiado para Email - Estado actualizado', 'success');
-                setTimeout(hideStatus, 2500);
+                // v3.7.98: feedback inmediato + guardado en 2º plano
+                showStatus('✓ Copiado (Email) — ya puedes pegarlo · guardando estado en segundo plano...', 'success');
+                _saveClientCopyBackground('email_copiado', email, 'Email', 'email_copiado');
             } catch (error) {
                 console.error('Error en copyForEmail:', error);
                 showStatus('Error: ' + error.message, 'error');
