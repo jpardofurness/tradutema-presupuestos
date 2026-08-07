@@ -1,4 +1,4 @@
-<!-- TRADUTEMA QUOTES - Gestor de    Presupuestos -->
+<!-- TRADUTEMA QUOTES - Gestor de Presupuestos -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -632,6 +632,7 @@
                 <span><span style="color:#64748b;">Tarifa:</span> <strong id="bsBarTarifa" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Importe:</span> <strong id="bsBarImporte" style="color:#15803d;">—</strong></span>
                 <span><span style="color:#64748b;">Plazo:</span> <strong id="bsBarPlazo" style="color:#0c4a6e;">—</strong></span>
+                <span id="bsBarPedido" style="display:none;"></span>
             </div>
             <span id="bsBarEstado" style="font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;background:#e2e8f0;color:#475569;"></span>
         </div>
@@ -661,6 +662,15 @@
             <input type="number" id="uploadTimeoutSecs" class="config-input" min="10" max="300" step="5" value="60" style="max-width:140px;">
             <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">
                 Si en este tiempo no se han subido todos los archivos a Drive, se corta la espera y se te indica cuáles faltan para subirlos a mano (📂 + "Actualizar desde Drive").
+            </div>
+
+            <label style="display:block; font-size:0.82rem; color:#475569; margin-top:12px; margin-bottom:4px;">
+                💻 Modo local (solo PC con Google Drive Desktop)
+            </label>
+            <div id="localModeStatus" style="font-size:0.8rem; color:#475569; margin-bottom:6px;"></div>
+            <button type="button" class="btn btn-secondary" onclick="chooseLocalFolder()" style="font-size:0.82rem; padding:6px 12px;">📁 Elegir carpeta local _PRESUPUESTOS</button>
+            <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">
+                Con el modo local, la carpeta y los archivos se crean al instante en tu disco (C:\_DATA\TRADUTEMA\02-CLIENTES\Proyectos\_PRESUPUESTOS) y Google Drive Desktop los sincroniza solo. En el móvil no aplica: ahí siempre se usa Drive.
             </div>
 
             <label for="uploadMaxMb" style="display:block; font-size:0.82rem; color:#475569; margin-top:12px; margin-bottom:4px;">
@@ -1889,8 +1899,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.7.99';
-        const HTML_DATE = '06/08/2026';
+        const HTML_VERSION = '3.8.0';
+        const HTML_DATE = '07/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2065,6 +2075,7 @@
             // v3.7.85: precargar peso máximo para subida automática
             const mEl = document.getElementById('uploadMaxMb');
             if (mEl) mEl.value = Math.round(getUploadMaxAutoBytes() / 1048576);
+            updateLocalModeUI();   // v3.8.0
         }
 
         // ====== HOME SCREEN ======
@@ -2280,6 +2291,23 @@
             document.getElementById('bsBarTarifa').textContent = fmtTarifa(tarifa);
             document.getElementById('bsBarImporte').textContent = fmtEuros(importe);
             document.getElementById('bsBarPlazo').textContent = plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—';
+
+            // v3.7.100: enlaces al pedido WooCommerce y al Dashboard CRM
+            const pedidoEl = document.getElementById('bsBarPedido');
+            if (pedidoEl) {
+                const nPed = (budgetData.numeroPedido || '').toString().trim();
+                if (nPed) {
+                    const wooUrl = 'https://tradutema.com/wp-admin/post.php?post=' + nPed + '&action=edit';
+                    const dashUrl = 'https://tradutema.com/wp-admin/admin.php?page=tradutema-crm-order&order_id=' + nPed;
+                    pedidoEl.innerHTML =
+                        '🛒 <a href="' + wooUrl + '" target="_blank" style="color:#7d3c98;font-weight:600;">Pedido #' + nPed + '</a>' +
+                        ' · 📊 <a href="' + dashUrl + '" target="_blank" style="color:#0e7490;font-weight:600;">Dashboard</a>';
+                    pedidoEl.style.display = '';
+                } else {
+                    pedidoEl.style.display = 'none';
+                    pedidoEl.innerHTML = '';
+                }
+            }
 
             // v3.7.55: estado como chip con color según fase del flujo
             const estadoEl = document.getElementById('bsBarEstado');
@@ -4767,7 +4795,10 @@
                 let pedidoHtml = '';
                 if (b.numeroPedido) {
                     const wooUrl = `https://tradutema.com/wp-admin/post.php?post=${b.numeroPedido}&action=edit`;
-                    pedidoHtml = `<span class="budget-item-detail" style="color:#7d3c98;font-weight:600;">🛒 <a href="${wooUrl}" target="_blank" onclick="event.stopPropagation()" style="color:#7d3c98;">Pedido #${b.numeroPedido}</a></span>`;
+                    // v3.7.100: enlace al Dashboard CRM junto al del pedido
+                    const dashUrl = `https://tradutema.com/wp-admin/admin.php?page=tradutema-crm-order&order_id=${b.numeroPedido}`;
+                    pedidoHtml = `<span class="budget-item-detail" style="color:#7d3c98;font-weight:600;">🛒 <a href="${wooUrl}" target="_blank" onclick="event.stopPropagation()" style="color:#7d3c98;">Pedido #${b.numeroPedido}</a></span>` +
+                        `<span class="budget-item-detail" style="color:#0e7490;font-weight:600;">📊 <a href="${dashUrl}" target="_blank" onclick="event.stopPropagation()" style="color:#0e7490;">Dashboard</a></span>`;
                 }
                 
                 // Mostrar traductores contactados y elegido CON HISTORIAL DE ENVÍOS
@@ -4977,6 +5008,7 @@
                         budgetData.savedQuotePricePerWord = parseFloat(b.tarifa) || 0;
                     }
                     budgetData.estado = b.estado || '';
+                    budgetData.numeroPedido = b.numeroPedido || '';   // v3.7.100: para enlaces Pedido/Dashboard en la barra
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
                     budgetData.hasRecuento = !!b.hasRecuento;  // v3.7.22
                     
@@ -6781,6 +6813,20 @@
         }
 
         async function reanalyzeFromFolder() {
+            // v3.8.0: en modo local, la carpeta puede no estar aún en Drive
+            // (Drive Desktop sincronizando). Resolver antes de analizar.
+            if (!budgetData.folderId && budgetData.id) {
+                showStatus('⏳ Esperando a que Google Drive Desktop sincronice la carpeta local...', 'loading');
+                const r = await resolveLocalFolderId(budgetData.id, 4);
+                if (r && r.folderId) {
+                    budgetData.folderId = r.folderId;
+                    budgetData.folderUrl = r.folderUrl || '';
+                } else {
+                    showStatus('La carpeta aún no aparece en Drive. Comprueba que Google Drive Desktop esté sincronizando y reintenta en unos segundos.', 'warning');
+                    setTimeout(hideStatus, 6000);
+                    return;
+                }
+            }
             const btn = document.getElementById('reanalyzeBtn');
             if (btn) {
                 btn.disabled = true;
@@ -7202,6 +7248,143 @@
             throw ultimoError || new Error('Error desconocido al ' + accion);
         }
 
+        // ============ v3.8.0: MODO LOCAL (patrón Corpotrad) ============
+        // En el PC, la carpeta y los archivos se crean DIRECTAMENTE en la
+        // carpeta local _PRESUPUESTOS (elegida en Ajustes), que Google Drive
+        // Desktop sincroniza solo. Milisegundos en vez de minutos, e inmune a
+        // los cortes de Apps Script. En el móvil (sin File System Access API)
+        // todo sigue por Drive como siempre, sin configurar nada.
+        const LOCAL_DB = 'tradutema_local';
+
+        function localModeSupported() {
+            return typeof window.showDirectoryPicker === 'function';
+        }
+
+        function _localDb() {
+            return new Promise((res, rej) => {
+                const rq = indexedDB.open(LOCAL_DB, 1);
+                rq.onupgradeneeded = () => rq.result.createObjectStore('handles');
+                rq.onsuccess = () => res(rq.result);
+                rq.onerror = () => rej(rq.error);
+            });
+        }
+
+        async function saveLocalDirHandle(handle) {
+            const db = await _localDb();
+            await new Promise((res, rej) => {
+                const tx = db.transaction('handles', 'readwrite');
+                tx.objectStore('handles').put(handle, 'presupuestosDir');
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        }
+
+        async function getLocalDirHandle() {
+            try {
+                const db = await _localDb();
+                return await new Promise((res, rej) => {
+                    const tx = db.transaction('handles', 'readonly');
+                    const rq = tx.objectStore('handles').get('presupuestosDir');
+                    rq.onsuccess = () => res(rq.result || null);
+                    rq.onerror = () => rej(rq.error);
+                });
+            } catch (e) { return null; }
+        }
+
+        // ¿Está el modo local operativo AHORA? (soportado + carpeta elegida + permiso)
+        async function localModeReady(interactivo) {
+            if (!localModeSupported()) return null;
+            const handle = await getLocalDirHandle();
+            if (!handle) return null;
+            try {
+                let perm = await handle.queryPermission({ mode: 'readwrite' });
+                if (perm !== 'granted' && interactivo) {
+                    perm = await handle.requestPermission({ mode: 'readwrite' });
+                }
+                return perm === 'granted' ? handle : null;
+            } catch (e) { return null; }
+        }
+
+        async function chooseLocalFolder() {
+            try {
+                const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                await saveLocalDirHandle(handle);
+                try { localStorage.setItem('tradutema_local_dir_name', handle.name); } catch (e) {}
+                updateLocalModeUI();
+                showStatus('✓ Carpeta local configurada: ' + handle.name + ' — los presupuestos del PC se crearán ahí al instante', 'success');
+                setTimeout(hideStatus, 4000);
+            } catch (e) {
+                if (e && e.name !== 'AbortError') {
+                    showStatus('No se pudo configurar la carpeta local: ' + e.message, 'error');
+                    setTimeout(hideStatus, 4000);
+                }
+            }
+        }
+
+        async function clearLocalFolder() {
+            try {
+                const db = await _localDb();
+                await new Promise((res) => {
+                    const tx = db.transaction('handles', 'readwrite');
+                    tx.objectStore('handles').delete('presupuestosDir');
+                    tx.oncomplete = res; tx.onerror = res;
+                });
+            } catch (e) {}
+            try { localStorage.removeItem('tradutema_local_dir_name'); } catch (e) {}
+            updateLocalModeUI();
+        }
+
+        function updateLocalModeUI() {
+            const el = document.getElementById('localModeStatus');
+            if (!el) return;
+            if (!localModeSupported()) {
+                el.innerHTML = 'Este navegador no soporta modo local (en el móvil se usa Drive directamente).';
+                return;
+            }
+            const name = localStorage.getItem('tradutema_local_dir_name') || '';
+            el.innerHTML = name
+                ? '✓ Activo · carpeta: <b>' + name + '</b> · <a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>'
+                : 'No configurado (se usa Drive). Elige tu carpeta local _PRESUPUESTOS para crear presupuestos al instante.';
+        }
+
+        // Escribir la carpeta del presupuesto + archivos en el disco local
+        async function createLocalBudgetFolder(dirHandle, budgetId, files) {
+            const folder = await dirHandle.getDirectoryHandle(budgetId, { create: true });
+            for (const f of files) {
+                const fh = await folder.getFileHandle(f.name, { create: true });
+                const w = await fh.createWritable();
+                const bin = atob(f.content);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                await w.write(bytes);
+                await w.close();
+            }
+            return folder;
+        }
+
+        async function writeLocalTextFile(folderHandle, name, text) {
+            const fh = await folderHandle.getFileHandle(name, { create: true });
+            const w = await fh.createWritable();
+            await w.write(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+            await w.close();
+        }
+
+        // Resolver el folderId de Drive de una carpeta creada en local (cuando
+        // Drive Desktop la haya sincronizado). Reintenta con paciencia.
+        async function resolveLocalFolderId(budgetId, maxIntentos) {
+            for (let i = 1; i <= (maxIntentos || 1); i++) {
+                try {
+                    const r = await apiPost({ action: 'resolveBudgetFolder', budgetId: budgetId }, { retry: false });
+                    if (r && r.success && r.folderId) return r;
+                    if (r && r.success && r.pending && i < maxIntentos) {
+                        await new Promise(res => setTimeout(res, 8000));
+                        continue;
+                    }
+                } catch (e) { /* siguiente intento */ }
+                if (i < maxIntentos) await new Promise(res => setTimeout(res, 8000));
+            }
+            return null;
+        }
+
         // v3.7.82: subida por Apps Script, UN archivo por llamada, con un
         // PRESUPUESTO DE TIEMPO total (petición de Javier: si en ese tiempo no
         // está, prefiere subir a mano en Drive y pulsar "Actualizar desde
@@ -7332,6 +7515,11 @@
                 // v3.7.78: usar subida directa si ya hay token válido O si el
                 // usuario conectó Drive alguna vez (en ese caso se pedirá el
                 // token justo antes de subir, no al cargar la página).
+                // v3.8.0 MODO LOCAL: si está configurado y con permiso, la
+                // carpeta y los archivos se escriben en el disco (instantáneo)
+                // y al backend solo se le pide el código y la fila.
+                const _localHandle = await localModeReady(true);
+
                 // v3.7.93: requestId único por creación. Se guarda en bgState
                 // para que el botón "Reintentar" reutilice EL MISMO id: si la
                 // primera ejecución llegó al servidor y solo se perdió la
@@ -7364,7 +7552,8 @@
                         paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
                         apostilla: !!document.getElementById('docApostille')?.checked,
                         enHistorico: document.getElementById('docInHistory')?.checked !== false,
-                        requestId: bgState.requestId   // v3.7.93: idempotencia
+                        requestId: bgState.requestId,   // v3.7.93: idempotencia
+                        localMode: !!_localHandle       // v3.8.0: solo registrar fila, sin carpeta Drive
                     }, { retry: true, attempts: 4 });   // v3.7.93: 4 intentos (seguro gracias al requestId)
                 } catch (folderErr) {
                     prodLogError('folder', (folderErr && folderErr.message) || 'sin respuesta');
@@ -7381,7 +7570,32 @@
                 // directamente (más rápido que esperar a que agote el tiempo).
                 let directUploadResults = null;
                 let _volverAPaso2 = false;   // v3.7.87: hay archivos sin subir → paso 2
-                if (folderResult && folderResult.success && folderResult.folderId && files.length > 0) {
+
+                // v3.8.0 MODO LOCAL: escribir carpeta + archivos en disco.
+                // Drive Desktop los sube por detrás; el folderId se resuelve
+                // en segundo plano sin bloquear a nadie.
+                if (_localHandle && folderResult && folderResult.success && folderResult.budgetId && files.length > 0) {
+                    try {
+                        const t0 = performance.now();
+                        bgState.localFolderHandle = await createLocalBudgetFolder(_localHandle, folderResult.budgetId, files);
+                        prodLogDone('folder-local', files.length + ' archivo(s) escritos en local · ' + Math.round(performance.now() - t0) + 'ms');
+                        directUploadResults = { subidos: files.length, fallidos: [] };
+                        // Resolver el folderId cuando Drive Desktop sincronice (sin bloquear)
+                        resolveLocalFolderId(folderResult.budgetId, 5).then(r => {
+                            if (r && r.folderId) {
+                                budgetData.folderId = r.folderId;
+                                budgetData.folderUrl = r.folderUrl || '';
+                                if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+                            }
+                        });
+                    } catch (eLocal) {
+                        prodLogError('folder-local', eLocal.message || String(eLocal));
+                        showStatus('⚠️ No se pudo escribir en la carpeta local (' + (eLocal.message || eLocal) + '). Súbelos a Drive a mano y pulsa "Actualizar desde Drive".', 'error');
+                        setTimeout(hideStatus, 9000);
+                        directUploadResults = { subidos: 0, fallidos: files.map(f => ({ name: f.name, error: 'local' })) };
+                        _volverAPaso2 = true;
+                    }
+                } else if (folderResult && folderResult.success && folderResult.folderId && files.length > 0) {
                     let _pesoLote = 0;
                     try {
                         files.forEach(f => {
@@ -7634,10 +7848,30 @@
                         prodLogStart('save', 'Guardando recuento + TXTs en Drive');
                         stageTimings.t_saveResultsStart = performance.now();  // v3.7.32
                         try {
+                            // v3.8.0 MODO LOCAL: los TXTs se escriben en la carpeta
+                            // local (Drive Desktop los sube); al backend solo la fila.
+                            if (bgState.localFolderHandle) {
+                                try {
+                                    const fh = bgState.localFolderHandle;
+                                    for (const item of (claudeResult.analysis || [])) {
+                                        if (item.extractedText) {
+                                            await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText);
+                                        }
+                                    }
+                                    let tsv = 'Presupuesto\t' + budgetData.id + '\nIdioma origen\t' + budgetData.sourceLang +
+                                        '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
+                                    (claudeResult.analysis || []).forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
+                                    tsv += 'TOTAL\t' + claudeResult.totalWords + '\n';
+                                    await writeLocalTextFile(fh, '_RECUENTO.txt', tsv);
+                                } catch (eTxt) {
+                                    console.warn('TXTs locales:', eTxt);
+                                }
+                            }
                             const saveData = await apiPost({
                                     action: 'saveWordCountResults',
                                     budgetId: budgetData.id,
                                     folderId: budgetData.folderId,
+                                    skipDrive: !!bgState.localFolderHandle,   // v3.8.0
                                     analysis: claudeResult.analysis,
                                     totalWords: claudeResult.totalWords,
                                     totalPages: claudeResult.totalPages,
@@ -8621,6 +8855,20 @@
         async function sendProviderEmails() {
             // v3.7.96: si ya hay un envío en curso, ignorar el clic
             if (_sendingProviders) return;
+            // v3.8.0: en modo local, resolver la carpeta antes de enviar (los
+            // adjuntos del email salen de Drive)
+            if (!budgetData.folderId && budgetData.id) {
+                showStatus('⏳ Esperando la sincronización de la carpeta con Drive antes de enviar...', 'loading');
+                const r = await resolveLocalFolderId(budgetData.id, 4);
+                if (r && r.folderId) {
+                    budgetData.folderId = r.folderId;
+                    budgetData.folderUrl = r.folderUrl || '';
+                } else {
+                    showStatus('La carpeta aún no está en Drive; los adjuntos no se pueden preparar. Reintenta en unos segundos.', 'warning');
+                    setTimeout(hideStatus, 6000);
+                    return;
+                }
+            }
             _sendingProviders = true;
 
             // Feedback INMEDIATO en el propio botón antes de cerrar el modal
