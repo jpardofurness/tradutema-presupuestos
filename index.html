@@ -594,7 +594,7 @@
                 <div class="budget-id" id="budgetIdDisplay">Sin crear</div>
                 <!-- v3.7.20: botones de acceso rápido -->
                 <button id="hdrBtnDriveFolder" onclick="openDriveFolder()" title="Abrir carpeta del presupuesto en Google Drive" style="display:none;background:#34a853;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📂 Drive</button>
-                <button id="hdrBtnLocalFolder" onclick="copyLocalFolderPath()" title="Copiar al portapapeles la ruta local del presupuesto (para pegar en el Explorer)" style="display:none;background:#0ea5e9;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">💻 Local</button>
+                <button id="hdrBtnLocalFolder" onclick="openLocalFolder()" title="Abrir la carpeta local del presupuesto en el Explorador (y copiar la ruta)" style="display:none;background:#0ea5e9;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">💻 Local</button>
                 <!-- v3.7.34: botón Guardar siempre visible para persistir datos editados del presupuesto -->
                 <button id="hdrBtnSave" onclick="saveCurrentBudget()" title="Guardar los datos editados del presupuesto (tarifa, plazo, email, mensaje, etc.)" style="display:none;background:#f59e0b;color:white;border:0;border-radius:5px;padding:6px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;">💾 Guardar</button>
                 <button id="hdrBtnSheet" onclick="openSpreadsheet()" title="Abrir Google Sheet de parámetros (Presupuestos, Tarifas, Proveedores, etc.)" style="background:#137333;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Sheet</button>
@@ -1267,6 +1267,15 @@
                 </label>
             </div>
 
+            <!-- v3.8.3: doble carril de recuento -->
+            <div style="margin-top:10px;padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:0.82rem;color:#0c4a6e;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="fastCountToggle" checked onchange="try{localStorage.setItem('tradutema_fastcount', this.checked?'1':'0')}catch(e){}">
+                    <span>⚡ <b>Recuento rápido</b> para PDFs con texto embebido (instantáneo, sin Claude)</span>
+                </label>
+                <span style="color:#64748b;font-size:0.75rem;">Desmárcalo si el documento mezcla idiomas o lleva manuscrito: todo irá a Claude con filtro de idioma.</span>
+            </div>
+
             <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
                 <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false, false)" disabled style="flex:1;min-width:130px;">
                     📁 Crear Carpeta
@@ -1899,7 +1908,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.8.0';
+        const HTML_VERSION = '3.8.3';
         const HTML_DATE = '07/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2076,6 +2085,9 @@
             const mEl = document.getElementById('uploadMaxMb');
             if (mEl) mEl.value = Math.round(getUploadMaxAutoBytes() / 1048576);
             updateLocalModeUI();   // v3.8.0
+            // v3.8.3: estado del recuento rápido
+            const fc = document.getElementById('fastCountToggle');
+            if (fc) fc.checked = fastCountEnabled();
         }
 
         // ====== HOME SCREEN ======
@@ -2127,6 +2139,36 @@
 
         function setLocalBasePath(p) {
             try { localStorage.setItem(LOCAL_BASE_PATH_KEY, p); } catch(e) {}
+        }
+
+        // v3.8.2: ABRIR la carpeta local en el Explorador de Windows vía el
+        // protocolo tradutema:// (instalable desde Ajustes; una página web no
+        // puede lanzar el Explorer directamente por seguridad del navegador).
+        // Además copia la ruta al portapapeles como red de seguridad.
+        function openLocalFolder(budgetId) {
+            const id = budgetId || budgetData.id;
+            if (!id) {
+                showStatus('No hay presupuesto cargado', 'warning');
+                setTimeout(hideStatus, 2500);
+                return;
+            }
+            const ruta = getLocalBasePath().replace('{id}', id);
+            try { navigator.clipboard.writeText(ruta); } catch (e) {}
+            try {
+                let fr = document.getElementById('tradutemaProtoFrame');
+                if (!fr) {
+                    fr = document.createElement('iframe');
+                    fr.id = 'tradutemaProtoFrame';
+                    fr.style.display = 'none';
+                    document.body.appendChild(fr);
+                }
+                fr.src = 'tradutema://open/' + encodeURIComponent(id);
+                showStatus('💻 Abriendo carpeta local de ' + id + '... (ruta copiada al portapapeles por si acaso)', 'success');
+                setTimeout(hideStatus, 3500);
+            } catch (e) {
+                showStatus('Ruta local copiada: ' + ruta + ' — pégala en el Explorer. Para abrir con un clic, instala el acceso desde Ajustes.', 'warning');
+                setTimeout(hideStatus, 6000);
+            }
         }
 
         function openDriveFolder() {
@@ -4842,6 +4884,7 @@
                 const actionsHtml = `
                     <div class="budget-item-actions" onclick="event.stopPropagation()">
                         ${folderUrl ? `<button class="budget-action-btn" onclick="window.open('${folderUrl}', '_blank')" title="Abrir carpeta">📁 Carpeta</button>` : ''}
+                        <button class="budget-action-btn" onclick="event.stopPropagation(); openLocalFolder('${b.id}')" title="Abrir carpeta local en el Explorador">💻 Local</button>
                         <button class="budget-action-btn success" onclick="showMarkAsOrderModal('${b.id}', '${b.numeroPedido || ''}')" title="${b.numeroPedido ? 'Pedido #' + b.numeroPedido + ' (editar)' : 'Vincular número de pedido'}">✅ Pedido${b.numeroPedido ? ' #' + b.numeroPedido : ''}</button>
                         <button class="budget-action-btn danger" onclick="confirmDeleteBudget('${b.id}')" title="Borrar tasación">🗑️</button>
                     </div>
@@ -5089,6 +5132,19 @@
                     
                     // Restaurar archivos de la carpeta de Drive
                     budgetData.folderFiles = b.archivosEnCarpeta || [];
+                    // v3.8.1: getBudget ya no lista Drive (era el grueso de los
+                    // 30 s de carga); la lista llega en segundo plano y el paso 2
+                    // se repinta cuando está.
+                    if (b._filesDeferred && b.folderId) {
+                        apiPost({ action: 'listFolderFiles', folderId: b.folderId }, { retry: false })
+                            .then(fr => {
+                                if (fr && fr.success && Array.isArray(fr.files)) {
+                                    budgetData.folderFiles = fr.files;
+                                    if (typeof renderStep2Files === 'function') renderStep2Files();
+                                }
+                            })
+                            .catch(e => console.warn('listFolderFiles diferido:', e));
+                    }
                     
                     // v3.7.19: restaurar ajustes por archivo (rango páginas + instrucciones)
                     budgetData.fileSettings = b.fileSettings || {};
@@ -7248,6 +7304,88 @@
             throw ultimoError || new Error('Error desconocido al ' + accion);
         }
 
+        // ============ v3.8.3: RECUENTO RÁPIDO (pdf.js, sin Claude) ============
+        // Los PDF "editables" llevan el texto embebido: no hace falta OCR ni
+        // IA, solo leerlo. pdf.js lo hace en el navegador en milisegundos.
+        // Un archivo CALIFICA solo si TODAS sus páginas tienen texto real
+        // (una página escaneada dentro de un PDF mixto lo manda entero a
+        // Claude — mejor lento que un recuento mutilado en silencio).
+        let _pdfjsLoading = null;
+
+        function loadPdfJs() {
+            if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+            if (_pdfjsLoading) return _pdfjsLoading;
+            _pdfjsLoading = new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                s.onload = () => {
+                    try {
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                        resolve(window.pdfjsLib);
+                    } catch (e) { reject(e); }
+                };
+                s.onerror = () => reject(new Error('No se pudo cargar pdf.js'));
+                document.head.appendChild(s);
+            });
+            return _pdfjsLoading;
+        }
+
+        function fastCountEnabled() {
+            try { return localStorage.getItem('tradutema_fastcount') !== '0'; } catch (e) { return true; }
+        }
+
+        // Extrae texto por página. Devuelve null si el archivo NO califica
+        // (alguna página sin texto suficiente → escaneo/mixto → Claude).
+        async function fastExtractPdf(file) {
+            const pdfjs = await loadPdfJs();
+            const bin = atob(file.content);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            const doc = await pdfjs.getDocument({ data: bytes }).promise;
+            const MIN_CHARS_PAGINA = 40;   // por debajo, huele a escaneo/sello
+            let fullText = '';
+            for (let p = 1; p <= doc.numPages; p++) {
+                const page = await doc.getPage(p);
+                const tc = await page.getTextContent();
+                const pageText = tc.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+                if (pageText.replace(/[^\p{L}\p{N}]/gu, '').length < MIN_CHARS_PAGINA) {
+                    try { doc.destroy(); } catch (e) {}
+                    return null;   // página sin texto real → no califica
+                }
+                fullText += (fullText ? '\n\n--- Página ' + p + ' ---\n\n' : '') + pageText;
+            }
+            const numPages = doc.numPages;
+            try { doc.destroy(); } catch (e) {}
+            const words = fullText.trim().split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+            return { words: words, pages: numPages, text: fullText };
+        }
+
+        // Reparte los archivos: los que califican se cuentan aquí; el resto, a Claude.
+        async function fastCountPartition(files) {
+            const fast = [], toClaude = [];
+            for (const f of files) {
+                const esPdf = (f.type === 'application/pdf') || /\.pdf$/i.test(f.name || '');
+                const tieneAjustes = (typeof fileSettings === 'object' && fileSettings && fileSettings[f.name]);
+                if (!fastCountEnabled() || !esPdf || tieneAjustes || !f.content) {
+                    toClaude.push(f);
+                    continue;
+                }
+                try {
+                    const r = await fastExtractPdf(f);
+                    if (r) {
+                        fast.push({ fileName: f.name, words: r.words, pages: r.pages, extractedText: r.text, _fast: true });
+                    } else {
+                        toClaude.push(f);
+                    }
+                } catch (e) {
+                    console.warn('fastExtract falló para', f.name, e);
+                    toClaude.push(f);   // ante la duda, Claude
+                }
+            }
+            return { fast, toClaude };
+        }
+
         // ============ v3.8.0: MODO LOCAL (patrón Corpotrad) ============
         // En el PC, la carpeta y los archivos se crean DIRECTAMENTE en la
         // carpeta local _PRESUPUESTOS (elegida en Ajustes), que Google Drive
@@ -7739,21 +7877,58 @@
                 let claudeFailedHard = false;
                 let claudeHardError = '';
                 if (withAnalysis) {
-                    prodLogStart('analyze', `Analizando documento con Claude (${totalPages} pág.)`);
+                    // v3.8.3: DOBLE CARRIL. Los PDF con texto embebido se
+                    // cuentan aquí mismo (pdf.js, milisegundos); solo el resto
+                    // viaja al backend (OCR de Google y/o Claude).
+                    let _fastResults = [];
+                    let _filesParaBackend = files;
+                    try {
+                        const t0f = performance.now();
+                        const parte = await fastCountPartition(files);
+                        _fastResults = parte.fast;
+                        _filesParaBackend = parte.toClaude;
+                        if (_fastResults.length > 0) {
+                            prodLogDone('fastcount', `⚡ ${_fastResults.length} archivo(s) contados en local · ${Math.round(performance.now() - t0f)}ms · ${_fastResults.reduce((s, f) => s + f.words, 0)} palabras`);
+                        }
+                    } catch (eFast) {
+                        console.warn('fastCount:', eFast);
+                        _fastResults = []; _filesParaBackend = files;
+                    }
+
+                    if (_filesParaBackend.length === 0) {
+                        // Todo resuelto en local: respuesta sintética compatible
+                        claudeResult = {
+                            success: true,
+                            analysis: _fastResults,
+                            totalWords: _fastResults.reduce((s, f) => s + f.words, 0),
+                            totalPages: _fastResults.reduce((s, f) => s + (f.pages || 0), 0),
+                            failedPages: [],
+                            _fast: true
+                        };
+                    } else {
+                    prodLogStart('analyze', `Analizando ${_filesParaBackend.length} archivo(s) en el servidor (OCR/Claude)`);
                     try {
                         const claudeResp = await fetch(apiUrl, {
                             method: 'POST',
                             body: JSON.stringify({
                                 action: 'countWordsParallel',
-                                files: files,
+                                files: _filesParaBackend,
                                 sourceLang: budgetData.sourceLang,
-                                internalComments: internalComments
+                                internalComments: internalComments,
+                                tryOcrFirst: fastCountEnabled()   // v3.8.3: grupo 2
                             })
                         });
                         claudeResult = await claudeResp.json();
+                        // Fusionar los resultados rápidos con los del servidor
+                        if (claudeResult && claudeResult.success && _fastResults.length > 0) {
+                            claudeResult.analysis = _fastResults.concat(claudeResult.analysis || []);
+                            claudeResult.totalWords = (claudeResult.totalWords || 0) + _fastResults.reduce((s, f) => s + f.words, 0);
+                            claudeResult.totalPages = (claudeResult.totalPages || 0) + _fastResults.reduce((s, f) => s + (f.pages || 0), 0);
+                        }
                     } catch (cErr) {
                         claudeFailedHard = true;
                         claudeHardError = (cErr && cErr.message) ? cErr.message : 'Failed to fetch';
+                    }
                     }
                     stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
 
