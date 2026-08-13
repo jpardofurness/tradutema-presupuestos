@@ -1922,7 +1922,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.8.7';
+        const HTML_VERSION = '3.8.8';
         const HTML_DATE = '13/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2419,6 +2419,7 @@
                 loading: { bg: '#e0f2fe', border: '#7dd3fc', color: '#0c4a6e', icon: '⏳' },
                 success: { bg: '#dcfce7', border: '#86efac', color: '#14532d', icon: '✓' },
                 warning: { bg: '#fef3c7', border: '#fcd34d', color: '#78350f', icon: '⚠️' },
+                info:    { bg: '#eff6ff', border: '#93c5fd', color: '#1e3a8a', icon: 'ℹ️' },
                 error:   { bg: '#fee2e2', border: '#fca5a5', color: '#7f1d1d', icon: '❌' }
             };
             const s = styles[state] || styles.loading;
@@ -7086,12 +7087,22 @@
                     // v3.7.23: si Claude falló en alguna página, avisar para reintentar
                     const failedCount = Array.isArray(data.failedPages) ? data.failedPages.length : 0;
                     const totalPages = data.totalPages || 0;
+                    // v3.8.8: el desglose de otros idiomas NO es un error.
+                    const _otros = formatOtrosIdiomas(data.otrosIdiomas);
+                    budgetData.otrosIdiomas = data.otrosIdiomas || null;
                     if (failedCount > 0) {
                         const okPages = totalPages - failedCount;
                         const msg = `⚠️ Análisis parcial · ${budgetData.id} · ${okPages}/${totalPages} páginas procesadas · ${data.totalWords} palabras. Pulsa Reanalizar para reintentar las ${failedCount} que faltan.`;
                         showGlobalAnalysisBanner('warning', msg);
                         showStatus(msg, 'warning');
                         setTimeout(hideStatus, 12000);
+                    } else if (_otros) {
+                        const pg = data.paginasOtroIdioma
+                            ? ` (${data.paginasOtroIdioma} de ${totalPages} páginas no aportan palabras al recuento)` : '';
+                        const msg = `✓ ${budgetData.id} · ${data.totalWords} palabras en ${budgetData.sourceLang} · ${totalPages} páginas. ` +
+                                    `Además hay aprox. ${_otros.texto}, que NO se contabilizan${pg}.`;
+                        showGlobalAnalysisBanner('info', msg);
+                        showSuccess(`Análisis completado · ${data.totalWords} palabras en ${budgetData.sourceLang}`, budgetData.id);
                     } else if (data.totalWords === 0 && totalPages > 0) {
                         // v3.7.24: 0 palabras con páginas procesadas = error de extracción
                         const msg = `❌ ${budgetData.id} · 0 palabras en ${totalPages} página(s). Posibles causas: idioma origen incorrecto, escaneo borroso, sin texto legible. Verifica el idioma y reintenta.`;
@@ -7248,6 +7259,7 @@
                 loading: { bg: '#e0f2fe', border: '#7dd3fc', icon: '⏳' },
                 success: { bg: '#dcfce7', border: '#86efac', icon: '✓' },
                 warning: { bg: '#fef3c7', border: '#fcd34d', icon: '⚠️' },  // v3.7.23
+                info:    { bg: '#eff6ff', border: '#93c5fd', icon: 'ℹ️' },  // v3.8.8
                 error:   { bg: '#fee2e2', border: '#fca5a5', icon: '⚠️' }
             };
             const c = colors[state] || colors.loading;
@@ -8252,11 +8264,21 @@
                         // v3.7.23: detectar páginas fallidas y avisar
                         const failedCount = Array.isArray(claudeResult.failedPages) ? claudeResult.failedPages.length : 0;
                         const totalPages = claudeResult.totalPages || 0;
+                        // v3.8.8: contenido en otro idioma ≠ fallo. Se informa en azul.
+                        const _otros = formatOtrosIdiomas(claudeResult.otrosIdiomas);
+                        budgetData.otrosIdiomas = claudeResult.otrosIdiomas || null;
                         if (failedCount > 0) {
                             const okPages = totalPages - failedCount;
                             const msg = `⚠️ ${budgetData.id} · Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron). Reanaliza desde paso 2 para reintentar.`;
                             showBgBanner('warning', msg, false);
                             showGlobalAnalysisBanner('warning', msg);
+                        } else if (_otros) {
+                            const pg = claudeResult.paginasOtroIdioma
+                                ? ` (${claudeResult.paginasOtroIdioma} de ${totalPages} páginas no aportan palabras al recuento)` : '';
+                            const msg = `✓ ${budgetData.id} · ${budgetData.wordCount} palabras en ${budgetData.sourceLang} · ${totalPages} páginas. ` +
+                                        `Además hay aprox. ${_otros.texto}, que NO se contabilizan${pg}.`;
+                            showBgBanner('info', msg, false);
+                            showGlobalAnalysisBanner('info', msg);
                         } else if (budgetData.wordCount === 0 && totalPages > 0) {
                             // v3.7.24: 0 palabras con páginas procesadas = error
                             const msg = `❌ ${budgetData.id} · 0 palabras en ${totalPages} página(s). Verifica el idioma origen (¿es correcto?) y reanaliza.`;
@@ -9526,6 +9548,22 @@
             updateClientMessage();
         }
 
+        // ====== v3.8.8: DESGLOSE DE OTROS IDIOMAS ======
+        // El recuento oficial sigue siendo SOLO el idioma origen. Lo que hay en
+        // otros idiomas no es un fallo ni se contabiliza: se informa, para que
+        // la decisión (presupuestarlo aparte, en otro par, o excluirlo) sea
+        // tuya y no una sorpresa.
+        function formatOtrosIdiomas(otros) {
+            if (!otros || typeof otros !== 'object') return null;
+            const partes = Object.keys(otros)
+                .filter(k => (otros[k] || 0) > 0)
+                .sort((a, b) => otros[b] - otros[a])
+                .map(k => `${Number(otros[k]).toLocaleString('es-ES')} en ${k}`);
+            if (!partes.length) return null;
+            const total = Object.keys(otros).reduce((s, k) => s + (otros[k] || 0), 0);
+            return { texto: partes.join(', '), total: total };
+        }
+
         // ====== v3.8.7: FICHA DE TARIFICACIÓN PERSISTENTE ======
         // Hasta v3.8.6 solo se guardaba el importe final. Al reabrir un
         // presupuesto se perdían el método de cálculo y todos los números con
@@ -9575,6 +9613,7 @@
                 words: budgetData.wordCount || 0,
                 pages: budgetData.pageCount || 0,
                 countMethod: budgetData.countMethodUsed || countMethod(),
+                otrosIdiomas: budgetData.otrosIdiomas || null,   // v3.8.8
                 sourceLang: budgetData.sourceLang || '',
                 targetLang: budgetData.targetLang || '',
                 providerName: chosen ? (chosen.textContent || '').trim() : '',
@@ -9621,6 +9660,8 @@
             if (cfg.words) partes.push(`${Number(cfg.words).toLocaleString('es-ES')} palabras`);
             if (cfg.pages) partes.push(`${cfg.pages} páginas`);
             if (cfg.countMethod) partes.push(countMethodLabel(cfg.countMethod, cfg.sourceLang));
+            const _o = formatOtrosIdiomas(cfg.otrosIdiomas);
+            if (_o) partes.push(`+ aprox. ${escapeHtml(_o.texto)} no contabilizadas`);
             if (cfg.providerName) partes.push(`proveedor: ${escapeHtml(cfg.providerName)}${cfg.providerQuote ? ' · ' + escapeHtml(cfg.providerQuote) : ''}`);
             box.innerHTML = `<b>🔒 Tarificación guardada</b> — método: <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || cfg.method)}</b>`
                 + (partes.length ? `<br>Datos usados: ${partes.join(' · ')}` : '')
