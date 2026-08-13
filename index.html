@@ -536,6 +536,8 @@
         .margin-status.low { background: rgba(241, 196, 15, 0.15); color: #d4a106; }
         .margin-status.high { background: rgba(231, 76, 60, 0.1); color: #c0392b; }
         .margin-hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
+        .cm-opt.cm-active { background: #dbeafe; box-shadow: inset 0 0 0 2px #3b82f6; }
+        .calc-method-option.cm-active { background: #dbeafe; box-shadow: inset 0 0 0 2px var(--primary-blue); font-weight: 600; }
         .calc-method-selector { background: #f8f9fa; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; }
         .calc-method-title { font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
         .calc-method-options { display: flex; gap: 16px; flex-wrap: wrap; }
@@ -1267,13 +1269,23 @@
                 </label>
             </div>
 
-            <!-- v3.8.3: doble carril de recuento -->
-            <div style="margin-top:10px;padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:0.82rem;color:#0c4a6e;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
-                    <input type="checkbox" id="fastCountToggle" checked onchange="try{localStorage.setItem('tradutema_fastcount', this.checked?'1':'0')}catch(e){}">
-                    <span>⚡ <b>Recuento rápido</b> para PDFs con texto embebido (instantáneo, sin Claude)</span>
-                </label>
-                <span style="color:#64748b;font-size:0.75rem;">Desmárcalo si el documento mezcla idiomas o lleva manuscrito: todo irá a Claude con filtro de idioma.</span>
+            <!-- v3.8.7: selector explícito de carril de recuento (3 opciones) -->
+            <div style="margin-top:10px;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:0.82rem;color:#0c4a6e;">
+                <div style="font-weight:600;margin-bottom:8px;">🔢 Método de recuento</div>
+                <div id="countMethodOptions" style="display:flex;flex-direction:column;gap:6px;">
+                    <label class="cm-opt" data-cm="claude" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0;padding:6px 8px;border-radius:6px;">
+                        <input type="radio" name="countMethod" value="claude" onchange="setCountMethod(this.value)" style="margin-top:2px;">
+                        <span>🤖 <b>Claude</b> — cualquier documento (escaneo, manuscrito, mixto).<br><span style="color:#475569;font-size:0.75rem;">Cuenta SOLO las palabras en el idioma origen. Es el más lento y el único fiable en documentos multilingües.</span></span>
+                    </label>
+                    <label class="cm-opt" data-cm="text" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0;padding:6px 8px;border-radius:6px;">
+                        <input type="radio" name="countMethod" value="text" onchange="setCountMethod(this.value)" style="margin-top:2px;">
+                        <span>⚡ <b>Extracción de texto</b> — PDFs editables, instantáneo y sin coste.<br><span style="color:#475569;font-size:0.75rem;">Cuenta TODAS las palabras, sin filtro de idioma. Si alguna página no tiene texto, ese archivo pasa a Claude.</span></span>
+                    </label>
+                    <label class="cm-opt" data-cm="ocr" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0;padding:6px 8px;border-radius:6px;">
+                        <input type="radio" name="countMethod" value="ocr" onchange="setCountMethod(this.value)" style="margin-top:2px;">
+                        <span>📷 <b>OCR de Google</b> — escaneos limpios en un solo idioma, sin coste de Claude.<br><span style="color:#475569;font-size:0.75rem;">Cuenta TODAS las palabras, sin filtro de idioma. Si el OCR sale sucio o mezcla idiomas, escala a Claude solo.</span></span>
+                    </label>
+                </div>
             </div>
 
             <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
@@ -1542,6 +1554,8 @@
                         <span class="calc-method-label">📊 Según Tipo de Documento (histórico)</span>
                     </label>
                 </div>
+                <!-- v3.8.7: ficha de la tarificación guardada (por qué se dio este precio) -->
+                <div id="quoteConfigStamp" class="hidden" style="margin-top:10px;padding:8px 10px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;font-size:0.8rem;color:#065f46;line-height:1.5;"></div>
             </div>
             
             <!-- OPCIÓN 1: Cálculo por páginas (tarifa web) -->
@@ -1811,10 +1825,10 @@
                         <input type="checkbox" id="msgIncludePages" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de páginas
                     </label>
                     <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-                        <input type="checkbox" id="msgIncludeWords" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de palabras
+                        <input type="checkbox" id="msgIncludeWords" onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de palabras
                     </label>
                     <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-                        <input type="checkbox" id="msgIncludeInstructions" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Notas/exclusiones
+                        <input type="checkbox" id="msgIncludeInstructions" onchange="regenerateMessageSilent()" style="cursor:pointer;"> Notas/exclusiones
                     </label>
                 </div>
                 <textarea class="editable-message" id="clientMessageEdit" rows="10" oninput="onClientMessageEdit()"></textarea>
@@ -1908,8 +1922,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.8.3';
-        const HTML_DATE = '07/08/2026';
+        const HTML_VERSION = '3.8.7';
+        const HTML_DATE = '13/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2086,8 +2100,7 @@
             if (mEl) mEl.value = Math.round(getUploadMaxAutoBytes() / 1048576);
             updateLocalModeUI();   // v3.8.0
             // v3.8.3: estado del recuento rápido
-            const fc = document.getElementById('fastCountToggle');
-            if (fc) fc.checked = fastCountEnabled();
+            syncCountMethodUI();   // v3.8.7
         }
 
         // ====== HOME SCREEN ======
@@ -2627,6 +2640,15 @@
             const calcMethodPages = document.querySelector('input[name="calcMethod"][value="pages"]');
             if (calcMethodPages) calcMethodPages.checked = true;
             currentCalcMethod = 'pages';
+            // v3.8.7: limpiar la ficha de tarificación del presupuesto anterior
+            budgetData.quoteConfig = null;
+            budgetData.countMethodUsed = null;
+            if (typeof renderQuoteConfigStamp === 'function') renderQuoteConfigStamp(null);
+            document.querySelectorAll('.calc-method-option').forEach(l => l.classList.remove('cm-active'));
+            const _mw = document.getElementById('msgIncludeWords');
+            if (_mw) _mw.checked = false;
+            const _mi = document.getElementById('msgIncludeInstructions');
+            if (_mi) _mi.checked = false;
             
             // Reset comentarios de proveedor (paso 4)
             const providerComments = document.getElementById('providerComments');
@@ -4646,7 +4668,8 @@
         let budgetsLoadingAll = false; // v3.7.91: carga del completo en curso
 
         async function fetchBudgetsData(limit) {
-            const data = await apiPost({ action: 'getBudgets', limit: limit || 0 });
+            // v3.8.4: también lectura idempotente → reintentos generosos
+            const data = await apiPost({ action: 'getBudgets', limit: limit || 0 }, { retry: true, attempts: 4 });
             if (!data.success) throw new Error(data.error || 'Error desconocido');
             const budgets = data.budgets || [];
             budgetsTotal = data.total || budgets.length;
@@ -5004,7 +5027,18 @@
             resetBudgetFilters();
 
             try {
-                const data = await apiPost({ action: 'getBudget', budgetId: budgetId });
+                // v3.8.4: getBudget es una LECTURA (idempotente) → 4 intentos
+                // automáticos con espera creciente; si Google se come una
+                // respuesta, el usuario ni se entera.
+                // v3.8.5: si hay una copia local inyectada (rescate), se usa
+                // como respuesta y se reutiliza TODO el camino normal.
+                let data;
+                if (window._budgetCacheOverride && window._budgetCacheOverride.id === budgetId) {
+                    data = { success: true, budget: window._budgetCacheOverride };
+                    window._budgetCacheOverride = null;
+                } else {
+                    data = await apiPost({ action: 'getBudget', budgetId: budgetId }, { retry: true, attempts: 4 });
+                }
                 
                 if (data.success) {
                     const b = data.budget;
@@ -5017,6 +5051,8 @@
                         return;
                     }
                     
+                    saveBudgetCache(b);   // v3.8.5: copia local por si Google falla
+
                     // Restore budget data
                     budgetData.id = b.id;
                     budgetData.folderId = b.folderId;
@@ -5051,6 +5087,17 @@
                         budgetData.savedQuotePricePerWord = parseFloat(b.tarifa) || 0;
                     }
                     budgetData.estado = b.estado || '';
+                    // v3.8.7: ficha de tarificación (método + números usados)
+                    budgetData.quoteConfig = null;
+                    try {
+                        if (b.quoteConfig) {
+                            budgetData.quoteConfig = (typeof b.quoteConfig === 'string')
+                                ? JSON.parse(b.quoteConfig) : b.quoteConfig;
+                        }
+                    } catch (e) { console.warn('quoteConfig no parseable:', e); }
+                    if (budgetData.quoteConfig && budgetData.quoteConfig.countMethod) {
+                        budgetData.countMethodUsed = budgetData.quoteConfig.countMethod;
+                    }
                     budgetData.numeroPedido = b.numeroPedido || '';   // v3.7.100: para enlaces Pedido/Dashboard en la barra
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
                     budgetData.hasRecuento = !!b.hasRecuento;  // v3.7.22
@@ -5218,6 +5265,14 @@
                     if (quoteUrgency && budgetData.savedUrgency) {
                         quoteUrgency.value = budgetData.savedUrgency;
                     }
+                    // v3.8.7: restaurar la tarificación completa (método + números
+                    // exactos). Va DESPUÉS de los campos sueltos de arriba para que
+                    // los valores guardados manden sobre los recalculados.
+                    if (budgetData.quoteConfig) {
+                        applyQuoteConfig(budgetData.quoteConfig);
+                    } else {
+                        renderQuoteConfigStamp(null);
+                    }
                     
                     // Show folder link
                     if (budgetData.folderUrl) {
@@ -5260,6 +5315,21 @@
                     throw new Error(data.error);
                 }
             } catch (error) {
+                // v3.8.5: RESCATE LOCAL. Si el servidor no responde (respuestas
+                // perdidas de Google) pero tenemos copia local de este
+                // presupuesto, se abre desde la copia con aviso claro. El
+                // trabajo no se bloquea; los datos son los de la última vez
+                // que se abrió con éxito.
+                const cached = getBudgetCache(budgetId);
+                if (cached && /no respondió correctamente|Failed to fetch|Respuesta no válida/i.test(error.message || '')) {
+                    console.warn('getBudget falló; abriendo copia local de', budgetId);
+                    window._budgetCacheOverride = cached;
+                    await loadBudget(budgetId);
+                    showStatus('⚠️ Servidor no disponible: mostrando la COPIA LOCAL de ' + budgetId +
+                        ' (datos de la última apertura). Los cambios que guardes ahora podrían fallar — reintenta en unos minutos.', 'warning');
+                    setTimeout(hideStatus, 10000);
+                    return;
+                }
                 showStatus('Error: ' + error.message, 'error');
             }
         }
@@ -5289,9 +5359,17 @@
             populateDocMetadata();
 
             // Auto-sync silencioso WooCommerce (última semana, en background)
+            // v3.8.6: MÁXIMO una vez cada 24 h (antes: en CADA apertura de la
+            // app — presión innecesaria sobre Apps Script que contribuía a los
+            // rechazos con página HTML). El botón manual sigue disponible.
             if (!_wooAutoSyncLanzado) {
                 _wooAutoSyncLanzado = true;
-                setTimeout(() => syncWooCommerce(true), 2000);
+                let _ultimoSync = 0;
+                try { _ultimoSync = parseInt(localStorage.getItem('tradutema_woo_autosync_ts') || '0', 10); } catch (e) {}
+                if (Date.now() - _ultimoSync > 24 * 3600 * 1000) {
+                    try { localStorage.setItem('tradutema_woo_autosync_ts', String(Date.now())); } catch (e) {}
+                    setTimeout(() => syncWooCommerce(true), 2000);
+                }
             }
         }
 
@@ -6945,7 +7023,9 @@
                         budgetId: budgetData.id,
                         sourceLang: budgetData.sourceLang,
                         internalComments: budgetData.internalComments || '',
-                        fileSettings: budgetData.fileSettings || {}  // v3.7.19
+                        fileSettings: budgetData.fileSettings || {},  // v3.7.19
+                        tryOcrFirst: (countMethod() === 'ocr'),       // v3.8.7
+                        countMethod: countMethod()                     // v3.8.7
                     }, { retry: false });
                 } catch (fetchErr) {
                     const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
@@ -6994,6 +7074,7 @@
                     'color:#7c3aed;font-weight:bold;', 'color:#475569;');
 
                 if (data.success) {
+                    budgetData.countMethodUsed = data.countMethodUsed || countMethod();   // v3.8.7
                     budgetData.fileAnalysis = data.analysis || [];
                     budgetData.wordCount = data.totalWords || 0;
                     budgetData.pageCount = data.totalPages || budgetData.pageCount;
@@ -7018,7 +7099,7 @@
                         showStatus(msg, 'error');
                         setTimeout(hideStatus, 14000);
                     } else {
-                        const msg = `✓ Análisis completado · ${budgetData.id} · ${data.totalWords} palabras · ${data.totalPages} páginas`;
+                        const msg = `✓ Análisis completado · ${budgetData.id} · ${data.totalWords} palabras · ${data.totalPages} páginas · ${countMethodLabel(budgetData.countMethodUsed || countMethod(), budgetData.sourceLang)}`;
                         showGlobalAnalysisBanner('success', msg);
                         showSuccess(`Análisis completado · ${data.totalWords} palabras · ${data.totalPages} páginas`, budgetData.id);
                         // v3.7.44: actualizar el presupuesto (páginas/importe/mensaje)
@@ -7304,6 +7385,40 @@
             throw ultimoError || new Error('Error desconocido al ' + accion);
         }
 
+        // ============ v3.8.5: COPIA LOCAL DE PRESUPUESTOS ============
+        // Cada presupuesto abierto con éxito se guarda en el navegador (sin
+        // el texto extraído, que pesa). Si un día Google se come TODAS las
+        // respuestas de getBudget, se abre la última copia local con aviso,
+        // en vez de bloquear el trabajo. Funciona igual en PC y en móvil.
+        const BUDGET_CACHE_PREFIX = 'tradutema_budget_';
+        const BUDGET_CACHE_MAX = 30;
+
+        function saveBudgetCache(b) {
+            try {
+                const lite = JSON.parse(JSON.stringify(b));
+                delete lite.analisisDetalle;   // el texto extraído pesa demasiado
+                lite._cachedAt = Date.now();
+                localStorage.setItem(BUDGET_CACHE_PREFIX + b.id, JSON.stringify(lite));
+                // Índice + poda de los más antiguos
+                let idx = [];
+                try { idx = JSON.parse(localStorage.getItem('tradutema_budget_cache_idx') || '[]'); } catch (e) {}
+                idx = idx.filter(x => x !== b.id);
+                idx.unshift(b.id);
+                while (idx.length > BUDGET_CACHE_MAX) {
+                    const viejo = idx.pop();
+                    try { localStorage.removeItem(BUDGET_CACHE_PREFIX + viejo); } catch (e) {}
+                }
+                localStorage.setItem('tradutema_budget_cache_idx', JSON.stringify(idx));
+            } catch (e) { console.warn('budgetCache save:', e); }
+        }
+
+        function getBudgetCache(budgetId) {
+            try {
+                const raw = localStorage.getItem(BUDGET_CACHE_PREFIX + budgetId);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        }
+
         // ============ v3.8.3: RECUENTO RÁPIDO (pdf.js, sin Claude) ============
         // Los PDF "editables" llevan el texto embebido: no hace falta OCR ni
         // IA, solo leerlo. pdf.js lo hace en el navegador en milisegundos.
@@ -7331,8 +7446,51 @@
             return _pdfjsLoading;
         }
 
+        // v3.8.7: tres carriles explícitos. Por defecto CLAUDE, que es el único
+        // que filtra por idioma origen. Los otros dos cuentan TODAS las palabras
+        // del documento, así que solo deben elegirse a sabiendas (documento en un
+        // único idioma). El método usado se registra y se muestra siempre.
+        const COUNT_METHODS = {
+            claude: { label: '🤖 Claude',              nota: 'solo idioma origen' },
+            text:   { label: '⚡ Extracción de texto', nota: 'todas las palabras' },
+            ocr:    { label: '📷 OCR de Google',       nota: 'todas las palabras' },
+            mixto:  { label: '🔀 Mixto',               nota: 'criterios distintos por archivo' }
+        };
+
+        function countMethod() {
+            try {
+                const v = localStorage.getItem('tradutema_countmethod');
+                if (v === 'claude' || v === 'text' || v === 'ocr') return v;
+            } catch (e) {}
+            return 'claude';
+        }
+
+        function setCountMethod(v) {
+            if (!COUNT_METHODS[v]) v = 'claude';
+            try { localStorage.setItem('tradutema_countmethod', v); } catch (e) {}
+            syncCountMethodUI();
+        }
+
+        function syncCountMethodUI() {
+            const m = countMethod();
+            document.querySelectorAll('input[name="countMethod"]').forEach(r => {
+                r.checked = (r.value === m);
+                const lab = r.closest('.cm-opt');
+                if (lab) lab.classList.toggle('cm-active', r.value === m);
+            });
+        }
+
+        // Etiqueta legible del método, para el log, el banner y _RECUENTO.txt.
+        function countMethodLabel(m, sourceLang) {
+            const info = COUNT_METHODS[m] || COUNT_METHODS.claude;
+            if (m === 'claude' && sourceLang) return info.label + ' (solo ' + sourceLang + ')';
+            return info.label + ' (' + info.nota + ')';
+        }
+
+        // Compat: el carril "rápido" del frontend (pdf.js) solo actúa si el
+        // método elegido es 'text'.
         function fastCountEnabled() {
-            try { return localStorage.getItem('tradutema_fastcount') !== '0'; } catch (e) { return true; }
+            return countMethod() === 'text';
         }
 
         // Extrae texto por página. Devuelve null si el archivo NO califica
@@ -7903,8 +8061,10 @@
                             totalWords: _fastResults.reduce((s, f) => s + f.words, 0),
                             totalPages: _fastResults.reduce((s, f) => s + (f.pages || 0), 0),
                             failedPages: [],
+                            countMethodUsed: 'text',   // v3.8.7
                             _fast: true
                         };
+                        budgetData.countMethodUsed = 'text';
                     } else {
                     prodLogStart('analyze', `Analizando ${_filesParaBackend.length} archivo(s) en el servidor (OCR/Claude)`);
                     try {
@@ -7915,7 +8075,8 @@
                                 files: _filesParaBackend,
                                 sourceLang: budgetData.sourceLang,
                                 internalComments: internalComments,
-                                tryOcrFirst: fastCountEnabled()   // v3.8.3: grupo 2
+                                tryOcrFirst: (countMethod() === 'ocr'),   // v3.8.7
+                                countMethod: countMethod()                 // v3.8.7
                             })
                         });
                         claudeResult = await claudeResp.json();
@@ -7924,6 +8085,14 @@
                             claudeResult.analysis = _fastResults.concat(claudeResult.analysis || []);
                             claudeResult.totalWords = (claudeResult.totalWords || 0) + _fastResults.reduce((s, f) => s + f.words, 0);
                             claudeResult.totalPages = (claudeResult.totalPages || 0) + _fastResults.reduce((s, f) => s + (f.pages || 0), 0);
+                        }
+                        // v3.8.7: método realmente usado. Si el carril elegido no
+                        // cubrió todos los archivos, es MIXTO y hay que decirlo:
+                        // los carriles no cuentan con el mismo criterio.
+                        if (claudeResult && claudeResult.success) {
+                            const _backendM = claudeResult.countMethodUsed || 'claude';
+                            budgetData.countMethodUsed = (_fastResults.length > 0 && _backendM !== 'text')
+                                ? 'mixto' : _backendM;
                         }
                     } catch (cErr) {
                         claudeFailedHard = true;
@@ -8033,7 +8202,12 @@
                                             await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText);
                                         }
                                     }
+                                    // v3.8.7: el método de recuento va SIEMPRE en la cabecera:
+                                    // cada carril cuenta con un criterio distinto y sin esto el
+                                    // número no es interpretable meses después.
+                                    const _mUsed = budgetData.countMethodUsed || countMethod();
                                     let tsv = 'Presupuesto\t' + budgetData.id + '\nIdioma origen\t' + budgetData.sourceLang +
+                                        '\nMetodo de recuento\t' + countMethodLabel(_mUsed, budgetData.sourceLang) +
                                         '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
                                     (claudeResult.analysis || []).forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
                                     tsv += 'TOTAL\t' + claudeResult.totalWords + '\n';
@@ -9311,6 +9485,12 @@
         function onCalcMethodChange() {
             const method = document.querySelector('input[name="calcMethod"]:checked').value;
             currentCalcMethod = method;
+            // v3.8.7: resaltar visualmente el método elegido — es el dato que
+            // explica el precio y tiene que verse de un vistazo.
+            document.querySelectorAll('input[name="calcMethod"]').forEach(r => {
+                const lab = r.closest('.calc-method-option');
+                if (lab) lab.classList.toggle('cm-active', r.checked);
+            });
             
             const pagesBox = document.getElementById('step5TariffCalcPages');
             const directBox = document.getElementById('step5TariffCalcDirect');
@@ -9344,6 +9524,108 @@
             }
 
             updateClientMessage();
+        }
+
+        // ====== v3.8.7: FICHA DE TARIFICACIÓN PERSISTENTE ======
+        // Hasta v3.8.6 solo se guardaba el importe final. Al reabrir un
+        // presupuesto se perdían el método de cálculo y todos los números con
+        // los que se llegó a ese importe (páginas a traducir, palabras
+        // contabilizadas, tarifa aplicada, cotización del proveedor...), así que
+        // era imposible saber meses después POR QUÉ se dio ese precio. Ahora
+        // todo eso se guarda en la hoja (columna AG) y se restaura al abrir.
+        const QUOTE_CONFIG_FIELDS = [
+            'quoteTotalPages', 'quotePagesToTranslate', 'quotePagesCount', 'quoteAmountPages',
+            'directTariffPerWord', 'directWordCount', 'quoteAmountDirect',
+            'quoteWordCount', 'quoteAmountWords',
+            'quoteAmountProvider', 'quoteAmountHistorical',
+            'quoteDays', 'quoteUrgency'
+        ];
+        const QUOTE_CONFIG_CHECKS = [
+            'msgIncludeFileCount', 'msgIncludeFileNames', 'msgIncludePages',
+            'msgIncludeWords', 'msgIncludeInstructions'
+        ];
+
+        const CALC_METHOD_LABELS = {
+            pages: '📄 Por páginas (tarifa web)',
+            direct: '🔤 Por tarifa por palabra (IVA inc.)',
+            words: '💰 Por palabras + margen',
+            provider: '🤝 Por cotización proveedor + margen',
+            historical: '📊 Según Tipo de Documento (histórico)'
+        };
+
+        function collectQuoteConfig() {
+            const fields = {};
+            QUOTE_CONFIG_FIELDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.value !== '' && el.value != null) fields[id] = el.value;
+            });
+            const checks = {};
+            QUOTE_CONFIG_CHECKS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) checks[id] = !!el.checked;
+            });
+            const chosen = document.getElementById('chosenProviderName');
+            const chosenQ = document.getElementById('chosenProviderQuote');
+            return {
+                v: 1,
+                method: currentCalcMethod || 'pages',
+                fields: fields,
+                checks: checks,
+                // contexto del recuento en el momento de tarificar
+                words: budgetData.wordCount || 0,
+                pages: budgetData.pageCount || 0,
+                countMethod: budgetData.countMethodUsed || countMethod(),
+                sourceLang: budgetData.sourceLang || '',
+                targetLang: budgetData.targetLang || '',
+                providerName: chosen ? (chosen.textContent || '').trim() : '',
+                providerQuote: chosenQ ? (chosenQ.textContent || '').trim() : '',
+                savedAt: new Date().toISOString()
+            };
+        }
+
+        function applyQuoteConfig(cfg) {
+            if (!cfg || typeof cfg !== 'object') return;
+            try {
+                // 1) método: marcar el radio y desplegar su caja
+                const m = CALC_METHOD_LABELS[cfg.method] ? cfg.method : 'pages';
+                const radio = document.querySelector(`input[name="calcMethod"][value="${m}"]`);
+                if (radio) {
+                    radio.checked = true;
+                    // onCalcMethodChange recalcula y sobrescribe campos, así que
+                    // se llama ANTES de restaurar los valores guardados.
+                    if (typeof onCalcMethodChange === 'function') onCalcMethodChange();
+                }
+                // 2) valores exactos con los que se cerró el presupuesto
+                Object.keys(cfg.fields || {}).forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = cfg.fields[id];
+                });
+                // 3) toggles del mensaje al cliente
+                Object.keys(cfg.checks || {}).forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.checked = !!cfg.checks[id];
+                });
+                renderQuoteConfigStamp(cfg);
+            } catch (e) {
+                console.warn('applyQuoteConfig:', e);
+            }
+        }
+
+        function renderQuoteConfigStamp(cfg) {
+            const box = document.getElementById('quoteConfigStamp');
+            if (!box) return;
+            if (!cfg || !cfg.method) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+            let fecha = '';
+            try { fecha = new Date(cfg.savedAt).toLocaleString('es-ES'); } catch (e) { fecha = cfg.savedAt || ''; }
+            const partes = [];
+            if (cfg.words) partes.push(`${Number(cfg.words).toLocaleString('es-ES')} palabras`);
+            if (cfg.pages) partes.push(`${cfg.pages} páginas`);
+            if (cfg.countMethod) partes.push(countMethodLabel(cfg.countMethod, cfg.sourceLang));
+            if (cfg.providerName) partes.push(`proveedor: ${escapeHtml(cfg.providerName)}${cfg.providerQuote ? ' · ' + escapeHtml(cfg.providerQuote) : ''}`);
+            box.innerHTML = `<b>🔒 Tarificación guardada</b> — método: <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || cfg.method)}</b>`
+                + (partes.length ? `<br>Datos usados: ${partes.join(' · ')}` : '')
+                + (fecha ? `<br><span style="color:#047857;font-size:0.75rem;">Guardado el ${escapeHtml(fecha)}</span>` : '');
+            box.classList.remove('hidden');
         }
 
         // v3.7.4 (extendido v3.7.8): cargar histórico con modo configurable
@@ -10049,8 +10331,10 @@
             const incFileCount = document.getElementById('msgIncludeFileCount')?.checked !== false;
             const incFileNames = document.getElementById('msgIncludeFileNames')?.checked !== false;
             const incPages = document.getElementById('msgIncludePages')?.checked !== false;
-            const incWords = document.getElementById('msgIncludeWords')?.checked !== false;
-            const incInstructions = document.getElementById('msgIncludeInstructions')?.checked !== false;
+            // v3.8.7: palabras y notas/exclusiones son opt-IN (desmarcados por
+            // defecto). El resto sigue siendo opt-OUT.
+            const incWords = document.getElementById('msgIncludeWords')?.checked === true;
+            const incInstructions = document.getElementById('msgIncludeInstructions')?.checked === true;
 
             const hasFiles = fileNames.length > 0;
             const totalWords = budgetData.wordCount || 0;
@@ -10331,7 +10615,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         amount: amount,
                         clientMessage: clientMessage,
                         quoteDays: quoteDaysValue,
-                        urgency: urgency
+                        urgency: urgency,
+                        quoteConfig: JSON.stringify(collectQuoteConfig())   // v3.8.7
                     })
                 });
                 console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue + ', urgencia: ' + urgency);
