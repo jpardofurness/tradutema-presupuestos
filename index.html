@@ -599,6 +599,7 @@
                 <button id="hdrBtnLocalFolder" onclick="openLocalFolder()" title="Abrir la carpeta local del presupuesto en el Explorador (y copiar la ruta)" style="display:none;background:#0ea5e9;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">💻 Local</button>
                 <!-- v3.7.34: botón Guardar siempre visible para persistir datos editados del presupuesto -->
                 <button id="hdrBtnSave" onclick="saveCurrentBudget()" title="Guardar los datos editados del presupuesto (tarifa, plazo, email, mensaje, etc.)" style="display:none;background:#f59e0b;color:white;border:0;border-radius:5px;padding:6px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;">💾 Guardar</button>
+                <button id="hdrBtnRecuento" onclick="abrirRecuentoExcel()" title="Descargar el recuento de palabras en Excel (desglose por archivo e idiomas)" style="display:none;background:#16a34a;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Recuento</button>
                 <button id="hdrBtnSheet" onclick="openSpreadsheet()" title="Abrir Google Sheet de parámetros (Presupuestos, Tarifas, Proveedores, etc.)" style="background:#137333;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Sheet</button>
                 <button class="delete-btn" id="deleteBudgetBtn" onclick="confirmDeleteBudgetFromHeader()" title="Eliminar presupuesto y carpeta" style="display: none;">🗑️</button>
             </div>
@@ -1922,7 +1923,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.8.8';
+        const HTML_VERSION = '3.9.2';
         const HTML_DATE = '13/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2099,8 +2100,17 @@
             const mEl = document.getElementById('uploadMaxMb');
             if (mEl) mEl.value = Math.round(getUploadMaxAutoBytes() / 1048576);
             updateLocalModeUI();   // v3.8.0
-            // v3.8.3: estado del recuento rápido
             syncCountMethodUI();   // v3.8.7
+        }
+
+        // v3.9.0 FIX: syncCountMethodUI() solo se llamaba desde showConfig(), o
+        // sea, al abrir Ajustes. El checkbox anterior traía checked en el HTML,
+        // así que se veía marcado; los radios no, y quedaban los tres vacíos
+        // hasta que entrabas en Ajustes. Ahora se sincroniza al arrancar.
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => { try { syncCountMethodUI(); } catch (e) {} });
+        } else {
+            setTimeout(() => { try { syncCountMethodUI(); } catch (e) {} }, 0);
         }
 
         // ====== HOME SCREEN ======
@@ -2316,6 +2326,13 @@
             if (hdrLocal) hdrLocal.style.display = budgetData.id ? '' : 'none';
             // v3.7.34: botón Guardar visible siempre que haya un presupuesto cargado
             if (hdrSave) hdrSave.style.display = budgetData.id ? '' : 'none';
+            // v3.8.9: el Excel de recuento solo tiene sentido si hay análisis
+            const hdrRec = document.getElementById('hdrBtnRecuento');
+            if (hdrRec) {
+                const hayAnalisis = !!(budgetData.id &&
+                    Array.isArray(budgetData.fileAnalysis) && budgetData.fileAnalysis.length > 0);
+                hdrRec.style.display = hayAnalisis ? '' : 'none';
+            }
         }
 
         // v3.7.24: actualizar el banner de resumen persistente con los totales
@@ -4909,6 +4926,7 @@
                     <div class="budget-item-actions" onclick="event.stopPropagation()">
                         ${folderUrl ? `<button class="budget-action-btn" onclick="window.open('${folderUrl}', '_blank')" title="Abrir carpeta">📁 Carpeta</button>` : ''}
                         <button class="budget-action-btn" onclick="event.stopPropagation(); openLocalFolder('${b.id}')" title="Abrir carpeta local en el Explorador">💻 Local</button>
+                        ${parseInt(b.palabras) > 0 ? `<button class="budget-action-btn" onclick="event.stopPropagation(); recuentoExcelDesdeLista('${b.id}')" title="Descargar el recuento en Excel">📊 Recuento</button>` : ''}
                         <button class="budget-action-btn success" onclick="showMarkAsOrderModal('${b.id}', '${b.numeroPedido || ''}')" title="${b.numeroPedido ? 'Pedido #' + b.numeroPedido + ' (editar)' : 'Vincular número de pedido'}">✅ Pedido${b.numeroPedido ? ' #' + b.numeroPedido : ''}</button>
                         <button class="budget-action-btn danger" onclick="confirmDeleteBudget('${b.id}')" title="Borrar tasación">🗑️</button>
                     </div>
@@ -7676,6 +7694,14 @@
             await w.close();
         }
 
+        // v3.8.9: mismo patrón que writeLocalTextFile pero para binarios (xlsx).
+        async function writeLocalBinaryFile(folderHandle, name, blob) {
+            const fh = await folderHandle.getFileHandle(name, { create: true });
+            const w = await fh.createWritable();
+            await w.write(blob);
+            await w.close();
+        }
+
         // Resolver el folderId de Drive de una carpeta creada en local (cuando
         // Drive Desktop la haya sincronizado). Reintenta con paciencia.
         async function resolveLocalFolderId(budgetId, maxIntentos) {
@@ -8227,6 +8253,8 @@
                                 } catch (eTxt) {
                                     console.warn('TXTs locales:', eTxt);
                                 }
+                                // v3.9.1: y la ficha Excel, junto a los TXT
+                                await escribirRecuentoExcelLocal('análisis');
                             }
                             const saveData = await apiPost({
                                     action: 'saveWordCountResults',
@@ -9548,6 +9576,451 @@
             updateClientMessage();
         }
 
+        // ====== v3.8.9: RECUENTO EN EXCEL (bajo demanda) ======
+        // Se genera al pulsar el botón, no en cada análisis: cero coste en el
+        // camino crítico. Un único generador para modo local y modo Drive,
+        // alimentado por budgetData.fileAnalysis (que al retomar una cotización
+        // viene de la hoja, así que también funciona con presupuestos antiguos).
+        // ExcelJS y no SheetJS porque la versión gratuita de SheetJS no aplica
+        // estilos de celda: sin ella el Excel saldría en blanco y negro.
+        let _exceljsPromise = null;
+        function loadExcelJs() {
+            if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+            if (_exceljsPromise) return _exceljsPromise;
+            _exceljsPromise = new Promise((resolve, reject) => {
+                const sc = document.createElement('script');
+                sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+                sc.onload = () => window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error('ExcelJS no se cargó'));
+                sc.onerror = () => reject(new Error('No se pudo descargar ExcelJS (¿sin conexión?)'));
+                document.head.appendChild(sc);
+            });
+            return _exceljsPromise;
+        }
+
+        const XL_AZUL = 'FF1E5AA8';      // cabeceras
+        const XL_AZUL_CLARO = 'FFEFF6FF';
+        const XL_GRIS = 'FFF1F5F9';
+        const XL_AMBAR = 'FFFEF3C7';
+
+        function _xlTituloFila(ws, fila, texto, ancho) {
+            const c = ws.getCell(fila, 1);
+            c.value = texto;
+            c.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AZUL } };
+            c.alignment = { vertical: 'middle' };
+            ws.mergeCells(fila, 1, fila, ancho);
+            ws.getRow(fila).height = 22;
+        }
+
+        function _xlCabecera(ws, fila, valores) {
+            valores.forEach((v, i) => {
+                const c = ws.getCell(fila, i + 1);
+                c.value = v;
+                c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AZUL } };
+                c.alignment = { vertical: 'middle', wrapText: true };
+                c.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+            });
+            ws.getRow(fila).height = 20;
+        }
+
+        // v3.9.0: el Excel deja de ser solo un recuento y pasa a ser la FICHA
+        // COMPLETA de la cotización: es el documento que se consulta meses
+        // después, cuando el pedido llega sin las condiciones que se pactaron
+        // al presupuestar (ej. "de este PDF de 4 páginas solo se traduce la 1").
+        async function construirRecuentoWorkbook(opts) {
+            opts = opts || {};
+            const ExcelJS = await loadExcelJs();
+            const wb = new ExcelJS.Workbook();
+            wb.creator = 'Tradutema QUOTES';
+            wb.created = new Date();
+
+            const settings = budgetData.fileSettings || {};
+            const archivos = (budgetData.fileAnalysis || []).map(f => {
+                const nombre = f.fileName || f.name || '';
+                const st = settings[nombre] || {};
+                return {
+                    nombre: nombre,
+                    palabras: parseInt(f.words) || 0,
+                    paginas: parseInt(f.pages) || 0,          // páginas contabilizadas
+                    paginasTotal: parseInt(f.totalPages || f.pagesTotal) || null,
+                    filtro: (st.pagesFilter || '').trim(),
+                    instrucciones: (st.instructions || '').trim(),
+                    otros: f.otrosIdiomas || {}
+                };
+            });
+            const totalPal = archivos.reduce((s, f) => s + f.palabras, 0);
+            const totalPag = archivos.reduce((s, f) => s + f.paginas, 0);
+
+            const otrosGlobal = {};
+            archivos.forEach(f => {
+                Object.keys(f.otros || {}).forEach(k => {
+                    otrosGlobal[k] = (otrosGlobal[k] || 0) + (f.otros[k] || 0);
+                });
+            });
+            const totalOtros = Object.keys(otrosGlobal).reduce((s, k) => s + otrosGlobal[k], 0);
+
+            const hayFiltros = archivos.some(f => f.filtro || f.instrucciones);
+
+            // ══════════ Hoja 1: Cotización ══════════
+            const wc = wb.addWorksheet('Cotización', {
+                pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+            });
+            wc.columns = [{ width: 30 }, { width: 78 }];
+            _xlTituloFila(wc, 1, 'COTIZACIÓN ' + (budgetData.id || '') +
+                (opts.esEnvio ? '  ·  VERSIÓN v' + opts.version + ' (ENVIADA AL CLIENTE)' : '  ·  estado actual'), 2);
+
+            let fc = 3;
+            const _dato = (etiqueta, valor, destacar) => {
+                const a = wc.getCell(fc, 1), b = wc.getCell(fc, 2);
+                a.value = etiqueta;
+                a.font = { bold: true, color: { argb: 'FF475569' } };
+                a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_GRIS } };
+                a.alignment = { vertical: 'top' };
+                b.value = (valor === null || valor === undefined || valor === '') ? '—' : valor;
+                b.alignment = { wrapText: true, vertical: 'top' };
+                if (destacar) b.font = { bold: true };
+                fc++;
+            };
+            const _seccion = (texto) => {
+                fc++;
+                const c = wc.getCell(fc, 1);
+                c.value = texto;
+                c.font = { bold: true, size: 11, color: { argb: XL_AZUL } };
+                c.border = { bottom: { style: 'thin', color: { argb: XL_AZUL } } };
+                wc.mergeCells(fc, 1, fc, 2);
+                fc++;
+            };
+
+            _dato('Presupuesto', budgetData.id || '');
+            if (opts.esEnvio) {
+                _dato('Versión', 'v' + opts.version + ' — enviada por ' + (opts.canal || 'cliente'), true);
+                _dato('Enviada el', new Date().toLocaleString('es-ES'), true);
+            } else {
+                _dato('Versión', 'Estado actual (no es una copia enviada)');
+            }
+            _dato('Estado', budgetData.estado || '');
+            _dato('Idiomas', (budgetData.sourceLang || '') + ' → ' + (budgetData.targetLang || ''), true);
+            _dato('Contacto', budgetData.clientEmail || budgetData.clientWhatsApp || '');
+            _dato('Nº de pedido', budgetData.numeroPedido || '(sin pedido asociado)');
+            _dato('Generado el', new Date().toLocaleString('es-ES'));
+
+            _seccion('PRECIO');
+            const cfg = budgetData.quoteConfig || null;
+            _dato('Método de cálculo', (cfg && CALC_METHOD_LABELS[cfg.method]) || CALC_METHOD_LABELS[currentCalcMethod] || '');
+            _dato('Palabras contabilizadas', totalPal, true);
+            _dato('Páginas contabilizadas', totalPag, true);
+            const _v = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+            _dato('Páginas totales (al cliente)', _v('quoteTotalPages'));
+            _dato('Páginas a traducir', _v('quotePagesToTranslate'));
+            _dato('Tarifa', budgetData.savedQuoteRate || budgetData.savedQuotePricePerWord || _v('directTariffPerWord') || '');
+            _dato('Importe', budgetData.savedQuoteTotal ? budgetData.savedQuoteTotal + ' €' : (_v('quoteAmountPages') || ''), true);
+            _dato('Plazo', (budgetData.savedQuoteDays || _v('quoteDays') || '') + ' días');
+            _dato('Recargo urgencia', _v('quoteUrgency') || budgetData.savedUrgency || '');
+            if (cfg && cfg.method === 'provider' && cfg.providerName) {
+                _dato('Proveedor cotizado', cfg.providerName + (cfg.providerQuote ? ' · ' + cfg.providerQuote : ''));
+            }
+
+            _seccion('CONDICIONES ACORDADAS  ⚠ leer antes de producir');
+            _dato('Notas e instrucciones', (document.getElementById('internalComments') || {}).value || budgetData.internalComments || '');
+            _dato('Comentarios a proveedores', (document.getElementById('providerComments') || {}).value || '');
+            if (hayFiltros) {
+                _dato('Restricciones por archivo', 'SÍ — ver la columna "Páginas a traducir" en la hoja Recuento');
+                const av = wc.getCell(fc, 1);
+                av.value = '⚠ Esta cotización NO cubre los documentos completos: hay archivos de los que solo se presupuestaron algunas páginas. Revisa el detalle antes de traducir.';
+                av.alignment = { wrapText: true, vertical: 'top' };
+                av.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AMBAR } };
+                av.font = { bold: true, color: { argb: 'FF78350F' } };
+                wc.mergeCells(fc, 1, fc + 1, 2);
+                wc.getRow(fc).height = 28;
+                fc += 3;
+            } else {
+                _dato('Restricciones por archivo', 'No — se presupuestaron los documentos completos');
+            }
+            if (totalOtros > 0) {
+                _dato('Otros idiomas NO incluidos',
+                    'Aprox. ' + totalOtros.toLocaleString('es-ES') + ' palabras en ' +
+                    Object.keys(otrosGlobal).filter(k => otrosGlobal[k] > 0).join(', ') +
+                    ' quedan FUERA de este presupuesto.');
+            }
+
+            _seccion('MENSAJE ENVIADO AL CLIENTE');
+            _dato('Texto', (document.getElementById('clientMessage') || {}).value || budgetData.savedClientMessage || '');
+
+            // ══════════ Hoja 2: Recuento ══════════
+            const ws = wb.addWorksheet('Recuento', {
+                views: [{ state: 'frozen', ySplit: 8 }],
+                pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+            });
+            ws.columns = [
+                { width: 46 }, { width: 10 }, { width: 12 }, { width: 15 }, { width: 28 }, { width: 34 }
+            ];
+
+            _xlTituloFila(ws, 1, 'RECUENTO DE PALABRAS · ' + (budgetData.id || '') +
+                (opts.esEnvio ? '  ·  v' + opts.version : ''), 6);
+            const meta = [
+                ['Presupuesto', budgetData.id || ''],
+                ['Idiomas', (budgetData.sourceLang || '') + ' → ' + (budgetData.targetLang || '')],
+                ['Método de recuento', countMethodLabel(budgetData.countMethodUsed || countMethod(), budgetData.sourceLang)],
+                ['Fecha', new Date().toLocaleString('es-ES')],
+                ['Contacto', budgetData.clientEmail || '']
+            ];
+            meta.forEach((par, i) => {
+                const fila = 2 + i;
+                const a = ws.getCell(fila, 1), b = ws.getCell(fila, 2);
+                a.value = par[0];
+                a.font = { bold: true, color: { argb: 'FF475569' } };
+                a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_GRIS } };
+                b.value = par[1];
+                ws.mergeCells(fila, 2, fila, 6);
+            });
+
+            _xlCabecera(ws, 8, ['Archivo', 'Palabras', 'Págs. contab.', 'Págs. a traducir',
+                                'Instrucciones para este archivo', 'Otros idiomas (no contabilizados)']);
+
+            let fila = 9;
+            archivos.forEach((f, idx) => {
+                const r = ws.getRow(fila);
+                r.getCell(1).value = f.nombre;
+                r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+                r.getCell(2).value = f.palabras;
+                r.getCell(2).numFmt = '#,##0';
+                r.getCell(3).value = f.paginas;
+                r.getCell(4).value = f.filtro ? ('Solo ' + f.filtro) : 'Todas';
+                r.getCell(4).alignment = { vertical: 'top' };
+                r.getCell(5).value = f.instrucciones;
+                r.getCell(5).alignment = { wrapText: true, vertical: 'top' };
+                const txtOtros = Object.keys(f.otros || {})
+                    .filter(k => f.otros[k] > 0)
+                    .sort((a, b) => f.otros[b] - f.otros[a])
+                    .map(k => `${k}: ~${f.otros[k]}`)
+                    .join(', ');
+                r.getCell(6).value = txtOtros;
+                r.getCell(6).alignment = { wrapText: true, vertical: 'top' };
+                // Resaltar en ámbar los archivos que NO se traducen enteros
+                if (f.filtro) {
+                    for (let c = 1; c <= 6; c++) {
+                        r.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AMBAR } };
+                    }
+                    r.getCell(4).font = { bold: true, color: { argb: 'FF78350F' } };
+                } else if (idx % 2 === 1) {
+                    for (let c = 1; c <= 6; c++) {
+                        r.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AZUL_CLARO } };
+                    }
+                }
+                fila++;
+            });
+
+            const rt = ws.getRow(fila);
+            rt.getCell(1).value = 'TOTAL';
+            rt.getCell(2).value = totalPal;
+            rt.getCell(2).numFmt = '#,##0';
+            rt.getCell(3).value = totalPag;
+            for (let c = 1; c <= 6; c++) {
+                rt.getCell(c).font = { bold: true };
+                rt.getCell(c).border = { top: { style: 'medium', color: { argb: XL_AZUL } } };
+            }
+            fila += 2;
+
+            if (totalOtros > 0) {
+                const ra = ws.getCell(fila, 1);
+                ra.value = 'El total de arriba cuenta SOLO las palabras en ' + (budgetData.sourceLang || 'el idioma origen') +
+                           '. El documento contiene además unas ' + totalOtros.toLocaleString('es-ES') +
+                           ' palabras en otros idiomas, que NO están incluidas en este recuento ni en el precio.';
+                ra.alignment = { wrapText: true, vertical: 'top' };
+                ra.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AMBAR } };
+                ra.font = { color: { argb: 'FF78350F' } };
+                ws.mergeCells(fila, 1, fila + 1, 6);
+                ws.getRow(fila).height = 30;
+                fila += 3;
+
+                _xlCabecera(ws, fila, ['Idioma detectado', 'Palabras aprox.', '', '', '', '']);
+                fila++;
+                Object.keys(otrosGlobal)
+                    .filter(k => otrosGlobal[k] > 0)
+                    .sort((a, b) => otrosGlobal[b] - otrosGlobal[a])
+                    .forEach(k => {
+                        ws.getCell(fila, 1).value = k;
+                        ws.getCell(fila, 2).value = otrosGlobal[k];
+                        ws.getCell(fila, 2).numFmt = '#,##0';
+                        fila++;
+                    });
+                const rn = ws.getCell(fila, 1);
+                rn.value = 'Cifras aproximadas: las estima el modelo sin transcribir ese texto. Sirven para decidir, no para facturar.';
+                rn.font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+                ws.mergeCells(fila, 1, fila, 6);
+            }
+
+            return wb;
+        }
+
+        function nombreRecuentoExcel(version) {
+            const base = '_RECUENTO_' + (budgetData.id || 'presupuesto');
+            return version ? (base + '_v' + version + '.xlsx') : (base + '.xlsx');
+        }
+
+        // ====== v3.9.2: VERSIONADO POR ENVÍO ======
+        // El archivo sin sufijo es el ESTADO ACTUAL: se reescribe con cada
+        // análisis y cada guardado. Los _v1, _v2... son fotos de lo que
+        // REALMENTE se mandó al cliente y no se tocan nunca más: si se
+        // reescribieran, el rastro no serviría de nada.
+        //
+        // El número se deduce leyendo la carpeta, no de un contador guardado:
+        // si borras o mueves archivos a mano, la numeración sigue siendo
+        // coherente con lo que hay en disco.
+        async function siguienteVersionRecuento(folderHandle) {
+            const base = '_RECUENTO_' + (budgetData.id || 'presupuesto') + '_v';
+            let max = 0;
+            try {
+                for await (const [nombre] of folderHandle.entries()) {
+                    if (!nombre.startsWith(base) || !nombre.endsWith('.xlsx')) continue;
+                    const n = parseInt(nombre.slice(base.length, -5), 10);
+                    if (!isNaN(n) && n > max) max = n;
+                }
+            } catch (e) {
+                console.warn('No se pudo listar la carpeta para versionar:', e);
+            }
+            return max + 1;
+        }
+
+        // Huella del contenido presupuestado. Sirve para no crear una versión
+        // nueva cuando el mismo presupuesto se manda por dos canales seguidos
+        // (copiar a WhatsApp y luego a Email es UN envío, no dos).
+        function huellaCotizacion() {
+            const _v = id => { const e = document.getElementById(id); return e ? String(e.value || '') : ''; };
+            return [
+                budgetData.wordCount || 0,
+                budgetData.pageCount || 0,
+                _v('quoteTotalPages'), _v('quotePagesToTranslate'),
+                _v('quoteDays'), _v('quoteUrgency'),
+                getQuoteAmount ? (getQuoteAmount() || '') : '',
+                currentCalcMethod || '',
+                (document.getElementById('clientMessageEdit') || {}).value || '',
+                (document.getElementById('internalComments') || {}).value || '',
+                JSON.stringify(budgetData.fileSettings || {})
+            ].join('¦');
+        }
+
+        function _claveVersion() { return 'tradutema_recuento_ver_' + (budgetData.id || ''); }
+
+        function leerUltimaVersion() {
+            try { return JSON.parse(localStorage.getItem(_claveVersion()) || 'null'); } catch (e) { return null; }
+        }
+        function guardarUltimaVersion(obj) {
+            try { localStorage.setItem(_claveVersion(), JSON.stringify(obj)); } catch (e) {}
+        }
+
+        // Llamado al enviar o copiar el presupuesto al cliente. No bloquea: el
+        // usuario ya tiene su mensaje en el portapapeles o enviado.
+        async function versionarRecuentoAlEnviar(canal) {
+            try {
+                if (!budgetData.id) return;
+                if (!Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) return;
+                const fh = bgState && bgState.localFolderHandle;
+                if (!fh) return;
+
+                const huella = huellaCotizacion();
+                const ultima = leerUltimaVersion();
+                if (ultima && ultima.huella === huella) {
+                    console.log('Recuento: la cotización no ha cambiado desde la v' + ultima.n +
+                                ' — no se crea versión nueva (canal: ' + canal + ')');
+                    return;
+                }
+
+                const n = await siguienteVersionRecuento(fh);
+                const wb = await construirRecuentoWorkbook({ version: n, canal: canal, esEnvio: true });
+                const buffer = await wb.xlsx.writeBuffer();
+                const blob = new Blob([buffer], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
+                await writeLocalBinaryFile(fh, nombreRecuentoExcel(n), blob);
+                guardarUltimaVersion({ n: n, huella: huella, fecha: new Date().toISOString(), canal: canal });
+                console.log('Recuento: creada versión v' + n + ' (' + canal + ')');
+                showStatus('📊 Guardada la versión v' + n + ' del presupuesto en la carpeta', 'success');
+                setTimeout(hideStatus, 3500);
+            } catch (e) {
+                console.warn('No se pudo versionar la ficha Excel:', e);
+            }
+        }
+
+        // v3.9.1: escribe la ficha en la carpeta local del presupuesto, en
+        // silencio. PRODUCTION ya tiene un enlace a esa carpeta, así que con
+        // dejar el archivo ahí queda consultable desde la otra aplicación sin
+        // ninguna integración nueva. Nunca interrumpe: si falla, solo avisa por
+        // consola — no es aceptable que un fallo escribiendo un informe rompa
+        // el guardado del presupuesto.
+        async function escribirRecuentoExcelLocal(motivo) {
+            try {
+                if (!budgetData.id) return false;
+                if (!Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) return false;
+                const fh = bgState && bgState.localFolderHandle;
+                if (!fh) return false;
+                const wb = await construirRecuentoWorkbook();
+                const buffer = await wb.xlsx.writeBuffer();
+                const blob = new Blob([buffer], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
+                await writeLocalBinaryFile(fh, nombreRecuentoExcel(), blob);
+                console.log('Ficha Excel actualizada en la carpeta local (' + (motivo || '') + ')');
+                return true;
+            } catch (e) {
+                console.warn('No se pudo escribir la ficha Excel en local:', e);
+                return false;
+            }
+        }
+
+        // Botón 📊: genera y entrega el Excel. En modo local lo escribe también
+        // en la carpeta del presupuesto, para que quede junto a los TXT.
+        async function abrirRecuentoExcel() {
+            if (!budgetData.id || !Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) {
+                showStatus('Este presupuesto todavía no tiene recuento. Analiza los documentos primero.', 'warning');
+                setTimeout(hideStatus, 4000);
+                return;
+            }
+            const btn = document.getElementById('hdrBtnRecuento');
+            const original = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generando...'; }
+            try {
+                const wb = await construirRecuentoWorkbook();
+                const buffer = await wb.xlsx.writeBuffer();
+                const blob = new Blob([buffer], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
+                const nombre = nombreRecuentoExcel();
+
+                // Modo local: dejarlo también en la carpeta del presupuesto
+                let guardadoLocal = false;
+                if (bgState && bgState.localFolderHandle && typeof writeLocalBinaryFile === 'function') {
+                    try {
+                        await writeLocalBinaryFile(bgState.localFolderHandle, nombre, blob);
+                        guardadoLocal = true;
+                    } catch (eLoc) {
+                        console.warn('No se pudo escribir el Excel en la carpeta local:', eLoc);
+                    }
+                }
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nombre;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+                showStatus(guardadoLocal
+                    ? `✓ ${nombre} descargado y guardado en la carpeta del presupuesto`
+                    : `✓ ${nombre} descargado`, 'success');
+                setTimeout(hideStatus, 4000);
+            } catch (e) {
+                console.error('Excel de recuento:', e);
+                showStatus('No se pudo generar el Excel: ' + (e.message || e), 'error');
+                setTimeout(hideStatus, 6000);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = original; }
+            }
+        }
+
         // ====== v3.8.8: DESGLOSE DE OTROS IDIOMAS ======
         // El recuento oficial sigue siendo SOLO el idioma origen. Lo que hay en
         // otros idiomas no es un fallo ni se contabiliza: se informa, para que
@@ -9602,8 +10075,19 @@
                 const el = document.getElementById(id);
                 if (el) checks[id] = !!el.checked;
             });
-            const chosen = document.getElementById('chosenProviderName');
-            const chosenQ = document.getElementById('chosenProviderQuote');
+            // v3.9.0 FIX: leer del estado, NO del DOM. Los <span> del proveedor
+            // solo los actualiza recalculateFromProvider(), así que si no se usa
+            // ese método de cálculo conservan el texto del presupuesto anterior
+            // y se guardaba un proveedor y un importe falsos (caso 0814-03-W:
+            // "Marysol · 600,00 €" en una cotización sin tasación pedida).
+            // Además solo tiene sentido guardarlo si el precio SALE de ahí.
+            let provName = '', provQuote = '';
+            if ((currentCalcMethod || '') === 'provider' && budgetData.chosenProvider) {
+                provName = budgetData.chosenProvider;
+                const q = (budgetData.providerQuotes || {})[provName];
+                const tarifa = q ? parseFloat(q.tarifa) : 0;
+                if (tarifa > 0) provQuote = tarifa.toFixed(2) + ' €';
+            }
             return {
                 v: 1,
                 method: currentCalcMethod || 'pages',
@@ -9616,8 +10100,8 @@
                 otrosIdiomas: budgetData.otrosIdiomas || null,   // v3.8.8
                 sourceLang: budgetData.sourceLang || '',
                 targetLang: budgetData.targetLang || '',
-                providerName: chosen ? (chosen.textContent || '').trim() : '',
-                providerQuote: chosenQ ? (chosenQ.textContent || '').trim() : '',
+                providerName: provName,
+                providerQuote: provQuote,
                 savedAt: new Date().toISOString()
             };
         }
@@ -9662,7 +10146,11 @@
             if (cfg.countMethod) partes.push(countMethodLabel(cfg.countMethod, cfg.sourceLang));
             const _o = formatOtrosIdiomas(cfg.otrosIdiomas);
             if (_o) partes.push(`+ aprox. ${escapeHtml(_o.texto)} no contabilizadas`);
-            if (cfg.providerName) partes.push(`proveedor: ${escapeHtml(cfg.providerName)}${cfg.providerQuote ? ' · ' + escapeHtml(cfg.providerQuote) : ''}`);
+            // v3.9.0: no mostrar proveedor si el precio no se calculó a partir de
+            // él (protege también de las fichas guardadas con el bug anterior).
+            if (cfg.providerName && cfg.method === 'provider') {
+                partes.push(`proveedor: ${escapeHtml(cfg.providerName)}${cfg.providerQuote ? ' · ' + escapeHtml(cfg.providerQuote) : ''}`);
+            }
             box.innerHTML = `<b>🔒 Tarificación guardada</b> — método: <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || cfg.method)}</b>`
                 + (partes.length ? `<br>Datos usados: ${partes.join(' · ')}` : '')
                 + (fecha ? `<br><span style="color:#047857;font-size:0.75rem;">Guardado el ${escapeHtml(fecha)}</span>` : '');
@@ -10680,6 +11168,10 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Guardando...'; }
             try {
                 await saveClientData();
+                // v3.9.1: la ficha Excel se regenera con cada guardado, así que
+                // lo que consulte PRODUCTION siempre refleja la última versión
+                // de la cotización (tarifa, plazo, condiciones, mensaje).
+                escribirRecuentoExcelLocal('guardado');
                 if (btn) {
                     btn.innerHTML = '✓ Guardado';
                     btn.style.background = '#16a34a';
@@ -10774,6 +11266,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 // portapapeles y se puede pegar; el guardado va en 2º plano.
                 showStatus('✓ Copiado (WhatsApp) — ya puedes pegarlo · guardando estado en segundo plano...', 'success');
                 _saveClientCopyBackground('whatsapp', whatsapp, 'WhatsApp', 'whatsapp');
+                versionarRecuentoAlEnviar('WhatsApp');   // v3.9.2
             } catch (error) {
                 console.error('Error en copyForWhatsApp:', error);
                 showStatus('Error: ' + error.message, 'error');
@@ -10794,6 +11287,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 // v3.7.98: feedback inmediato + guardado en 2º plano
                 showStatus('✓ Copiado (Email) — ya puedes pegarlo · guardando estado en segundo plano...', 'success');
                 _saveClientCopyBackground('email_copiado', email, 'Email', 'email_copiado');
+                versionarRecuentoAlEnviar('Email (copiado)');   // v3.9.2
             } catch (error) {
                 console.error('Error en copyForEmail:', error);
                 showStatus('Error: ' + error.message, 'error');
@@ -10976,6 +11470,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                     hideStatus();
                     completedSteps.add(5);
                     updateProgressSteps();
+                    versionarRecuentoAlEnviar('Email');   // v3.9.2
                     showSuccess('¡Presupuesto enviado!', `Email enviado a ${email}`, true);
                 } else {
                     throw new Error(data.error);
