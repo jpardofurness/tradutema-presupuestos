@@ -1923,7 +1923,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.9.5';
+        const HTML_VERSION = '3.9.6';
         const HTML_DATE = '13/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -9512,7 +9512,10 @@
                 if (date) {
                     const dateObj = new Date(date);
                     const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-                    body += `* Plazo requerido: ${dateObj.toLocaleDateString('es-ES', options)} a las ${time}\n`;
+                    // v3.9.6: la fecha es una petición, no una imposición. Sin esta
+                    // coletilla el proveedor que no llega simplemente no contesta,
+                    // en vez de proponer su mejor plazo.
+                    body += `* Plazo requerido: ${dateObj.toLocaleDateString('es-ES', options)} a las ${time} (si no es posible, por favor, indícame tu mejor plazo)\n`;
                 }
             }
 
@@ -9547,7 +9550,6 @@
             
             body += `\n--------------------\n`;
             body += `Referencia: ${budgetData.id}\n\n`;
-            body += `Por favor, confírmame disponibilidad y tarifa.\n\n`;
             body += `Gracias,\n\n`;
             body += `Javier Pardo Furness\n`;
             body += `Traductor Jurado Nº 2098\n`;
