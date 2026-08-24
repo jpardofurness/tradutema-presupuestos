@@ -1923,7 +1923,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.9.4';
+        const HTML_VERSION = '3.9.5';
         const HTML_DATE = '13/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6230,11 +6230,13 @@
         // creado cuando NO se quiere volver a lanzar el recuento de palabras.
         // pdf.js entiende los PDF con object streams comprimidos, que es donde
         // falla el parser de texto del backend.
-        async function actualizarArchivosYPaginas() {
+        async function actualizarArchivosYPaginas(silencioso) {
             const fh = bgState && bgState.localFolderHandle;
             if (!fh) {
-                showStatus('Recontar páginas necesita la carpeta local enlazada (botón 💻 Local).', 'warning');
-                setTimeout(hideStatus, 5000);
+                if (!silencioso) {
+                    showStatus('Recontar páginas necesita la carpeta local enlazada (botón 💻 Local).', 'warning');
+                    setTimeout(hideStatus, 5000);
+                }
                 return;
             }
             const btn = document.getElementById('btnRecontarPaginas');
@@ -6265,8 +6267,10 @@
                     }
                 }
                 if (n === 0) {
-                    showStatus('No se han encontrado documentos en la carpeta local.', 'warning');
-                    setTimeout(hideStatus, 4000);
+                    if (!silencioso) {
+                        showStatus('No se han encontrado documentos en la carpeta local.', 'warning');
+                        setTimeout(hideStatus, 4000);
+                    }
                     return;
                 }
                 budgetData.pagesByFile = porArchivo;
@@ -6286,10 +6290,15 @@
                     (fallos.length ? ` · no se pudieron leer: ${fallos.join(', ')}` : '');
                 showStatus(msg, fallos.length ? 'warning' : 'success');
                 setTimeout(hideStatus, 6000);
+                if (typeof saveBudgetDataIfNeeded === 'function') {
+                    try { saveBudgetDataIfNeeded(); } catch (e) {}
+                }
             } catch (e) {
                 console.error('actualizarArchivosYPaginas:', e);
-                showStatus('No se pudo recontar: ' + (e.message || e), 'error');
-                setTimeout(hideStatus, 6000);
+                if (!silencioso) {
+                    showStatus('No se pudo recontar: ' + (e.message || e), 'error');
+                    setTimeout(hideStatus, 6000);
+                }
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = orig; }
             }
@@ -6722,18 +6731,28 @@
             // texto (/Type /Page) que devuelve 0 en PDFs con object streams
             // comprimidos —DocuSign, por ejemplo—, así que un solo documento
             // moderno dejaba congelado el total de páginas del presupuesto entero.
-            // Ahora basta con que la MAYORÍA sean conocidas; los que falten se
-            // resuelven con el botón "Recontar páginas" (pdf.js, sin Claude).
+            // v3.9.5: se mantiene la exigencia (un total incompleto sería peor
+            // que uno desactualizado), pero ya no es un callejón sin salida: si
+            // falta alguno y hay carpeta local, se cuenta solo con pdf.js.
             const _pagesDe = f => ((analysisByNameP[f.name] && analysisByNameP[f.name].pages)
                 || (budgetData.pagesByFile || {})[f.name] || f.pages || 0);
             const _sinPaginas = driveFiles.filter(f => _pagesDe(f) <= 0);
             const drivePagesKnown = driveFiles.length > 0 && _sinPaginas.length === 0;
             const drivePages = driveFiles.reduce((s, f) => s + _pagesDe(f), 0);
             // Aviso visible: nunca un número silenciosamente incompleto.
-            if (_sinPaginas.length > 0) {
-                window._archivosSinPaginas = _sinPaginas.map(f => f.name);
-            } else {
-                window._archivosSinPaginas = [];
+            window._archivosSinPaginas = _sinPaginas.map(f => f.name);
+            // v3.9.5: autorreparación. Si hay archivos cuyas páginas el backend
+            // no supo contar (PDFs con object streams comprimidos) y tenemos la
+            // carpeta local, se cuentan con pdf.js sin pedir nada al usuario.
+            // Guard por firma para no repetirlo en cada re-render.
+            if (_sinPaginas.length > 0 && bgState && bgState.localFolderHandle) {
+                const firma = _sinPaginas.map(f => f.name).sort().join('|');
+                if (window._ultimaFirmaSinPaginas !== firma) {
+                    window._ultimaFirmaSinPaginas = firma;
+                    setTimeout(() => {
+                        actualizarArchivosYPaginas(true).catch(e => console.warn('autoconteo:', e));
+                    }, 600);
+                }
             }
 
             let displayPages;
@@ -6843,16 +6862,6 @@
                     btnSync.style.cssText = 'flex:1;min-width:150px;';
                     btnSync.title = 'Vuelve a leer la carpeta de Drive para detectar los archivos que hayas copiado a mano desde el explorador';
                     btnSync.innerHTML = '🔄 Actualizar desde Drive';
-                    // v3.9.4: botón hermano para recontar páginas sin Claude
-                    if (!document.getElementById('btnRecontarPaginas') && btnSync.parentNode) {
-                        const b = document.createElement('button');
-                        b.id = 'btnRecontarPaginas';
-                        b.className = btnSync.className;
-                        b.title = 'Cuenta archivos y páginas reales con pdf.js. No consume Claude ni cambia el recuento de palabras.';
-                        b.innerHTML = '🔢 Recontar páginas';
-                        b.onclick = actualizarArchivosYPaginas;
-                        btnSync.parentNode.insertBefore(b, btnSync.nextSibling);
-                    }
                     btnSync.onclick = async () => {
                         btnSync.disabled = true;
                         const prev = btnSync.innerHTML;
@@ -6879,6 +6888,25 @@
                     if (containerSync) containerSync.appendChild(btnSync);
                 }
                 btnSync.style.display = '';
+
+                // v3.9.5 FIX: en la v3.9.4 este botón se insertaba con
+                // btnSync.parentNode ANTES de que btnSync estuviera en el DOM,
+                // así que parentNode era null y el botón no llegaba a crearse
+                // nunca. Ahora se añade al mismo contenedor, ya resuelto.
+                let btnRecuento = document.getElementById('btnRecontarPaginas');
+                if (!btnRecuento) {
+                    btnRecuento = document.createElement('button');
+                    btnRecuento.id = 'btnRecontarPaginas';
+                    btnRecuento.type = 'button';
+                    btnRecuento.className = 'btn btn-secondary action-btn';
+                    btnRecuento.style.cssText = 'flex:1;min-width:150px;';
+                    btnRecuento.title = 'Cuenta archivos y páginas reales con pdf.js. No consume Claude ni cambia el recuento de palabras.';
+                    btnRecuento.innerHTML = '🔢 Recontar páginas';
+                    btnRecuento.onclick = actualizarArchivosYPaginas;
+                    const cont2 = btnCreateAndAnalyze.parentNode;
+                    if (cont2) cont2.appendChild(btnRecuento);
+                }
+                btnRecuento.style.display = '';
 
                 btnReanalyze.style.display = '';
                 // No machacar el botón si está en modo "Analizando..." (data-busy)
