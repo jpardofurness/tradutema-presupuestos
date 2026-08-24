@@ -1923,7 +1923,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.9.2';
+        const HTML_VERSION = '3.9.4';
         const HTML_DATE = '13/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -5214,6 +5214,9 @@
                     
                     // v3.7.19: restaurar ajustes por archivo (rango páginas + instrucciones)
                     budgetData.fileSettings = b.fileSettings || {};
+                    // v3.9.3: los filtros por archivo guardados mandan sobre el
+                    // total de páginas también al retomar la cotización.
+                    setTimeout(() => { try { aplicarFiltrosAPaginas(); } catch (e) {} }, 300);
                     
                     // Nota: historialTraductores ya se cargó arriba para enriquecer contactedProviders
                     
@@ -6221,6 +6224,258 @@
             return { pagesFilter: s.pagesFilter || '', instructions: s.instructions || '' };
         }
 
+        // ====== v3.9.4: RECONTAR PÁGINAS SIN CLAUDE ======
+        // Cuenta las páginas reales de cada PDF con pdf.js, en local, gratis y
+        // en segundo. Resuelve el caso de añadir archivos a un presupuesto ya
+        // creado cuando NO se quiere volver a lanzar el recuento de palabras.
+        // pdf.js entiende los PDF con object streams comprimidos, que es donde
+        // falla el parser de texto del backend.
+        async function actualizarArchivosYPaginas() {
+            const fh = bgState && bgState.localFolderHandle;
+            if (!fh) {
+                showStatus('Recontar páginas necesita la carpeta local enlazada (botón 💻 Local).', 'warning');
+                setTimeout(hideStatus, 5000);
+                return;
+            }
+            const btn = document.getElementById('btnRecontarPaginas');
+            const orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Contando...'; }
+            try {
+                if (typeof pdfjsLib === 'undefined') throw new Error('pdf.js no está cargado');
+                const porArchivo = {};
+                let total = 0, n = 0, fallos = [];
+                for await (const [nombre, handle] of fh.entries()) {
+                    if (handle.kind !== 'file') continue;
+                    if (!nombre || nombre.charAt(0) === '_') continue;
+                    const lower = nombre.toLowerCase();
+                    if (lower.endsWith('.txt') || lower.endsWith('.xlsx') ||
+                        lower.endsWith('.docx') || lower.endsWith('.doc') || lower.endsWith('.zip')) continue;
+                    n++;
+                    if (!lower.endsWith('.pdf')) { porArchivo[nombre] = 1; total += 1; continue; }
+                    try {
+                        const file = await handle.getFile();
+                        const buf = await file.arrayBuffer();
+                        const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+                        porArchivo[nombre] = doc.numPages;
+                        total += doc.numPages;
+                        try { doc.destroy(); } catch (e) {}
+                    } catch (ePdf) {
+                        console.warn('No se pudieron contar las páginas de ' + nombre + ':', ePdf);
+                        fallos.push(nombre);
+                    }
+                }
+                if (n === 0) {
+                    showStatus('No se han encontrado documentos en la carpeta local.', 'warning');
+                    setTimeout(hideStatus, 4000);
+                    return;
+                }
+                budgetData.pagesByFile = porArchivo;
+                budgetData.pageCount = total;
+                budgetData.numArchivos = n;
+                // Reflejarlo en el análisis existente sin tocar las palabras
+                (budgetData.fileAnalysis || []).forEach(a => {
+                    const p = porArchivo[a.fileName];
+                    if (p) a.pages = p;
+                });
+                if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                if (typeof aplicarFiltrosAPaginas === 'function') aplicarFiltrosAPaginas();
+                if (typeof updateClientMessage === 'function' && !clientMessageEdited) updateClientMessage();
+                if (typeof renderFileList === 'function') { try { renderFileList(); } catch (e) {} }
+
+                const msg = `✓ ${n} archivo(s) · ${total} páginas` +
+                    (fallos.length ? ` · no se pudieron leer: ${fallos.join(', ')}` : '');
+                showStatus(msg, fallos.length ? 'warning' : 'success');
+                setTimeout(hideStatus, 6000);
+            } catch (e) {
+                console.error('actualizarArchivosYPaginas:', e);
+                showStatus('No se pudo recontar: ' + (e.message || e), 'error');
+                setTimeout(hideStatus, 6000);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+            }
+        }
+
+        // ====== v3.9.3: EL FILTRO DE PÁGINAS MANDA SOBRE EL PRECIO ======
+        // Mismo criterio que parsePageRange() del backend: "1", "1-5", "1,3,5-8".
+        // Si los dos no coinciden, se cobrarían páginas distintas de las que se
+        // cuentan, así que este parser tiene que ser un espejo exacto.
+        function parsePageRangeFront(rangeStr) {
+            if (!rangeStr) return null;
+            const s = String(rangeStr).trim();
+            if (!s) return null;
+            const out = {};
+            s.split(/[,;]/).forEach(part => {
+                const t = part.trim();
+                if (!t) return;
+                if (t.indexOf('-') >= 0) {
+                    const m = t.split('-');
+                    let a = parseInt(m[0], 10), b = parseInt(m[1], 10);
+                    if (isNaN(a) || isNaN(b)) return;
+                    if (a > b) { const tmp = a; a = b; b = tmp; }
+                    for (let i = a; i <= b; i++) if (i >= 1) out[i] = true;
+                } else {
+                    const n = parseInt(t, 10);
+                    if (!isNaN(n) && n >= 1) out[n] = true;
+                }
+            });
+            return Object.keys(out).length ? out : null;
+        }
+
+        // Inventario unificado: cada archivo con sus páginas físicas, su filtro
+        // y cuántas páginas se traducen realmente.
+        function inventarioArchivos() {
+            const vistos = new Set();
+            const out = [];
+            const anByName = {};
+            (budgetData.fileAnalysis || []).forEach(a => {
+                if (a && a.fileName) anByName[a.fileName] = a;
+            });
+
+            const push = (nombre, paginasFisicas, ajustes) => {
+                const clave = (nombre || '').toLowerCase();
+                if (!nombre || vistos.has(clave)) return;
+                vistos.add(clave);
+                const filtro = (ajustes.pagesFilter || '').trim();
+                const set = parsePageRangeFront(filtro);
+                let aTraducir;
+                if (set) {
+                    // Acotar al número real de páginas: si pide "1-99" en un PDF
+                    // de 11, se traducen 11, no 99.
+                    const nums = Object.keys(set).map(Number);
+                    aTraducir = paginasFisicas > 0
+                        ? nums.filter(n => n <= paginasFisicas).length
+                        : nums.length;
+                } else {
+                    aTraducir = paginasFisicas;
+                }
+                out.push({
+                    nombre: nombre,
+                    paginas: paginasFisicas,
+                    filtro: filtro,
+                    aTraducir: aTraducir,
+                    instrucciones: (ajustes.instructions || '').trim()
+                });
+            };
+
+            (budgetData.folderFiles || []).forEach(f => {
+                const nombre = f.name || '';
+                if (!nombre || nombre.charAt(0) === '_') return;
+                const lower = nombre.toLowerCase();
+                if (lower.endsWith('.txt') || lower.endsWith('.docx') || lower.endsWith('.doc')) return;
+                const an = anByName[nombre];
+                const fisicas = parseInt(f.pages) || (an ? parseInt(an.pages) : 0) || 0;
+                push(nombre, fisicas, (budgetData.fileSettings || {})[nombre] || {});
+            });
+
+            (uploadedFiles || []).forEach(f => {
+                push(f.name || '', parseInt(f.pages) || 0, f);
+            });
+
+            return out;
+        }
+
+        // Páginas realmente a traducir en todo el presupuesto.
+        function calcularPaginasATraducir() {
+            const inv = inventarioArchivos();
+            if (!inv.length) return null;
+            const total = inv.reduce((s, f) => s + (f.paginas || 0), 0);
+            const aTraducir = inv.reduce((s, f) => s + (f.aTraducir || 0), 0);
+            return { total: total, aTraducir: aTraducir, hayFiltros: inv.some(f => f.filtro), inventario: inv };
+        }
+
+        // Refresca los tres campos del paso 4 y la barra de resumen.
+        function aplicarFiltrosAPaginas() {
+            const r = calcularPaginasATraducir();
+            if (!r || !r.hayFiltros) {
+                budgetData.pagesToTranslate = null;
+                budgetData.quotePagesCount = null;
+            } else {
+                budgetData.pagesToTranslate = r.aTraducir;
+                budgetData.quotePagesCount = r.aTraducir;
+                const elT = document.getElementById('quotePagesToTranslate');
+                const elC = document.getElementById('quotePagesCount');
+                if (elT) elT.value = r.aTraducir;
+                if (elC) elC.value = r.aTraducir;
+                if (typeof recalculateQuoteFromPages === 'function') {
+                    try { recalculateQuoteFromPages(); } catch (e) {}
+                }
+            }
+            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+            return r;
+        }
+
+        // ====== v3.9.3: ARMONIZACIÓN DE COMENTARIOS ======
+        // Los ajustes por archivo (⚙) se vuelcan automáticamente a "Notas e
+        // instrucciones" y a "Comentarios para proveedores", que son los dos
+        // textos que llegan a Claude, al traductor y a la hoja (columna V, que
+        // es la que lee PRODUCTION al abrir el pedido).
+        //
+        // Se hace con un bloque DELIMITADO: el texto que escribes tú queda
+        // intacto y el bloque automático se sustituye entero en cada cambio.
+        // Sin el delimitador, cada edición del filtro iría acumulando líneas
+        // duplicadas en un campo que también editas a mano.
+        const MARCA_INI = '--- Instrucciones por documento (automático) ---';
+        const MARCA_FIN = '--- fin ---';
+
+        function _quitarBloqueAuto(texto) {
+            const t = String(texto || '');
+            const i = t.indexOf(MARCA_INI);
+            if (i < 0) return t.trim();
+            const j = t.indexOf(MARCA_FIN, i);
+            const resto = j >= 0 ? t.slice(j + MARCA_FIN.length) : '';
+            return (t.slice(0, i) + resto).trim();
+        }
+
+        function _construirBloqueAuto(inventario) {
+            const lineas = inventario
+                .filter(f => f.filtro || f.instrucciones)
+                .map(f => {
+                    let l = '• "' + f.nombre + '": ';
+                    if (f.filtro) {
+                        const plural = f.aTraducir === 1 ? 'la página' : 'las páginas';
+                        l += 'traducir SOLO ' + plural + ' ' + f.filtro +
+                             (f.paginas ? ' (de ' + f.paginas + ')' : '');
+                    } else {
+                        l += 'documento completo';
+                    }
+                    if (f.instrucciones) l += '. ' + f.instrucciones;
+                    return l;
+                });
+            if (!lineas.length) return '';
+            return MARCA_INI + '\n' + lineas.join('\n') + '\n' + MARCA_FIN;
+        }
+
+        function _fusionar(textoActual, bloque) {
+            const propio = _quitarBloqueAuto(textoActual);
+            if (!bloque) return propio;
+            return propio ? (propio + '\n\n' + bloque) : bloque;
+        }
+
+        // Vuelca los ajustes por archivo a los dos cuadros de comentarios.
+        function sincronizarComentariosPorArchivo() {
+            try {
+                const r = calcularPaginasATraducir();
+                if (!r) return;
+                const bloque = _construirBloqueAuto(r.inventario);
+                ['internalComments', 'providerComments'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const nuevo = _fusionar(el.value, bloque);
+                    if (el.value !== nuevo) {
+                        el.value = nuevo;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+                budgetData.internalComments = (document.getElementById('internalComments') || {}).value || '';
+                // El mensaje al cliente debe reflejar las páginas reales
+                if (!clientMessageEdited && typeof updateClientMessage === 'function') {
+                    try { updateClientMessage(); } catch (e) {}
+                }
+            } catch (e) {
+                console.warn('sincronizarComentariosPorArchivo:', e);
+            }
+        }
+
         // Helper: escribe settings (con persistencia inmediata en estado)
         function writeSettingsForFile(name, pendingIdx, field, value) {
             if (pendingIdx !== undefined && pendingIdx !== null && uploadedFiles[pendingIdx]) {
@@ -6230,6 +6485,15 @@
             }
             // Actualizar indicador en línea sin re-renderizar todo
             updateSettingsBadge(name, pendingIdx);
+            // v3.9.3: el filtro cambia las páginas a traducir y, con ellas, el
+            // precio y los comentarios. Se recalcula al vuelo.
+            if (field === 'pagesFilter' || field === 'instructions') {
+                clearTimeout(window._filtroTimer);
+                window._filtroTimer = setTimeout(() => {
+                    aplicarFiltrosAPaginas();
+                    sincronizarComentariosPorArchivo();
+                }, 400);
+            }
         }
 
         // Construye el indicador "⚙ págs 1-5 · con instrucciones" en línea
@@ -6453,12 +6717,24 @@
             (budgetData.fileAnalysis || []).forEach(a => {
                 if (a && a.fileName) analysisByNameP[a.fileName] = a;
             });
-            const drivePagesKnown = driveFiles.length > 0 &&
-                driveFiles.every(f => ((analysisByNameP[f.name] && analysisByNameP[f.name].pages) || f.pages || 0) > 0);
-            const drivePages = driveFiles.reduce((s, f) => {
-                const an = analysisByNameP[f.name];
-                return s + ((an && an.pages) ? parseInt(an.pages) : (f.pages || 0));
-            }, 0);
+            // v3.9.4 FIX: antes exigía que TODOS los archivos tuvieran páginas
+            // conocidas. countPdfPagesFromDriveFile() del backend es un parser de
+            // texto (/Type /Page) que devuelve 0 en PDFs con object streams
+            // comprimidos —DocuSign, por ejemplo—, así que un solo documento
+            // moderno dejaba congelado el total de páginas del presupuesto entero.
+            // Ahora basta con que la MAYORÍA sean conocidas; los que falten se
+            // resuelven con el botón "Recontar páginas" (pdf.js, sin Claude).
+            const _pagesDe = f => ((analysisByNameP[f.name] && analysisByNameP[f.name].pages)
+                || (budgetData.pagesByFile || {})[f.name] || f.pages || 0);
+            const _sinPaginas = driveFiles.filter(f => _pagesDe(f) <= 0);
+            const drivePagesKnown = driveFiles.length > 0 && _sinPaginas.length === 0;
+            const drivePages = driveFiles.reduce((s, f) => s + _pagesDe(f), 0);
+            // Aviso visible: nunca un número silenciosamente incompleto.
+            if (_sinPaginas.length > 0) {
+                window._archivosSinPaginas = _sinPaginas.map(f => f.name);
+            } else {
+                window._archivosSinPaginas = [];
+            }
 
             let displayPages;
             if (driveFiles.length > 0 && pendingFiles.length > 0) {
@@ -6567,6 +6843,16 @@
                     btnSync.style.cssText = 'flex:1;min-width:150px;';
                     btnSync.title = 'Vuelve a leer la carpeta de Drive para detectar los archivos que hayas copiado a mano desde el explorador';
                     btnSync.innerHTML = '🔄 Actualizar desde Drive';
+                    // v3.9.4: botón hermano para recontar páginas sin Claude
+                    if (!document.getElementById('btnRecontarPaginas') && btnSync.parentNode) {
+                        const b = document.createElement('button');
+                        b.id = 'btnRecontarPaginas';
+                        b.className = btnSync.className;
+                        b.title = 'Cuenta archivos y páginas reales con pdf.js. No consume Claude ni cambia el recuento de palabras.';
+                        b.innerHTML = '🔢 Recontar páginas';
+                        b.onclick = actualizarArchivosYPaginas;
+                        btnSync.parentNode.insertBefore(b, btnSync.nextSibling);
+                    }
                     btnSync.onclick = async () => {
                         btnSync.disabled = true;
                         const prev = btnSync.innerHTML;
@@ -10657,12 +10943,19 @@
             // por defecto los tres = total de páginas de los archivos; se
             // restauran ediciones previas si las hubo en esta sesión)
             const pages = budgetData.pageCount || 1;
+            // v3.9.3: si hay filtros por archivo, mandan sobre el total.
+            const _filtros = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null;
+            const _porFiltro = (_filtros && _filtros.hayFiltros) ? _filtros.aTraducir : null;
             const quoteTotalPages = document.getElementById('quoteTotalPages');
             const quotePagesToTranslate = document.getElementById('quotePagesToTranslate');
             if (quoteTotalPages) quoteTotalPages.value = pages;
-            if (quotePagesToTranslate) quotePagesToTranslate.value = (budgetData.pagesToTranslate != null ? budgetData.pagesToTranslate : pages);
+            if (quotePagesToTranslate) {
+                quotePagesToTranslate.value = (budgetData.pagesToTranslate != null ? budgetData.pagesToTranslate
+                    : (_porFiltro != null ? _porFiltro : pages));
+            }
             if (quotePagesCount) {
-                quotePagesCount.value = (budgetData.quotePagesCount != null ? budgetData.quotePagesCount : pages);
+                quotePagesCount.value = (budgetData.quotePagesCount != null ? budgetData.quotePagesCount
+                    : (_porFiltro != null ? _porFiltro : pages));
             }
             
             // Pre-rellenar número de palabras (del análisis si existe)
@@ -10799,7 +11092,20 @@
             const refId = budgetData.id || 'REFERENCIA';
             const srcLang = budgetData.sourceLang || 'origen';
             const tgtLang = budgetData.targetLang || 'destino';
-            const numDocs = uploadedFiles.length || budgetData.numArchivos || 1;
+            // v3.9.4 FIX: numDocs usaba `uploadedFiles.length || budgetData.numArchivos`.
+            // uploadedFiles son los PENDIENTES de subir: en un presupuesto ya creado
+            // está vacío, así que caía en numArchivos, que es el valor CONGELADO del
+            // momento de creación. Al añadir archivos después seguía diciendo "(3)"
+            // mientras la lista de nombres —que sí mira folderFiles— mostraba 7.
+            // Ahora usa la misma cascada que fileNames.
+            const numDocs = (function () {
+                if (uploadedFiles.length > 0) return uploadedFiles.length;
+                const enDrive = (budgetData.folderFiles || [])
+                    .filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_');
+                if (enDrive.length > 0) return enDrive.length;
+                if (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) return budgetData.fileAnalysis.length;
+                return budgetData.numArchivos || 1;
+            })();
             
             // Obtener páginas y lista de archivos
             // v3.7.53: páginas totales y a traducir son campos distintos; la
