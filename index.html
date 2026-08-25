@@ -1923,7 +1923,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.9.9';
+        const HTML_VERSION = '3.10.0';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6288,6 +6288,12 @@
                 budgetData.pagesByFile = porArchivo;
                 budgetData.pageCount = total;
                 budgetData.numArchivos = n;
+                // v3.10.0: volcar el total al campo del paso 4. Es lo que lee el
+                // mensaje al cliente; si no se actualiza aquí, el mensaje sigue
+                // enseñando el valor viejo que restauró la ficha de tarificación
+                // (en 0824-11-M: 22 páginas reales y "Páginas totales: 9").
+                const _elTot = document.getElementById('quoteTotalPages');
+                if (_elTot) _elTot.value = total;
                 // Reflejarlo en el análisis existente sin tocar las palabras
                 (budgetData.fileAnalysis || []).forEach(a => {
                     const p = porArchivo[a.fileName];
@@ -6384,12 +6390,22 @@
                 const lower = nombre.toLowerCase();
                 if (lower.endsWith('.txt') || lower.endsWith('.docx') || lower.endsWith('.doc')) return;
                 const an = anByName[nombre];
-                const fisicas = parseInt(f.pages) || (an ? parseInt(an.pages) : 0) || 0;
+                const fisicas = paginasDeArchivo(nombre, f.pages, an && an.pages);   // v3.10.0
                 push(nombre, fisicas, (budgetData.fileSettings || {})[nombre] || {});
             });
 
+            // v3.10.0: los archivos que sólo conocemos por la carpeta local.
+            // Sin esto, cuando folderFiles aún no ha llegado el inventario sale
+            // vacío y el mensaje al cliente se queda con las páginas viejas.
+            Object.keys(budgetData.pagesByFile || {}).forEach(nombre => {
+                if (!nombre || nombre.charAt(0) === '_') return;
+                const an = anByName[nombre];
+                push(nombre, paginasDeArchivo(nombre, 0, an && an.pages),
+                     (budgetData.fileSettings || {})[nombre] || {});
+            });
+
             (uploadedFiles || []).forEach(f => {
-                push(f.name || '', parseInt(f.pages) || 0, f);
+                push(f.name || '', paginasDeArchivo(f.name, f.pages, null), f);
             });
 
             return out;
@@ -6407,9 +6423,19 @@
         // Refresca los tres campos del paso 4 y la barra de resumen.
         function aplicarFiltrosAPaginas() {
             const r = calcularPaginasATraducir();
-            if (!r || !r.hayFiltros) {
+            if (!r) {
                 budgetData.pagesToTranslate = null;
                 budgetData.quotePagesCount = null;
+            } else if (!r.hayFiltros) {
+                // v3.10.0: sin filtros, "a traducir" ES el total. Antes se
+                // dejaban los campos como estuvieran, así que podían seguir
+                // mostrando el número anterior al recuento.
+                budgetData.pagesToTranslate = null;
+                budgetData.quotePagesCount = null;
+                const elT0 = document.getElementById('quotePagesToTranslate');
+                const elC0 = document.getElementById('quotePagesCount');
+                if (elT0 && r.total > 0) elT0.value = r.total;
+                if (elC0 && r.total > 0) elC0.value = r.total;
             } else {
                 budgetData.pagesToTranslate = r.aTraducir;
                 budgetData.quotePagesCount = r.aTraducir;
@@ -6676,7 +6702,9 @@
                     // v3.7.67: si no hay análisis previo, usar el nº de páginas
                     // que cuenta el backend al listar la carpeta (necesario para
                     // los ficheros copiados a mano desde el explorador).
-                    const pagesShown = (an && an.pages) ? an.pages : (f.pages || 0);
+                    // v3.10.0: antes ignoraba pagesByFile, así que el resultado
+                    // del botón 📄 Recontar no llegaba nunca a esta lista.
+                    const pagesShown = paginasDeArchivo(f.name, f.pages, an && an.pages);
                     const pStr = pagesShown ? `${pagesShown} pág${pagesShown > 1 ? 's' : ''}` : '';
                     const wStr = an && an.words != null
                         ? `${(an.words || 0).toLocaleString('es-ES')} palabras`
@@ -6746,8 +6774,9 @@
             // v3.9.5: se mantiene la exigencia (un total incompleto sería peor
             // que uno desactualizado), pero ya no es un callejón sin salida: si
             // falta alguno y hay carpeta local, se cuenta solo con pdf.js.
-            const _pagesDe = f => ((analysisByNameP[f.name] && analysisByNameP[f.name].pages)
-                || (budgetData.pagesByFile || {})[f.name] || f.pages || 0);
+            // v3.10.0: mismo orden de confianza que el resto (pdf.js primero).
+            const _pagesDe = f => paginasDeArchivo(f.name, f.pages,
+                analysisByNameP[f.name] && analysisByNameP[f.name].pages);
             const _sinPaginas = driveFiles.filter(f => _pagesDe(f) <= 0);
             const drivePagesKnown = driveFiles.length > 0 && _sinPaginas.length === 0;
             const drivePages = driveFiles.reduce((s, f) => s + _pagesDe(f), 0);
@@ -8028,6 +8057,47 @@
             const w = await fh.createWritable();
             await w.write(blob);
             await w.close();
+        }
+
+        // ====== v3.10.0: FUENTE ÚNICA DE PÁGINAS Y DE ARCHIVOS ======
+        // Había siete respuestas distintas a "cuántas páginas tiene esto" y
+        // dos a "cuántos documentos hay". En 0824-11-M dieron 22 / 11 / 9 a la
+        // vez. El diagnóstico dejó claro cuál es fiable: pdf.js sobre la
+        // carpeta local contó los 7 PDF correctamente, incluido el contrato de
+        // Toptal con 12 páginas, que el parser de texto del backend devuelve
+        // como 0 por llevar object streams comprimidos.
+        //
+        // Orden de confianza para las páginas FÍSICAS de un archivo:
+        //   1. pagesByFile  — pdf.js abriendo el PDF de verdad
+        //   2. f.pages      — el backend al listar la carpeta (falla en PDF modernos)
+        //   3. analysis.pages — puede venir ya filtrado, no siempre es físico
+        // Los ceros caen al siguiente nivel: un 0 nunca es una respuesta válida.
+        function paginasDeArchivo(nombre, pagesBackend, pagesAnalisis) {
+            const pb = parseInt((budgetData.pagesByFile || {})[nombre]) || 0;
+            if (pb > 0) return pb;
+            const bk = parseInt(pagesBackend) || 0;
+            if (bk > 0) return bk;
+            return parseInt(pagesAnalisis) || 0;
+        }
+
+        // Única lista de nombres de archivo del presupuesto. La usan a la vez
+        // el contador "Documentos (N)" y la lista de nombres del mensaje al
+        // cliente: antes eran dos cascadas con los dos niveles centrales
+        // invertidos, y por eso el mensaje decía "Documentos (3)" encima de
+        // siete nombres.
+        function nombresDeArchivos() {
+            if (uploadedFiles.length > 0) return uploadedFiles.map(f => f.name);
+            const enDrive = (budgetData.folderFiles || [])
+                .filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_')
+                .map(f => f.name)
+                .filter(Boolean);
+            if (enDrive.length > 0) return enDrive;
+            // Si la lista de Drive aún no ha llegado, la carpeta local ya sabe
+            // qué archivos hay.
+            const local = Object.keys(budgetData.pagesByFile || {});
+            if (local.length > 0) return local;
+            return (budgetData.fileAnalysis || [])
+                .map(f => f.fileName || f.name).filter(Boolean);
         }
 
         // ====== v3.9.9: NOMBRES DE PROVEEDOR CON COMA ======
@@ -11244,14 +11314,11 @@
             // momento de creación. Al añadir archivos después seguía diciendo "(3)"
             // mientras la lista de nombres —que sí mira folderFiles— mostraba 7.
             // Ahora usa la misma cascada que fileNames.
-            const numDocs = (function () {
-                if (uploadedFiles.length > 0) return uploadedFiles.length;
-                const enDrive = (budgetData.folderFiles || [])
-                    .filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_');
-                if (enDrive.length > 0) return enDrive.length;
-                if (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) return budgetData.fileAnalysis.length;
-                return budgetData.numArchivos || 1;
-            })();
+            // v3.10.0: numDocs y fileNames salen ya de la MISMA llamada. El
+            // comentario de 3.9.4 decía que compartían cascada y no era cierto:
+            // los dos niveles centrales estaban invertidos.
+            const _archivos = nombresDeArchivos();
+            const numDocs = _archivos.length || budgetData.numArchivos || 1;
             
             // Obtener páginas y lista de archivos
             // v3.7.53: páginas totales y a traducir son campos distintos; la
@@ -11266,18 +11333,7 @@
                 : totalPages;
             
             // Lista de nombres de archivos
-            let fileNames = [];
-            if (uploadedFiles.length > 0) {
-                fileNames = uploadedFiles.map(f => f.name);
-            } else if (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) {
-                fileNames = budgetData.fileAnalysis.map(f => f.fileName || f.name);
-            } else if (budgetData.folderFiles && budgetData.folderFiles.length > 0) {
-                // v3.7.33: si retomamos un presupuesto sin fileAnalysis (no analizado)
-                // pero con archivos en Drive, los listamos igualmente.
-                fileNames = budgetData.folderFiles
-                    .filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_')
-                    .map(f => f.name);
-            }
+            const fileNames = _archivos;   // v3.10.0: misma fuente que numDocs
             // Traducir idiomas al inglés
             const srcLangEn = translateLanguageToEnglish(srcLang);
             const tgtLangEn = translateLanguageToEnglish(tgtLang);
