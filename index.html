@@ -1114,7 +1114,7 @@
             </div>
 
             <div style="font-size:0.78rem;color:#888;margin-bottom:12px;">
-                💡 Combina el buscador de texto con los filtros. Ej: idioma "Checo" + año 2025 + mes Marzo.
+                💡 Busca por nombre, email, nº de pedido, nº de factura (WC-001618), referencia o archivo. Combínalo con los filtros: idioma "Checo" + año 2025 + mes Marzo.
             </div>
 
             <div id="orderSearchResults"></div>
@@ -1924,7 +1924,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.4';
+        const HTML_VERSION = '3.10.6';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3301,6 +3301,39 @@
             renderOrderSearchResults();
             const input = document.getElementById('orderSearchInput');
             if (input) input.focus();
+
+            // v3.10.6: actualización incremental al abrir la pantalla. SIN await:
+            // el buscador ya está utilizable y se puede escribir mientras corre.
+            // Al terminar, startWooCacheSync recarga la caché y vuelve a pintar
+            // los resultados respetando lo que haya escrito el usuario.
+            autoSyncPedidos();
+        }
+
+        // v3.10.6: el caché no se actualizaba nunca solo, así que un pedido de
+        // hoy no aparecía en el buscador hasta pulsar 🔄 Actualizar a mano.
+        let _ultimoAutoSync = 0;
+        async function autoSyncPedidos() {
+            // Caché vacía: lo que hace falta es un Sync completo, no un
+            // incremental. Se deja que lo pulse el usuario.
+            if (!window.wooCacheData || window.wooCacheData.length === 0) return;
+            // Sin fecha de referencia, el incremental se traería el histórico
+            // entero creyendo que es incremental.
+            if (!window._wooLatestModified) return;
+            // ¿Hay ya una sincronización en marcha? (los botones se deshabilitan)
+            const incBtn = document.getElementById('wooSyncIncBtn');
+            if (incBtn && incBtn.disabled) return;
+            // No repetir si se acaba de hacer: entrar y salir de la pantalla
+            // varias veces no debe disparar una llamada por vez.
+            const ahora = Date.now();
+            if (ahora - _ultimoAutoSync < 120000) return;   // 2 minutos
+            _ultimoAutoSync = ahora;
+            try {
+                await startWooCacheSync(false);
+            } catch (e) {
+                // Nunca debe romper la pantalla: el buscador sigue sirviendo
+                // con lo que ya hay en caché.
+                console.warn('Auto-sync de pedidos:', e);
+            }
         }
 
         async function refreshWooCacheStatus() {
@@ -3476,6 +3509,9 @@
                 if (o.company) lines.push(`🏢 ${o.company}`);
                 if (o.city || o.country) lines.push(`📍 ${[o.city, o.country].filter(Boolean).join(', ')}`);
                 if (o.quoteRef) lines.push(`🏷️ Ref: ${o.quoteRef}`);
+                // v3.10.5: nº de factura de Quaderno. Los clientes suelen dar
+                // este número creyendo que es el del pedido.
+                if (o.invoiceNumber) lines.push(`🧾 Factura: ${o.invoiceNumber}`);
                 if (o.langs) lines.push(`🌐 ${o.langs}`);
                 if (o.fileNames) lines.push(`📎 ${o.fileNames}`);
                 if (o.customerNote) lines.push(`📝 ${o.customerNote}`);
@@ -3484,6 +3520,10 @@
                 // v3.7.38: enlace al proyecto de Drive si el pedido está vinculado a un presupuesto
                 const driveLink = o.driveUrl
                     ? `<a href="${o.driveUrl}" target="_blank" style="font-size:0.78rem;color:#16a34a;text-decoration:none;font-weight:600;margin-left:14px;">📂 Abrir proyecto Drive →</a>`
+                    : '';
+                // v3.10.5: enlace directo a la factura en Quaderno
+                const facturaLink = o.invoiceUrl
+                    ? `<a href="${o.invoiceUrl}" target="_blank" style="font-size:0.78rem;color:#b45309;text-decoration:none;font-weight:600;margin-left:14px;">🧾 Ver factura →</a>`
                     : '';
                 html += `
                     <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:white;">
@@ -3501,6 +3541,7 @@
                         <div style="margin-top:8px;">
                             <a href="${wooUrl}" target="_blank" style="font-size:0.78rem;color:#7c3aed;text-decoration:none;font-weight:600;">Abrir en WooCommerce →</a>
                             ${driveLink}
+                            ${facturaLink}
                         </div>
                     </div>`;
             });
