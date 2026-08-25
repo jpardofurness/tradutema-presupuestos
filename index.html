@@ -630,6 +630,7 @@
             <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
                 <span><span style="color:#64748b;">Idiomas:</span> <strong id="bsBarIdiomas" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Contacto:</span> <strong id="bsBarContacto" style="color:#0c4a6e;">—</strong></span>
+                <span><span style="color:#64748b;">Documentos:</span> <strong id="bsBarDocs" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Palabras:</span> <strong id="bsBarPalabras" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Páginas:</span> <strong id="bsBarPaginas" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Tarifa:</span> <strong id="bsBarTarifa" style="color:#0c4a6e;">—</strong></span>
@@ -1923,7 +1924,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.0';
+        const HTML_VERSION = '3.10.2';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2344,6 +2345,11 @@
                 bar.classList.add('hidden');
                 return;
             }
+            // v3.10.1: nº de documentos desde la misma fuente única que usa
+            // el mensaje al cliente. numArchivos (la hoja) es sólo el respaldo:
+            // es el campo que llegó a valer 11 cuando había 7 archivos.
+            const documentos = (typeof nombresDeArchivos === 'function'
+                ? nombresDeArchivos().length : 0) || budgetData.numArchivos || 0;
             const palabras = budgetData.wordCount || 0;
             const paginas = budgetData.pageCount || (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.pages) || 0), 0) || 0;
             const tarifa = parseFloat(budgetData.savedQuotePricePerWord || budgetData.savedQuoteRate || 0);
@@ -2358,6 +2364,8 @@
                 ? n.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) + ' €/pal'
                 : '—';
 
+            const _elDocs = document.getElementById('bsBarDocs');
+            if (_elDocs) _elDocs.textContent = documentos > 0 ? documentos : '—';
             document.getElementById('bsBarPalabras').textContent = palabras > 0 ? palabras.toLocaleString('es-ES') : '—';
             document.getElementById('bsBarPaginas').textContent = paginas > 0 ? paginas : '—';
             document.getElementById('bsBarTarifa').textContent = fmtTarifa(tarifa);
@@ -4944,6 +4952,7 @@
                             <span class="budget-item-detail">${canal}</span>
                             <span class="budget-item-detail">🌐 ${b.origen} → ${b.destino}</span>
                             ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} ${parseInt(b.palabras) === 1 ? 'palabra' : 'palabras'}</span>` : ''}
+                            ${b.numArchivos && parseInt(b.numArchivos) > 0 ? `<span class="budget-item-detail">📎 ${parseInt(b.numArchivos)} doc${parseInt(b.numArchivos) > 1 ? 's' : ''}</span>` : ''}
                             ${b.paginas ? `<span class="budget-item-detail">📄 ${parseInt(b.paginas)} pág${parseInt(b.paginas) > 1 ? 's' : ''}</span>` : ''}
                             ${(parseFloat(b.importe) > 0) ? `<span class="budget-item-detail" style="color:#15803d;font-weight:600;">💶 ${parseFloat(b.importe).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</span>` : ''}
                             ${(parseFloat(b.tarifa) > 0) ? `<span class="budget-item-detail" style="color:#475569;font-size:0.78rem;">${parseFloat(b.tarifa).toLocaleString('es-ES', {minimumFractionDigits: 4, maximumFractionDigits: 4})} €/pal</span>` : ''}
@@ -9659,7 +9668,10 @@
         }
 
         function generateProviderEmailBody(provider, includeWords, includeProposedRate) {
-            let body = `Hola [NOMBRE],\n\n`;
+            // v3.10.2: coma vocativa + dos puntos, que es la forma correcta en
+            // español para el encabezamiento de una carta. El backend 3.7.71
+            // sustituye [NOMBRE] por el nombre de pila: "Hola, Olga:"
+            let body = `Hola, [NOMBRE]:\n\n`;
             body += `Te escribo para solicitar tarifa y disponibilidad para una traducción.\n\n`;
             body += `DETALLES DEL ENCARGO\n`;
             body += `--------------------\n`;
