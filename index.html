@@ -1924,7 +1924,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.2';
+        const HTML_VERSION = '3.10.4';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -11440,6 +11440,16 @@
             const urgencyNum = parseFloat(urgency);
             const hasUrgency = !isNaN(urgencyNum) && urgencyNum > 0;
 
+            // v3.10.3: aviso de grafía de nombres propios cuando el original
+            // no está en alfabeto latino.
+            const _nombresProp = requiereGrafiaDeNombres(srcLang, tgtLang);
+            const notaNombresEs = _nombresProp
+                ? `\nIMPORTANTE - Nombres propios: el ${srcLang.toLowerCase()} no utiliza el alfabeto latino. Indícanos en la casilla "Comentarios" del pedido cómo se escriben con caracteres latinos los nombres y apellidos que aparecen en los documentos, tal y como figuran en el pasaporte o el NIE.\n`
+                : '';
+            const notaNombresEn = _nombresProp
+                ? `\nIMPORTANT - Proper names: ${srcLangEn} does not use the Latin alphabet. In the "Comments" box of your order, please tell us how the first names and surnames appearing in the documents are written in Latin characters, as they appear on the passport or NIE.\n`
+                : '';
+
             if (messageLang === 'es') {
                 // Texto de urgencia
                 const urgencyText = hasUrgency ? ` (si lo necesitas antes, es posible, con un recargo por urgencia de ${urgency} EUR)` : '';
@@ -11455,7 +11465,7 @@ Para realizar el pedido:
 2. Selecciona los idiomas. En Referencia Cotización, introduce ${refId}. En Importe indica ${amount} EUR, indica Cómo quieres recibir la traducción, en plazo indica la fecha de ${deliveryDateEs} y Carga los documentos.
 3. Carrito situado arriba a la derecha de la página.
 4. Haz clic en AÑADIR AL CARRITO y ve al carrito para finalizar la compra.
-
+${notaNombresEs}
 *El IVA se descontará automáticamente durante el pago si el cliente está establecido fuera de la UE, en Canarias, Ceuta o Melilla, o si es una empresa de la UE con NIF-IVA intracomunitario válido.
 ${pagesTextEs}
 Muchas gracias,
@@ -11482,7 +11492,7 @@ To place your order:
 2. Select the languages. In Quote Reference, enter ${refId}. In Amount enter ${amount} EUR, indicate how you want to receive the translation, in deadline enter the date ${deliveryDateEn} and upload the documents.
 3. Shopping cart located at the top right of the page.
 4. Click ADD TO CART and go to cart to complete your purchase.
-
+${notaNombresEn}
 *VAT will be automatically deducted during payment if the client is established outside the EU, in the Canary Islands, Ceuta or Melilla, or if it is an EU company with a valid intra-community VAT number.
 ${pagesTextEn}
 Thank you very much,
@@ -11499,6 +11509,46 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             document.getElementById('clientMessageEdit').value = message;
         }
         
+        // ====== v3.10.3: IDIOMAS SIN ALFABETO LATINO ======
+        // Cuando el original no se escribe en alfabeto latino, la grafía de los
+        // nombres propios en la traducción es una decisión del traductor y
+        // puede no coincidir con la del pasaporte o el NIE del cliente. Eso
+        // obliga después a rehacer la jurada. Se avisa en el presupuesto.
+        //
+        // La lista incluye idiomas que hoy no están en el catálogo de tarifas,
+        // para que siga funcionando si se añaden más adelante.
+        const IDIOMAS_SIN_ALFABETO_LATINO = new Set([
+            'arabe', 'ruso', 'chino', 'japones', 'coreano', 'ucraniano',
+            'bulgaro', 'griego', 'hebreo', 'persa', 'farsi', 'dari', 'pastun',
+            'urdu', 'hindi', 'bengali', 'tailandes', 'serbio', 'macedonio',
+            'bielorruso', 'armenio', 'georgiano', 'kazajo', 'kirguis',
+            'tayiko', 'mongol', 'nepali', 'cingales', 'singales', 'tamil',
+            'telugu', 'marati', 'panyabi', 'punjabi', 'guyarati', 'gujarati',
+            'canares', 'malayalam', 'oriya', 'asames', 'amarico', 'tigriña',
+            'tigrina', 'birmano', 'jemer', 'camboyano', 'lao', 'sindhi',
+            'yidis', 'tibetano', 'divehi', 'uigur'
+        ]);
+
+        function _normIdioma(x) {
+            return String(x || '').toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zñ ]/g, '').trim();
+        }
+
+        // Acepta "Árabe" y también combinaciones escritas a mano como
+        // "Árabe/Francés/Inglés": basta con que uno de ellos no sea latino.
+        function usaAlfabetoNoLatino(lang) {
+            return String(lang || '').split(/[\/,+&]| y /)
+                .map(_normIdioma).filter(Boolean)
+                .some(t => IDIOMAS_SIN_ALFABETO_LATINO.has(t));
+        }
+
+        // Sólo aplica traduciendo HACIA un idioma en alfabeto latino: de árabe
+        // a español sí, de árabe a ruso no tendría sentido.
+        function requiereGrafiaDeNombres(origen, destino) {
+            return usaAlfabetoNoLatino(origen) && !usaAlfabetoNoLatino(destino);
+        }
+
         // Traducir nombres de idiomas al inglés
         function translateLanguageToEnglish(lang) {
             const translations = {
