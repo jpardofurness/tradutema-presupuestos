@@ -1923,8 +1923,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.9.6';
-        const HTML_DATE = '13/08/2026';
+        const HTML_VERSION = '3.9.9';
+        const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -4887,7 +4887,8 @@
                 // Mostrar traductores contactados y elegido CON HISTORIAL DE ENVÍOS
                 let traductoresHtml = '';
                 if (b.traductoresContactados) {
-                    const traductores = b.traductoresContactados.split(',').map(t => t.trim()).filter(t => t);
+                    const traductores = splitProviderNames(b.traductoresContactados,
+                        nombresConocidosDeProveedores(b.historialTraductores));   // v3.9.9
                     if (traductores.length > 0) {
                         traductoresHtml = '<div class="budget-item-providers">';
                         traductores.forEach(t => {
@@ -5033,6 +5034,10 @@
             // contener archivos residuales que se mostrarían erróneamente como
             // "Pendientes de subir" en paso 2.
             uploadedFiles = [];
+            // v3.9.8: soltar el handle del presupuesto ANTERIOR antes de nada.
+            // Sin esto, cualquier escritura hecha antes del reenganche iría a
+            // la carpeta del presupuesto que estaba abierto hasta ahora.
+            if (bgState) bgState.localFolderHandle = null;
             if (window.openSettingsPanels) window.openSettingsPanels.clear();
             // v3.7.33: ocultar también el banner de error de creación de
             // carpeta (bgStatusBanner) si quedó visible de un intento previo.
@@ -5135,7 +5140,10 @@
                             }
                         });
                         
-                        budgetData.contactedProviders = b.traductoresContactados.split(',').map(t => {
+                        budgetData.contactedProviders = splitProviderNames(
+                                b.traductoresContactados,
+                                nombresConocidosDeProveedores(budgetData.historialTraductores)
+                            ).map(t => {
                             const nombreNorm = t.trim();
                             return {
                                 nombre: nombreNorm,
@@ -5242,6 +5250,10 @@
                     });
                     document.getElementById('budgetIdDisplay').textContent = budgetData.id;
                     document.getElementById('deleteBudgetBtn').style.display = 'inline-block';
+                    // v3.9.8: enganchar la carpeta local de ESTE presupuesto en
+                    // cuanto se conoce el id. No bloquea la carga; si no hay
+                    // carpeta, cada escritura lo reintentará por su cuenta.
+                    reengancharCarpetaLocal().catch(e => console.warn('reenganche:', e));
                     // v3.7.20: refrescar botones del header (Drive / Local)
                     if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
                     // v3.7.24: refrescar banner de resumen
@@ -6231,7 +6243,7 @@
         // pdf.js entiende los PDF con object streams comprimidos, que es donde
         // falla el parser de texto del backend.
         async function actualizarArchivosYPaginas(silencioso) {
-            const fh = bgState && bgState.localFolderHandle;
+            const fh = await handleLocalDelPresupuesto(!silencioso);   // v3.9.8
             if (!fh) {
                 if (!silencioso) {
                     showStatus('Recontar páginas necesita la carpeta local enlazada (botón 💻 Local).', 'warning');
@@ -6745,7 +6757,9 @@
             // no supo contar (PDFs con object streams comprimidos) y tenemos la
             // carpeta local, se cuentan con pdf.js sin pedir nada al usuario.
             // Guard por firma para no repetirlo en cada re-render.
-            if (_sinPaginas.length > 0 && bgState && bgState.localFolderHandle) {
+            // v3.9.8: ya no se consulta el handle aquí (podía ser el de otro
+            // presupuesto). La comprobación real la hace actualizarArchivosYPaginas.
+            if (_sinPaginas.length > 0) {
                 const firma = _sinPaginas.map(f => f.name).sort().join('|');
                 if (window._ultimaFirmaSinPaginas !== firma) {
                     window._ultimaFirmaSinPaginas = firma;
@@ -8016,6 +8030,98 @@
             await w.close();
         }
 
+        // ====== v3.9.9: NOMBRES DE PROVEEDOR CON COMA ======
+        // La lista oficial guarda "APELLIDOS, Nombre". La columna P los unía
+        // con comas y se releían con split(','), así que cada nombre con coma
+        // se convertía en dos proveedores fantasma sin email ni fecha.
+        // El backend 3.7.71 ya escribe con ' | '. Aquí se leen los dos
+        // formatos: el nuevo directo, y el antiguo recomponiendo los trozos
+        // contra los nombres que sí conocemos (historial y lista oficial).
+        function nombresConocidosDeProveedores(historial) {
+            const out = [];
+            try { Object.keys(historial || {}).forEach(n => out.push(n)); } catch (e) {}
+            try { (allProviders || []).forEach(p => { if (p && p.nombre) out.push(p.nombre); }); } catch (e) {}
+            return out;
+        }
+
+        function splitProviderNames(texto, conocidos) {
+            const s = String(texto || '').trim();
+            if (!s) return [];
+            if (s.indexOf('|') >= 0) {
+                return s.split('|').map(t => t.trim()).filter(t => t);
+            }
+            const trozos = s.split(',').map(t => t.trim()).filter(t => t);
+            const set = new Set((conocidos || []).map(n => String(n).trim().toLowerCase()));
+            const out = [];
+            for (let i = 0; i < trozos.length; i++) {
+                if (i + 1 < trozos.length && set.has((trozos[i] + ', ' + trozos[i + 1]).toLowerCase())) {
+                    out.push(trozos[i] + ', ' + trozos[i + 1]);
+                    i++;
+                } else {
+                    out.push(trozos[i]);
+                }
+            }
+            return out;
+        }
+
+        // ====== v3.9.8: PUERTA ÚNICA AL HANDLE DE CARPETA LOCAL ======
+        // Causa raíz del bug: bgState.localFolderHandle sólo se asignaba al
+        // CREAR la carpeta y no se limpiaba nunca. Al abrir otro presupuesto en
+        // la misma pestaña seguía apuntando al anterior, así que los TXT, la
+        // ficha Excel y las versiones inmutables se escribían en la carpeta
+        // equivocada — sin ningún aviso.
+        //
+        // A partir de aquí NADIE lee bgState.localFolderHandle directamente.
+        // Todo pasa por handleLocalDelPresupuesto(), que sólo devuelve un
+        // handle cuando fh.name coincide con budgetData.id. Si no coincide, lo
+        // tira y reengancha la carpeta correcta desde la raíz.
+        async function reengancharCarpetaLocal() {
+            const id = budgetData && budgetData.id;
+            if (!id) return null;
+            try {
+                const raiz = await localModeReady(false);   // sin pedir permisos
+                if (!raiz) return null;
+                const folder = await raiz.getDirectoryHandle(id, { create: false });
+                if (!folder || folder.name !== id) return null;
+                bgState.localFolderHandle = folder;
+                console.log('Carpeta local reenganchada: ' + id);
+                return folder;
+            } catch (e) {
+                // NotFoundError = ese presupuesto no tiene carpeta local (p. ej.
+                // creado desde el móvil). No es un error: es un dato.
+                if (e && e.name === 'NotFoundError') {
+                    console.log('Sin carpeta local para ' + id + ' (no existe en la raíz).');
+                } else {
+                    console.warn('No se pudo reenganchar la carpeta local de ' + id + ':', e);
+                }
+                return null;
+            }
+        }
+
+        // interactivo=true → si hiciera falta permiso, se pide (sólo desde
+        // acciones nacidas de un clic del usuario).
+        async function handleLocalDelPresupuesto(interactivo) {
+            const id = budgetData && budgetData.id;
+            if (!id) return null;
+            const fh = bgState && bgState.localFolderHandle;
+            if (fh) {
+                if (fh.name === id) return fh;
+                console.warn('Handle local descartado: apuntaba a "' + fh.name +
+                             '" y el presupuesto abierto es "' + id + '".');
+                bgState.localFolderHandle = null;
+            }
+            let nuevo = await reengancharCarpetaLocal();
+            if (!nuevo && interactivo && typeof localModeReady === 'function') {
+                // Segundo intento pidiendo permiso: puede que la raíz esté
+                // configurada pero el permiso caducado en esta pestaña.
+                try {
+                    const raiz = await localModeReady(true);
+                    if (raiz) nuevo = await reengancharCarpetaLocal();
+                } catch (e) { /* el usuario canceló */ }
+            }
+            return nuevo;
+        }
+
         // Resolver el folderId de Drive de una carpeta creada en local (cuando
         // Drive Desktop la haya sincronizado). Reintenta con paciencia.
         async function resolveLocalFolderId(budgetId, maxIntentos) {
@@ -8546,9 +8652,10 @@
                         try {
                             // v3.8.0 MODO LOCAL: los TXTs se escriben en la carpeta
                             // local (Drive Desktop los sube); al backend solo la fila.
-                            if (bgState.localFolderHandle) {
+                            const _fhLocal = await handleLocalDelPresupuesto(false);   // v3.9.8
+                            if (_fhLocal) {
                                 try {
-                                    const fh = bgState.localFolderHandle;
+                                    const fh = _fhLocal;
                                     for (const item of (claudeResult.analysis || [])) {
                                         if (item.extractedText) {
                                             await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText);
@@ -8574,7 +8681,7 @@
                                     action: 'saveWordCountResults',
                                     budgetId: budgetData.id,
                                     folderId: budgetData.folderId,
-                                    skipDrive: !!bgState.localFolderHandle,   // v3.8.0
+                                    skipDrive: !!_fhLocal,   // v3.8.0 · v3.9.8: handle validado
                                     analysis: claudeResult.analysis,
                                     totalWords: claudeResult.totalWords,
                                     totalPages: claudeResult.totalPages,
@@ -10232,8 +10339,12 @@
             try {
                 if (!budgetData.id) return;
                 if (!Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) return;
-                const fh = bgState && bgState.localFolderHandle;
-                if (!fh) return;
+                const fh = await handleLocalDelPresupuesto(false);   // v3.9.8
+                if (!fh) {
+                    console.log('Recuento: sin carpeta local para ' + budgetData.id +
+                                ' — no se versiona (canal: ' + canal + ').');
+                    return;
+                }
 
                 const huella = huellaCotizacion();
                 const ultima = leerUltimaVersion();
@@ -10269,8 +10380,12 @@
             try {
                 if (!budgetData.id) return false;
                 if (!Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) return false;
-                const fh = bgState && bgState.localFolderHandle;
-                if (!fh) return false;
+                const fh = await handleLocalDelPresupuesto(false);   // v3.9.8
+                if (!fh) {
+                    console.log('Ficha Excel: sin carpeta local para ' + budgetData.id +
+                                ' — no se escribe (' + (motivo || '') + ').');
+                    return false;
+                }
                 const wb = await construirRecuentoWorkbook();
                 const buffer = await wb.xlsx.writeBuffer();
                 const blob = new Blob([buffer], {
@@ -10306,9 +10421,10 @@
 
                 // Modo local: dejarlo también en la carpeta del presupuesto
                 let guardadoLocal = false;
-                if (bgState && bgState.localFolderHandle && typeof writeLocalBinaryFile === 'function') {
+                const _fhExcel = await handleLocalDelPresupuesto(true);   // v3.9.8
+                if (_fhExcel && typeof writeLocalBinaryFile === 'function') {
                     try {
-                        await writeLocalBinaryFile(bgState.localFolderHandle, nombre, blob);
+                        await writeLocalBinaryFile(_fhExcel, nombre, blob);
                         guardadoLocal = true;
                     } catch (eLoc) {
                         console.warn('No se pudo escribir el Excel en la carpeta local:', eLoc);
