@@ -1930,7 +1930,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.9';
+        const HTML_VERSION = '3.10.11';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3406,8 +3406,29 @@
         async function loadWooCacheIntoMemory() {
             const el = document.getElementById('wooCacheStatusText');
             try {
+                // v3.10.11: cargar POR TRAMOS. Pedir las 10.500 filas de golpe
+                // son varios megas de JSON en una sola respuesta: Apps Script
+                // tarda casi un minuto en generarla y a veces ni llega. El
+                // backend ya aceptaba offset/limit; el frontend no los usaba.
                 if (el) el.textContent = 'Cargando caché en memoria...';
-                const data = await apiPost({ action: 'getWooCache' });
+                const TRAMO = 2500;
+                let offset = 0, total = null, headers = null;
+                const filas = [];
+                for (let vuelta = 0; vuelta < 40; vuelta++) {
+                    const tramo = await apiPost({ action: 'getWooCache', offset: offset, limit: TRAMO });
+                    if (!tramo || !tramo.success) throw new Error((tramo && tramo.error) || 'Respuesta vacía');
+                    if (!headers) headers = tramo.headers || [];
+                    if (total === null) total = tramo.total || 0;
+                    const lote = tramo.orders || [];
+                    lote.forEach(r => filas.push(r));
+                    offset += lote.length;
+                    if (el && total) {
+                        el.textContent = 'Cargando caché... ' + filas.length.toLocaleString('es-ES') +
+                                         ' de ' + total.toLocaleString('es-ES');
+                    }
+                    if (lote.length === 0 || offset >= total) break;
+                }
+                const data = { success: true, headers: headers, orders: filas, total: total };
                 if (data.success && data.orders) {
                     window.wooCacheHeaders = data.headers || [];
                     const H = window.wooCacheHeaders;
@@ -3639,14 +3660,44 @@
                         ? `Descargando histórico... ${totalProcessed.toLocaleString('es-ES')} pedidos procesados`
                         : `Actualizando... ${totalProcessed} pedidos nuevos/modificados`;
 
-                    const data = await apiPost({
-                            action: 'wooSyncCache',
-                            startPage: startPage,
-                            maxPages: 8,
-                            reset: reset,
-                            after: afterISO
-                        });
-                    if (!data.success) throw new Error(data.error || 'Error en sync');
+                    // v3.10.10: reintentar el LOTE, no abortar el sync entero.
+                    // Un sync completo son ~12 llamadas encadenadas y basta con
+                    // que se pierda una respuesta de Apps Script para tirarlo
+                    // todo. El backend hace upsert por orderId, así que repetir
+                    // un lote no duplica nada.
+                    let data = null;
+                    let ultimoError = null;
+                    for (let intento = 1; intento <= 4; intento++) {
+                        try {
+                            data = await apiPost({
+                                action: 'wooSyncCache',
+                                startPage: startPage,
+                                maxPages: 8,
+                                reset: reset,
+                                after: afterISO
+                            });
+                            if (!data.success) throw new Error(data.error || 'Error en sync');
+                            ultimoError = null;
+                            break;
+                        } catch (err) {
+                            ultimoError = err;
+                            data = null;
+                            if (intento < 4) {
+                                const espera = intento * 2500;   // 2,5s · 5s · 7,5s
+                                if (txt) txt.textContent =
+                                    `Reintentando lote (${intento}/3)... ${totalProcessed.toLocaleString('es-ES')} pedidos ya procesados`;
+                                console.warn('wooSyncCache lote ' + startPage + ' falló (intento ' +
+                                             intento + '): ' + (err.message || err));
+                                await new Promise(r => setTimeout(r, espera));
+                            }
+                        }
+                    }
+                    if (!data) {
+                        throw new Error('El lote de la página ' + startPage +
+                            ' falló 4 veces seguidas. Los ' + totalProcessed.toLocaleString('es-ES') +
+                            ' pedidos ya descargados están guardados: vuelve a pulsar Sync completo ' +
+                            'y continuará. Último error: ' + (ultimoError && ultimoError.message || '?'));
+                    }
 
                     reset = false;  // solo resetear en la primera llamada
                     totalProcessed += (data.processed || 0);
