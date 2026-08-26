@@ -1931,7 +1931,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.15';
+        const HTML_VERSION = '3.10.16';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -11979,12 +11979,21 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const faltan = [];      // datos que faltan
             const marcadores = [];  // placeholders sin sustituir en el mensaje
 
-            // 1. Presupuesto creado (referencia) y carpeta creada en Drive
+            // 1. Presupuesto creado (referencia) y carpeta del proyecto
             if (!budgetData.id) {
                 faltan.push('la referencia del presupuesto (créalo primero)');
             }
-            if (!budgetData.folderId && !budgetData.folderUrl) {
-                faltan.push('la carpeta del proyecto (aún no se ha creado)');
+            // v3.10.16: en modo local NO se crea carpeta en Drive (v3.8.0
+            // manda localMode y el backend solo registra la fila), así que
+            // folderId y folderUrl van vacíos. La comprobación miraba solo
+            // Drive y bloqueaba el envío diciendo que la carpeta "aún no se ha
+            // creado" mientras el banner de arriba decía justo lo contrario y
+            // los archivos estaban en disco.
+            const _hayLocal = !!(bgState && bgState.localFolderHandle &&
+                                 budgetData.id &&
+                                 bgState.localFolderHandle.name === budgetData.id);
+            if (!budgetData.folderId && !budgetData.folderUrl && !_hayLocal) {
+                faltan.push('la carpeta del proyecto (no existe ni en Drive ni en local)');
             }
 
             // 2. Importe
