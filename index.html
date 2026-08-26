@@ -630,6 +630,9 @@
             <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;">
                 <span><span style="color:#64748b;">Idiomas:</span> <strong id="bsBarIdiomas" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Contacto:</span> <strong id="bsBarContacto" style="color:#0c4a6e;">—</strong></span>
+                <span id="bsBarTarifWrap" class="hidden" style="flex-basis:100%;margin-top:4px;padding-top:4px;border-top:1px dashed #cbd5e1;">
+                    <span style="color:#64748b;">🧮 Cálculo:</span> <strong id="bsBarTarif" style="color:#065f46;"></strong>
+                </span>
                 <span><span style="color:#64748b;">Documentos:</span> <strong id="bsBarDocs" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Palabras:</span> <strong id="bsBarPalabras" style="color:#0c4a6e;">—</strong></span>
                 <span><span style="color:#64748b;">Páginas:</span> <strong id="bsBarPaginas" style="color:#0c4a6e;">—</strong></span>
@@ -1846,9 +1849,7 @@
                 <button class="btn copy-btn whatsapp" id="waCopyBtn" onclick="copyForWhatsApp()">
                     💾 Guardar y Copiar WhatsApp
                 </button>
-                <button class="btn copy-btn email" id="emailCopyBtn" onclick="copyForEmail()">
-                    💾 Guardar y Copiar Email
-                </button>
+
             </div>
             
             <!-- Historial de envíos al cliente -->
@@ -1930,7 +1931,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.11';
+        const HTML_VERSION = '3.10.14';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2411,6 +2412,14 @@
                 ? n.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) + ' €/pal'
                 : '—';
 
+            // v3.10.13: cómo se calculó el precio, a la vista al abrir
+            const _wrapT = document.getElementById('bsBarTarifWrap');
+            const _elT = document.getElementById('bsBarTarif');
+            if (_wrapT && _elT) {
+                const _txt = formatearTarif(compactarTarif(budgetData.quoteConfig));
+                if (_txt) { _elT.textContent = _txt; _wrapT.classList.remove('hidden'); }
+                else { _elT.textContent = ''; _wrapT.classList.add('hidden'); }
+            }
             const _elDocs = document.getElementById('bsBarDocs');
             if (_elDocs) _elDocs.textContent = documentos > 0 ? documentos : '—';
             document.getElementById('bsBarPalabras').textContent = palabras > 0 ? palabras.toLocaleString('es-ES') : '—';
@@ -3403,9 +3412,114 @@
             }
         }
 
-        async function loadWooCacheIntoMemory() {
+        // ====== v3.10.12: CACHÉ DE PEDIDOS PERSISTENTE EN EL NAVEGADOR ======
+        // Descargar 10.500 filas de Apps Script tarda más de un minuto, y hasta
+        // ahora se repetía en CADA apertura de la pantalla porque sólo vivía en
+        // memoria. Ahora se guarda en IndexedDB: la segunda vez es instantánea
+        // y el incremental automático se encarga de mantenerla al día.
+        // Base propia (no la de los handles) para no tocar su versión.
+        const WOO_DB = 'tradutema_woocache';
+
+        function _wooDb() {
+            return new Promise((res, rej) => {
+                const rq = indexedDB.open(WOO_DB, 1);
+                rq.onupgradeneeded = () => {
+                    if (!rq.result.objectStoreNames.contains('cache')) {
+                        rq.result.createObjectStore('cache');
+                    }
+                };
+                rq.onsuccess = () => res(rq.result);
+                rq.onerror = () => rej(rq.error);
+            });
+        }
+
+        async function guardarCacheLocalPedidos(headers, filas, total) {
+            try {
+                const db = await _wooDb();
+                await new Promise((res, rej) => {
+                    const tx = db.transaction('cache', 'readwrite');
+                    tx.objectStore('cache').put(
+                        { headers: headers, orders: filas, total: total,
+                          savedAt: Date.now(), appVersion: HTML_VERSION },
+                        'pedidos');
+                    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+                });
+            } catch (e) {
+                console.warn('No se pudo guardar la caché en el navegador:', e);
+            }
+        }
+
+        async function leerCacheLocalPedidos() {
+            try {
+                const db = await _wooDb();
+                return await new Promise((res, rej) => {
+                    const tx = db.transaction('cache', 'readonly');
+                    const rq = tx.objectStore('cache').get('pedidos');
+                    rq.onsuccess = () => res(rq.result || null);
+                    rq.onerror = () => rej(rq.error);
+                });
+            } catch (e) { return null; }
+        }
+
+        async function borrarCacheLocalPedidos() {
+            try {
+                const db = await _wooDb();
+                await new Promise((res) => {
+                    const tx = db.transaction('cache', 'readwrite');
+                    tx.objectStore('cache').delete('pedidos');
+                    tx.oncomplete = res; tx.onerror = res;
+                });
+            } catch (e) {}
+        }
+
+        // Convierte las filas crudas en los objetos que usa el buscador.
+        function montarCacheEnMemoria(headers, filas) {
+            window.wooCacheHeaders = headers || [];
+            const H = window.wooCacheHeaders;
+            window.wooCacheData = (filas || []).map(row => {
+                const o = {};
+                H.forEach((h, i) => { o[h] = row[i] || ''; });
+                let year = '', month = '', fechaEs = '';
+                if (o.date && /^\d{4}-\d{2}/.test(o.date)) {
+                    year = o.date.substring(0, 4);
+                    month = o.date.substring(5, 7);
+                    const dd = o.date.substring(8, 10);
+                    if (dd && month && year) fechaEs = `${dd}/${month}/${year}`;
+                }
+                o._year = year;
+                o._month = month;
+                const totalComma = String(o.total || '').replace('.', ',');
+                o._search = normalizeText(row.join(' ') + ' ' + fechaEs + ' ' + totalComma);
+                return o;
+            });
+        }
+
+        async function loadWooCacheIntoMemory(forzarDescarga) {
             const el = document.getElementById('wooCacheStatusText');
             try {
+                // v3.10.12: si hay copia en el navegador, se usa y no se
+                // descarga nada. El incremental automático la pondrá al día.
+                if (!forzarDescarga) {
+                    let local = await leerCacheLocalPedidos();
+                    // Una versión nueva puede haber añadido columnas: la copia
+                    // guardada tendría cabeceras viejas y faltarían campos.
+                    // Ante la duda, se descarta y se vuelve a bajar una vez.
+                    if (local && local.appVersion !== HTML_VERSION) {
+                        console.log('Caché local de otra versión (' + local.appVersion +
+                                    '): se descarta y se vuelve a descargar.');
+                        await borrarCacheLocalPedidos();
+                        local = null;
+                    }
+                    if (local && local.orders && local.orders.length) {
+                        montarCacheEnMemoria(local.headers, local.orders);
+                        populateOrderFilters();
+                        await refreshWooCacheStatus();
+                        console.log('Caché de pedidos leída del navegador: ' +
+                                    local.orders.length + ' filas');
+                        return;
+                    }
+                }
+
                 // v3.10.11: cargar POR TRAMOS. Pedir las 10.500 filas de golpe
                 // son varios megas de JSON en una sola respuesta: Apps Script
                 // tarda casi un minuto en generarla y a veces ni llega. El
@@ -3428,32 +3542,10 @@
                     }
                     if (lote.length === 0 || offset >= total) break;
                 }
-                const data = { success: true, headers: headers, orders: filas, total: total };
-                if (data.success && data.orders) {
-                    window.wooCacheHeaders = data.headers || [];
-                    const H = window.wooCacheHeaders;
-                    window.wooCacheData = data.orders.map(row => {
-                        const o = {};
-                        H.forEach((h, i) => { o[h] = row[i] || ''; });
-                        // v3.7.39: precalcular año y mes a partir de la fecha ISO
-                        let year = '', month = '', fechaEs = '';
-                        if (o.date && /^\d{4}-\d{2}/.test(o.date)) {
-                            year = o.date.substring(0, 4);
-                            month = o.date.substring(5, 7);
-                            const dd = o.date.substring(8, 10);
-                            if (dd && month && year) fechaEs = `${dd}/${month}/${year}`;
-                        }
-                        o._year = year;
-                        o._month = month;
-                        // v3.7.39: importe con coma además de punto, para que "167,00" lo encuentre
-                        const totalComma = String(o.total || '').replace('.', ',');
-                        // Campo de búsqueda enriquecido: todos los campos + fecha es + importe coma
-                        o._search = normalizeText(row.join(' ') + ' ' + fechaEs + ' ' + totalComma);
-                        return o;
-                    });
-                    populateOrderFilters();
-                    await refreshWooCacheStatus();
-                }
+                montarCacheEnMemoria(headers, filas);
+                await guardarCacheLocalPedidos(headers, filas, total);   // v3.10.12
+                populateOrderFilters();
+                await refreshWooCacheStatus();
             } catch(e) {
                 if (el) el.textContent = 'Error cargando caché: ' + e.message;
             }
@@ -3581,6 +3673,13 @@
                 // este número creyendo que es el del pedido.
                 if (o.invoiceNumber) lines.push(`🧾 Factura: ${o.invoiceNumber}`);
                 if (o.productName) lines.push(`🛒 ${o.productName}`);
+                // v3.10.13: cómo se tarificó la cotización de la que salió
+                if (o.tarifResumen) {
+                    try {
+                        const _t = formatearTarif(JSON.parse(o.tarifResumen));
+                        if (_t) lines.push(`🧮 ${_t}`);
+                    } catch (e) { /* JSON viejo o corrupto: se ignora */ }
+                }
                 if (o.langs) lines.push(`🌐 ${o.langs}`);
                 if (o.fileNames) lines.push(`📎 ${o.fileNames}`);
                 if (o.customerNote) lines.push(`📝 ${o.customerNote}`);
@@ -3644,6 +3743,9 @@
             if (incBtn) incBtn.disabled = true;
             if (fullBtn) fullBtn.disabled = true;
             if (wrap) wrap.style.display = 'block';
+            // v3.10.12: un Sync completo invalida la copia del navegador; si no,
+            // al terminar se leería la vieja en la siguiente apertura.
+            if (full) { try { await borrarCacheLocalPedidos(); } catch (e) {} }
 
             let startPage = 1;
             let totalProcessed = 0;
@@ -3720,7 +3822,14 @@
                 if (txt) txt.textContent = `✓ Sincronización completada · ${totalProcessed.toLocaleString('es-ES')} pedidos procesados`;
 
                 // Recargar caché en memoria y refrescar
-                await loadWooCacheIntoMemory();
+                // v3.10.12: si el incremental no trajo nada, no tiene sentido
+                // volver a bajar las 10.500 filas. Es el caso habitual al entrar
+                // en la pantalla varias veces al día.
+                if (totalProcessed > 0) {
+                    await loadWooCacheIntoMemory(true);
+                } else {
+                    await refreshWooCacheStatus();
+                }
                 renderOrderSearchResults();
 
                 setTimeout(() => { if (wrap) wrap.style.display = 'none'; }, 3000);
@@ -5109,6 +5218,7 @@
                             <span class="budget-item-detail">${canal}</span>
                             <span class="budget-item-detail">🌐 ${b.origen} → ${b.destino}</span>
                             ${b.palabras ? `<span class="budget-item-detail">📝 ${parseInt(b.palabras).toLocaleString('es-ES')} ${parseInt(b.palabras) === 1 ? 'palabra' : 'palabras'}</span>` : ''}
+                            ${b.tarif ? `<span class="budget-item-detail" style="color:#065f46;" title="Cómo se calculó el precio">🧮 ${escapeHtml(formatearTarif(b.tarif))}</span>` : ''}
                             ${b.numArchivos && parseInt(b.numArchivos) > 0 ? `<span class="budget-item-detail">📎 ${parseInt(b.numArchivos)} doc${parseInt(b.numArchivos) > 1 ? 's' : ''}</span>` : ''}
                             ${b.paginas ? `<span class="budget-item-detail">📄 ${parseInt(b.paginas)} pág${parseInt(b.paginas) > 1 ? 's' : ''}</span>` : ''}
                             ${(parseFloat(b.importe) > 0) ? `<span class="budget-item-detail" style="color:#15803d;font-weight:600;">💶 ${parseFloat(b.importe).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</span>` : ''}
@@ -10805,6 +10915,66 @@
             }
         }
 
+        // ====== v3.10.13: RESUMEN DE TARIFICACIÓN EN UNA LÍNEA ======
+        // Espejo de resumenTarifDeConfig_ del backend (3.7.74). El backend lo
+        // calcula para los listados; aquí se calcula para el presupuesto
+        // abierto, que tiene la ficha entera en memoria.
+        function compactarTarif(cfg) {
+            if (!cfg || !cfg.method) return null;
+            const f = cfg.fields || {};
+            const num = x => {
+                const n = parseFloat(String(x == null ? '' : x).replace(',', '.'));
+                return isNaN(n) ? 0 : n;
+            };
+            let cant = 0, uni = 0, tot = 0, u = '';
+            switch (cfg.method) {
+                case 'pages':
+                    cant = num(f.quotePagesCount) || num(f.quotePagesToTranslate) || num(f.quoteTotalPages);
+                    tot = num(f.quoteAmountPages); u = 'pág'; break;
+                case 'direct':
+                    cant = num(f.directWordCount); uni = num(f.directTariffPerWord);
+                    tot = num(f.quoteAmountDirect); u = 'pal'; break;
+                case 'words':
+                    cant = num(f.quoteWordCount); tot = num(f.quoteAmountWords); u = 'pal'; break;
+                case 'provider':  tot = num(f.quoteAmountProvider); break;
+                case 'historical': tot = num(f.quoteAmountHistorical); break;
+            }
+            if (!cant) {
+                if (u === 'pág') { cant = num(cfg.pages); }
+                else if (u === 'pal') { cant = num(cfg.words); }
+                if (!cant) {
+                    if (num(cfg.pages)) { cant = num(cfg.pages); u = 'pág'; }
+                    else if (num(cfg.words)) { cant = num(cfg.words); u = 'pal'; }
+                }
+            }
+            if (!uni && cant > 0 && tot > 0) uni = tot / cant;
+            return { m: cfg.method, cant: cant, u: u, uni: uni, tot: tot,
+                     cm: cfg.countMethod || '', prov: cfg.providerName || '',
+                     at: cfg.savedAt || '' };
+        }
+
+        // Devuelve texto plano: "Por palabras + margen · 1.234 pal · 0,08 €/pal · 98,72 €"
+        function formatearTarif(t) {
+            if (!t || !t.m) return '';
+            const eur = n => Number(n).toLocaleString('es-ES',
+                { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+            const partes = [];
+            const etiqueta = (CALC_METHOD_LABELS && CALC_METHOD_LABELS[t.m]) || t.m;
+            // sin el emoji, que en una línea de resumen sobra
+            partes.push(String(etiqueta).replace(/^[^\wÁÉÍÓÚÑa-z]+/, '').trim());
+            if (t.cant > 0 && t.u) {
+                partes.push(Number(t.cant).toLocaleString('es-ES') + ' ' + t.u);
+                if (t.uni > 0) {
+                    const dec = t.uni < 1 ? 4 : 2;
+                    partes.push(Number(t.uni).toLocaleString('es-ES',
+                        { minimumFractionDigits: 2, maximumFractionDigits: dec }) + ' €/' + t.u);
+                }
+            }
+            if (t.prov) partes.push('prov. ' + t.prov);
+            if (t.tot > 0) partes.push(eur(t.tot));
+            return partes.join(' · ');
+        }
+
         function renderQuoteConfigStamp(cfg) {
             const box = document.getElementById('quoteConfigStamp');
             if (!box) return;
@@ -11402,6 +11572,22 @@
             
             // Actualizar UI según método
             onCalcMethodChange();
+
+            // ====== v3.10.14: LA FICHA GUARDADA MANDA ======
+            // Todo lo de arriba son valores POR DEFECTO, y se escribían sin
+            // condición: quoteWordCount = budgetData.wordCount (0 si no hubo
+            // análisis), directWordCount, quoteTotalPages, directTariffPerWord
+            // y hasta el método de cálculo. Esta función corre al mostrar el
+            // paso 4, o sea DESPUÉS de que loadBudget restaurara la ficha, así
+            // que borraba lo que el usuario había tecleado y guardado: se
+            // introducían 15.745 palabras, se guardaba bien en la columna AG,
+            // y al reabrir el campo aparecía a 0.
+            // Sobrevivían solo quotePagesToTranslate y quotePagesCount, que sí
+            // miraban si había valor previo. Ahora se reaplica la ficha al
+            // final: lo guardado gana siempre sobre lo calculado por defecto.
+            if (budgetData.quoteConfig) {
+                applyQuoteConfig(budgetData.quoteConfig);
+            }
         }
         
         // Recalcular desde tarifa directa por palabra (col E, IVA inc.)
@@ -11936,7 +12122,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 b.title = enabled ? '' : motivo;
             };
             setBtn('waCopyBtn', hasWa, 'Añade un número de WhatsApp del cliente para usar este botón');
-            setBtn('emailCopyBtn', hasEmail, 'Añade un email del cliente para usar este botón');
+            // v3.10.13: el botón "Guardar y Copiar Email" se eliminó
             setBtn('sendClientBtn', hasEmail, 'Añade un email del cliente para enviarlo por correo');
         }
 
