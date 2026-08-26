@@ -1931,7 +1931,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.14';
+        const HTML_VERSION = '3.10.15';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3349,14 +3349,22 @@
             document.getElementById('progressContainer').classList.add('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
 
-            // Estado de la caché + cargar en memoria si no está
-            await refreshWooCacheStatus();
-            if (window.wooCacheData.length === 0) {
-                await loadWooCacheIntoMemory();
-            }
+            // v3.10.15: la pantalla se muestra y se puede escribir DESDE YA.
+            // Antes se esperaba a tener las 10.500 filas antes de pintar nada,
+            // y eso era más de un minuto mirando "Cargando caché...".
             renderOrderSearchResults();
             const input = document.getElementById('orderSearchInput');
             if (input) input.focus();
+            if (window.wooCacheData.length === 0) {
+                // No se llama aquí a refreshWooCacheStatus: escribe en el mismo
+                // rótulo que el progreso de carga y lo pisaría a media descarga.
+                // loadWooCacheIntoMemory ya lo refresca al terminar.
+                loadWooCacheIntoMemory()
+                    .then(() => autoSyncPedidos())
+                    .catch(e => console.warn('carga de caché:', e));
+                return;   // autoSyncPedidos se encadena al terminar
+            }
+            refreshWooCacheStatus();   // sin await: solo actualiza el rótulo
 
             // v3.10.6: actualización incremental al abrir la pantalla. SIN await:
             // el buscador ya está utilizable y se puede escribir mientras corre.
@@ -3473,10 +3481,10 @@
         }
 
         // Convierte las filas crudas en los objetos que usa el buscador.
-        function montarCacheEnMemoria(headers, filas) {
+        function montarCacheEnMemoria(headers, filas, añadir) {
             window.wooCacheHeaders = headers || [];
             const H = window.wooCacheHeaders;
-            window.wooCacheData = (filas || []).map(row => {
+            const nuevos = (filas || []).map(row => {
                 const o = {};
                 H.forEach((h, i) => { o[h] = row[i] || ''; });
                 let year = '', month = '', fechaEs = '';
@@ -3492,6 +3500,11 @@
                 o._search = normalizeText(row.join(' ') + ' ' + fechaEs + ' ' + totalComma);
                 return o;
             });
+            if (añadir && Array.isArray(window.wooCacheData)) {
+                nuevos.forEach(o => window.wooCacheData.push(o));
+            } else {
+                window.wooCacheData = nuevos;
+            }
         }
 
         async function loadWooCacheIntoMemory(forzarDescarga) {
@@ -3524,30 +3537,40 @@
                 // son varios megas de JSON en una sola respuesta: Apps Script
                 // tarda casi un minuto en generarla y a veces ni llega. El
                 // backend ya aceptaba offset/limit; el frontend no los usaba.
+                window._wooCargando = true;   // v3.10.15
                 if (el) el.textContent = 'Cargando caché en memoria...';
-                const TRAMO = 2500;
+                // v3.10.15: el primer tramo es pequeño para que aparezca algo
+                // enseguida, y CADA tramo se pinta según llega. Los pedidos
+                // vienen del más reciente al más antiguo, así que lo primero
+                // que se puede buscar es justo lo más probable.
                 let offset = 0, total = null, headers = null;
                 const filas = [];
                 for (let vuelta = 0; vuelta < 40; vuelta++) {
+                    const TRAMO = (vuelta === 0) ? 800 : 3000;
                     const tramo = await apiPost({ action: 'getWooCache', offset: offset, limit: TRAMO });
                     if (!tramo || !tramo.success) throw new Error((tramo && tramo.error) || 'Respuesta vacía');
                     if (!headers) headers = tramo.headers || [];
                     if (total === null) total = tramo.total || 0;
                     const lote = tramo.orders || [];
                     lote.forEach(r => filas.push(r));
+                    // Pintar ya lo que hay: la pantalla deja de estar muerta.
+                    montarCacheEnMemoria(headers, lote, vuelta > 0);
+                    try { renderOrderSearchResults(); } catch (e) {}
                     offset += lote.length;
                     if (el && total) {
                         el.textContent = 'Cargando caché... ' + filas.length.toLocaleString('es-ES') +
-                                         ' de ' + total.toLocaleString('es-ES');
+                                         ' de ' + total.toLocaleString('es-ES') +
+                                         ' (ya puedes buscar entre los cargados)';
                     }
                     if (lote.length === 0 || offset >= total) break;
                 }
-                montarCacheEnMemoria(headers, filas);
                 await guardarCacheLocalPedidos(headers, filas, total);   // v3.10.12
                 populateOrderFilters();
                 await refreshWooCacheStatus();
             } catch(e) {
                 if (el) el.textContent = 'Error cargando caché: ' + e.message;
+            } finally {
+                window._wooCargando = false;   // v3.10.15
             }
         }
 
@@ -3594,7 +3617,9 @@
             const q = normalizeText(document.getElementById('orderSearchInput').value.trim());
 
             if (window.wooCacheData.length === 0) {
-                cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">No hay pedidos en caché. Pulsa "Sync completo" para descargar el histórico.</div>';
+                cont.innerHTML = window._wooCargando
+                    ? '<div style="text-align:center;color:#7c3aed;padding:30px;">⏳ Descargando la caché de pedidos...<br><small style="color:#888;">En cuanto llegue el primer bloque ya podrás buscar.</small></div>'
+                    : '<div style="text-align:center;color:#888;padding:30px;">No hay pedidos en caché. Pulsa "Sync completo" para descargar el histórico.</div>';
                 return;
             }
 
