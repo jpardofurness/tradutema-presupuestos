@@ -1931,7 +1931,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.16';
+        const HTML_VERSION = '3.10.17';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3411,7 +3411,13 @@
                         window._wooLatestModified = data.latestModified || '';
                     } else {
                         if (el) el.textContent = 'Caché vacía — pulsa "Sync completo" para descargar el histórico';
+                        // v3.10.17: sin esto, la fecha del último sincronizado
+                        // sobrevivía a una caché vaciada y el siguiente
+                        // "Actualizar" pedía a WooCommerce solo lo modificado
+                        // desde ayer: 0 resultados y la caché sin reconstruirse.
+                        window._wooLatestModified = '';
                     }
+                    window._wooTotalCache = data.total || 0;
                 } else {
                     if (el) el.textContent = 'Error consultando estado';
                 }
@@ -3774,6 +3780,17 @@
 
             let startPage = 1;
             let totalProcessed = 0;
+            // v3.10.17: un incremental sobre una caché vacía no tiene sentido:
+            // no hay nada que incrementar. Se convierte en completo, que es lo
+            // que el usuario espera al pulsar cualquiera de los dos botones
+            // teniendo la caché a cero.
+            const cacheVacia = !window._wooLatestModified &&
+                               (!window.wooCacheData || window.wooCacheData.length === 0);
+            if (!full && cacheVacia) {
+                console.log('Caché vacía: el incremental se trata como completo.');
+                full = true;
+                try { await borrarCacheLocalPedidos(); } catch (e) {}
+            }
             let reset = full;
             // Para sync incremental, usar la fecha del más reciente en caché
             const afterISO = (!full && window._wooLatestModified) ? window._wooLatestModified : '';
