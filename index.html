@@ -1931,7 +1931,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.17';
+        const HTML_VERSION = '3.10.19';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3361,7 +3361,14 @@
                 // loadWooCacheIntoMemory ya lo refresca al terminar.
                 loadWooCacheIntoMemory()
                     .then(() => autoSyncPedidos())
-                    .catch(e => console.warn('carga de caché:', e));
+                    .catch(e => {
+                        // v3.10.18: antes esto solo iba a la consola y la
+                        // pantalla decía "No hay pedidos en caché", que es
+                        // falso y manda a pulsar Sync completo sin motivo.
+                        console.error('carga de caché:', e);
+                        window._wooErrorCarga = (e && e.message) || String(e);
+                        try { renderOrderSearchResults(); } catch (x) {}
+                    });
                 return;   // autoSyncPedidos se encadena al terminar
             }
             refreshWooCacheStatus();   // sin await: solo actualiza el rótulo
@@ -3544,17 +3551,40 @@
                 // tarda casi un minuto en generarla y a veces ni llega. El
                 // backend ya aceptaba offset/limit; el frontend no los usaba.
                 window._wooCargando = true;   // v3.10.15
+                window._wooErrorCarga = null; // v3.10.18
                 if (el) el.textContent = 'Cargando caché en memoria...';
                 // v3.10.15: el primer tramo es pequeño para que aparezca algo
                 // enseguida, y CADA tramo se pinta según llega. Los pedidos
                 // vienen del más reciente al más antiguo, así que lo primero
                 // que se puede buscar es justo lo más probable.
-                let offset = 0, total = null, headers = null;
+                // v3.10.19: el PRIMER tramo se pide del FINAL de la hoja.
+                // Tras un sync completo las filas quedan de más reciente a más
+                // antigua, pero los pedidos que entran luego por el incremental
+                // se añaden al final. O sea que lo más nuevo de todo está
+                // abajo. Se trae primero esa cola y luego el resto desde el
+                // principio, así lo de hoy es buscable en segundos.
+                let total = null, headers = null;
                 const filas = [];
+                const cabecera = await apiPost({ action: 'getWooCache', offset: 0, limit: 1 });
+                total = (cabecera && cabecera.total) || 0;
+                headers = (cabecera && cabecera.headers) || [];
+                window._wooTotalCache = total;
+                const COLA = Math.min(800, total);
+                let offset = Math.max(0, total - COLA);
+                let colaPendiente = true;
                 for (let vuelta = 0; vuelta < 40; vuelta++) {
-                    const TRAMO = (vuelta === 0) ? 800 : 3000;
+                    // El recorrido hacia delante se para justo donde empieza
+                    // la cola ya cargada, para no traer las mismas filas dos veces.
+                    const TRAMO = colaPendiente
+                        ? COLA
+                        : Math.min(3000, Math.max(0, (total - COLA) - offset));
+                    console.log('getWooCache tramo: offset=' + offset + ' limit=' + TRAMO);
                     const tramo = await apiPost({ action: 'getWooCache', offset: offset, limit: TRAMO });
-                    if (!tramo || !tramo.success) throw new Error((tramo && tramo.error) || 'Respuesta vacía');
+                    if (!tramo || !tramo.success) {
+                        throw new Error('getWooCache offset=' + offset + ': ' +
+                                        ((tramo && tramo.error) || 'respuesta vacía o sin success'));
+                    }
+                    console.log('  → ' + ((tramo.orders || []).length) + ' filas · total=' + tramo.total);
                     if (!headers) headers = tramo.headers || [];
                     if (total === null) total = tramo.total || 0;
                     const lote = tramo.orders || [];
@@ -3562,13 +3592,20 @@
                     // Pintar ya lo que hay: la pantalla deja de estar muerta.
                     montarCacheEnMemoria(headers, lote, vuelta > 0);
                     try { renderOrderSearchResults(); } catch (e) {}
-                    offset += lote.length;
+                    if (colaPendiente) {
+                        // Ya está la cola: seguimos desde el principio.
+                        colaPendiente = false;
+                        offset = 0;
+                    } else {
+                        offset += lote.length;
+                    }
                     if (el && total) {
                         el.textContent = 'Cargando caché... ' + filas.length.toLocaleString('es-ES') +
                                          ' de ' + total.toLocaleString('es-ES') +
                                          ' (ya puedes buscar entre los cargados)';
                     }
-                    if (lote.length === 0 || offset >= total) break;
+                    if (lote.length === 0) break;
+                    if (!colaPendiente && offset >= Math.max(0, total - COLA)) break;
                 }
                 await guardarCacheLocalPedidos(headers, filas, total);   // v3.10.12
                 populateOrderFilters();
@@ -3623,9 +3660,19 @@
             const q = normalizeText(document.getElementById('orderSearchInput').value.trim());
 
             if (window.wooCacheData.length === 0) {
-                cont.innerHTML = window._wooCargando
-                    ? '<div style="text-align:center;color:#7c3aed;padding:30px;">⏳ Descargando la caché de pedidos...<br><small style="color:#888;">En cuanto llegue el primer bloque ya podrás buscar.</small></div>'
-                    : '<div style="text-align:center;color:#888;padding:30px;">No hay pedidos en caché. Pulsa "Sync completo" para descargar el histórico.</div>';
+                if (window._wooCargando) {
+                    cont.innerHTML = '<div style="text-align:center;color:#7c3aed;padding:30px;">⏳ Descargando la caché de pedidos...<br><small style="color:#888;">En cuanto llegue el primer bloque ya podrás buscar.</small></div>';
+                } else if (window._wooErrorCarga) {
+                    // v3.10.18: distinguir "no hay nada" de "no se pudo traer".
+                    cont.innerHTML = '<div style="text-align:center;color:#b91c1c;padding:30px;">' +
+                        '⚠️ No se pudo cargar la caché en memoria.<br>' +
+                        '<small style="color:#7f1d1d;">' + escapeHtml(window._wooErrorCarga) + '</small><br>' +
+                        '<button onclick="window._wooErrorCarga=null;loadWooCacheIntoMemory(true).catch(e=>{window._wooErrorCarga=e.message;renderOrderSearchResults();});" ' +
+                        'style="margin-top:12px;padding:7px 14px;background:#7c3aed;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">🔄 Reintentar carga</button>' +
+                        '<br><small style="color:#888;margin-top:8px;display:inline-block;">Los pedidos siguen en la hoja: esto es un fallo al traerlos, no una caché vacía.</small></div>';
+                } else {
+                    cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">No hay pedidos en caché. Pulsa "Sync completo" para descargar el histórico.</div>';
+                }
                 return;
             }
 
@@ -3673,7 +3720,22 @@
             results = results.slice(0, 200);
 
             if (results.length === 0) {
-                cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">Sin resultados. Prueba a quitar algún filtro.</div>';
+                // v3.10.19: decir "Sin resultados" con la caché a medio cargar
+                // es mentira: el pedido puede estar en un tramo que aún no ha
+                // llegado. Pasó con el 91418, que entró por el incremental
+                // DESPUÉS del sync completo y por tanto está al final de la
+                // hoja, no al principio.
+                if (window._wooCargando) {
+                    const cargados = (window.wooCacheData || []).length;
+                    const totalCache = window._wooTotalCache || 0;
+                    cont.innerHTML = '<div style="text-align:center;color:#7c3aed;padding:30px;">' +
+                        '⏳ No está entre los ' + cargados.toLocaleString('es-ES') +
+                        ' pedidos cargados hasta ahora' +
+                        (totalCache ? ' de ' + totalCache.toLocaleString('es-ES') : '') + '.<br>' +
+                        '<small style="color:#888;">Sigue cargando: si aparece, se mostrará solo.</small></div>';
+                } else {
+                    cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">Sin resultados. Prueba a quitar algún filtro.</div>';
+                }
                 return;
             }
 
