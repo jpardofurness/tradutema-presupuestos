@@ -1931,7 +1931,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.19';
+        const HTML_VERSION = '3.10.20';
         const HTML_DATE = '24/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2224,6 +2224,27 @@
             } catch (e) {
                 showStatus('No se pudo lanzar el acceso local. Instálalo desde Ajustes.', 'warning');
                 setTimeout(hideStatus, 5000);
+            }
+        }
+
+        // v3.10.20: carpeta local del PRESUPUESTO (…\_PRESUPUESTOS\0824-07-M).
+        // Usa el formato de siempre del protocolo, distinto del de pedido.
+        function abrirCarpetaLocalPresupuesto(ref) {
+            if (!ref) return;
+            try {
+                let fr = document.getElementById('tradutemaProtoFrame');
+                if (!fr) {
+                    fr = document.createElement('iframe');
+                    fr.id = 'tradutemaProtoFrame';
+                    fr.style.display = 'none';
+                    document.body.appendChild(fr);
+                }
+                fr.src = 'tradutema://open/' + encodeURIComponent(ref);
+                showStatus('💻 Abriendo la carpeta local del presupuesto ' + ref + '...', 'success');
+                setTimeout(hideStatus, 3000);
+            } catch (e) {
+                showStatus('No se pudo lanzar el acceso local.', 'warning');
+                setTimeout(hideStatus, 4000);
             }
         }
 
@@ -3788,14 +3809,25 @@
                 // v3.10.8: si no hay carpeta, decir POR QUÉ en vez de no
                 // mostrar nada. Un hueco en blanco no distingue "no le toca
                 // tener carpeta" de "la tenía y no aparece".
-                let driveLink;
-                if (o.driveUrl) {
-                    driveLink = `<a href="${o.driveUrl}" target="_blank" style="font-size:0.78rem;color:#16a34a;text-decoration:none;font-weight:600;margin-left:14px;">📂 Abrir proyecto Drive →</a>`;
-                } else if (/pago adicional|payment/i.test(o.productName || '')) {
-                    driveLink = `<span style="font-size:0.78rem;color:#94a3b8;margin-left:14px;" title="Un pago adicional no genera proyecto: los documentos están en el pedido original.">💳 Sin carpeta (pago adicional)</span>`;
-                } else {
-                    driveLink = `<span style="font-size:0.78rem;color:#b45309;margin-left:14px;" title="El pedido no tiene carpeta de Drive vinculada. Si es un encargo antiguo, lo más probable es que esté archivado.">📦 ARCHIVADO (sin carpeta vinculada)</span>`;
+                // v3.10.20: cuatro accesos separados. Presupuesto y proyecto
+                // son carpetas distintas y antes compartían un único enlace.
+                const _est = 'font-size:0.78rem;text-decoration:none;font-weight:600;margin-left:14px;';
+                const partesCarpetas = [];
+                if (o.quoteRef) {
+                    partesCarpetas.push(`<a href="#" onclick="abrirCarpetaLocalPresupuesto('${o.quoteRef}');return false;" style="${_est}color:#0284c7;" title="Carpeta local del presupuesto ${o.quoteRef}">💻 Presup. local →</a>`);
                 }
+                if (o.driveUrl) {
+                    partesCarpetas.push(`<a href="${o.driveUrl}" target="_blank" style="${_est}color:#0ea5e9;" title="Carpeta del presupuesto en Drive">📂 Presup. Drive →</a>`);
+                }
+                partesCarpetas.push(`<a href="#" onclick="abrirCarpetaLocalPedido('${o.orderId}');return false;" style="${_est}color:#7c3aed;" title="Carpeta local del proyecto (requiere tradutema_open.vbs v2)">💻 Proyecto local →</a>`);
+                if (o.driveProject) {
+                    partesCarpetas.push(`<a href="${o.driveProject}" target="_blank" style="${_est}color:#16a34a;" title="Carpeta del proyecto en Drive">📁 Proyecto Drive →</a>`);
+                } else if (/pago adicional|payment/i.test(o.productName || '')) {
+                    partesCarpetas.push(`<span style="${_est}color:#94a3b8;" title="Un pago adicional no genera proyecto: los documentos están en el pedido original.">💳 Sin proyecto (pago adicional)</span>`);
+                } else {
+                    partesCarpetas.push(`<span style="${_est}color:#b45309;" title="El pedido no tiene carpeta de proyecto en Drive. Si es un encargo antiguo, lo más probable es que esté archivado.">📦 Proyecto archivado</span>`);
+                }
+                const driveLink = partesCarpetas.join('');
                 // v3.10.5: enlace directo a la factura en Quaderno
                 const facturaLink = o.invoiceUrl
                     ? `<a href="${o.invoiceUrl}" target="_blank" style="font-size:0.78rem;color:#b45309;text-decoration:none;font-weight:600;margin-left:14px;">🧾 Ver factura →</a>`
@@ -3817,7 +3849,6 @@
                             <a href="${wooUrl}" target="_blank" style="font-size:0.78rem;color:#7c3aed;text-decoration:none;font-weight:600;">Abrir en WooCommerce →</a>
                             <a href="${crmUrl}" target="_blank" style="font-size:0.78rem;color:#0ea5e9;text-decoration:none;font-weight:600;margin-left:14px;">📋 Ficha CRM →</a>
                             ${cotizacionLink}
-                            <a href="#" onclick="abrirCarpetaLocalPedido('${o.orderId}');return false;" style="font-size:0.78rem;color:#0284c7;text-decoration:none;font-weight:600;margin-left:14px;" title="Abre la carpeta del proyecto en el Explorador de Windows. Requiere el acceso local instalado (tradutema_open.vbs v2).">💻 Carpeta local →</a>
                             ${driveLink}
                             ${facturaLink}
                         </div>
