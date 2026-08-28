@@ -207,6 +207,8 @@
         .provider-email { font-size: 0.8rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
         .provider-tariff { font-size: 0.8rem; color: var(--accent-green); font-weight: 600; margin-top: 4px; }
         .provider-comment { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; margin-top: 2px; line-height: 1.3; }
+        .provider-tariff-empty { color: #b45309; font-weight: 500; }
+        .provider-comment-empty { color: #94a3b8; font-style: italic; }
         .provider-edit-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 8px; font-size: 1rem; border-radius: var(--radius-sm); transition: all 0.2s; flex-shrink: 0; }
         .provider-edit-btn:hover { background: rgba(52,152,219,0.1); color: var(--tradutema-blue); }
         
@@ -231,6 +233,24 @@
         .select-all-btn:hover { background: rgba(52,152,219,0.08); }
         .selected-count { font-size: 0.85rem; color: var(--text-secondary); }
         .no-providers { text-align: center; padding: 30px; color: var(--text-secondary); }
+
+        /* v3.10.24: consulta de proveedores agrupada por persona + pestanas */
+        .prov-tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--border-color); margin-bottom: 18px; }
+        .prov-tab { background: none; border: none; border-bottom: 3px solid transparent; padding: 10px 16px; font-family: inherit; font-size: 0.92rem; color: var(--text-secondary); cursor: pointer; margin-bottom: -2px; }
+        .prov-tab:hover { color: var(--tradutema-blue); }
+        .prov-tab.active { color: var(--text-primary); border-bottom-color: var(--tradutema-blue); font-weight: 600; }
+        .prov-card { border: 2px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); padding: 14px 16px; transition: border-color 0.2s; }
+        .prov-card:hover { border-color: var(--tradutema-blue); }
+        .prov-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .prov-btn-sm { border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; cursor: pointer; font-family: inherit; }
+        .prov-pairs { border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 8px; }
+        .prov-pair { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; padding: 5px 6px; }
+        .prov-pair + .prov-pair { border-top: 1px solid var(--border-color); }
+        .prov-pair-hit { background: rgba(52,152,219,0.10); border-radius: var(--radius-sm); }
+        .prov-pair-langs { color: var(--text-primary); }
+        .prov-pair-data { color: var(--text-secondary); white-space: nowrap; }
+        .prov-edit-row { display: grid; grid-template-columns: minmax(0,1fr) 92px 74px 36px; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--border-color); }
+        .prov-edit-row input, .prov-edit-row select { width: 100%; margin: 0; }
         
         /* CONTACTED PROVIDERS */
         .contacted-providers { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color); }
@@ -840,75 +860,93 @@
         <!-- PROVIDERS CONSULT SCREEN -->
         <div class="card hidden" id="providersConsultScreen">
             <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
-            
-            <div class="card-title">👥 Consultar Proveedores</div>
-            
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
-                Filtra por idiomas para ver tarifas y comentarios de los traductores.
-            </p>
-            
-            <div class="provider-filters" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-                <div class="form-group">
-                    <label>Idioma Origen</label>
-                    <select id="consultSourceLang" onchange="filterConsultProviders()">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Idioma Destino</label>
-                    <select id="consultTargetLang" onchange="filterConsultProviders()">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="consult-stats" style="display: flex; gap: 16px; align-items:center; margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-md);">
-                <span style="color: var(--text-secondary);">Mostrando: <strong id="consultProviderCount">0</strong> proveedores</span>
-                <button onclick="showAddProviderForm()" style="margin-left:auto;background:var(--tradutema-blue,#2563eb);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.85rem;cursor:pointer;">➕ Añadir proveedor</button>
-                <button onclick="toggleDirectorioPanel()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.85rem;cursor:pointer;">🔎 Buscar nuevos (MAEC)</button>
+
+            <div class="card-title">👥 Traductores</div>
+
+            <!-- v3.10.24: dos funciones distintas, dos pestañas excluyentes.
+                 Antes el buscador del directorio oficial se desplegaba ENCIMA de
+                 la lista de tus proveedores y quedaban a la vista dos juegos de
+                 filtros que se parecen y no significan lo mismo. -->
+            <div class="prov-tabs">
+                <button class="prov-tab active" id="provTabMios" onclick="switchProviderTab('mios')">Mis traductores</button>
+                <button class="prov-tab" id="provTabMaec" onclick="switchProviderTab('maec')">Directorio oficial (MAEC)</button>
             </div>
 
-            <!-- v3.7.58: buscador del directorio oficial MAEC (bajo demanda) -->
-            <div id="directorioPanel" class="hidden" style="border:1px solid #c4b5fd;border-radius:10px;padding:16px;margin-bottom:16px;background:#faf5ff;">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px;">
-                    <div style="font-weight:600;color:#5b21b6;">🔎 Buscar nuevos traductores (directorio oficial MAEC)</div>
-                    <button onclick="backToProviders()" style="background:#fff;color:#5b21b6;border:1px solid #c4b5fd;border-radius:6px;padding:6px 12px;font-size:0.82rem;cursor:pointer;white-space:nowrap;">← Volver a proveedores</button>
+            <!-- ===== PESTAÑA 1: TUS TRADUCTORES ===== -->
+            <div id="provPaneMios">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                    Una ficha por persona, con todas sus combinaciones de idiomas dentro.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label>Idioma Origen</label>
+                        <select id="consultSourceLang" onchange="filterConsultProviders()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Idioma Destino</label>
+                        <select id="consultTargetLang" onchange="filterConsultProviders()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre o email</label>
+                        <input type="text" id="consultText" class="form-control" placeholder="opcional" oninput="filterConsultProviders()">
+                    </div>
                 </div>
-                <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Filtra el listado oficial. Los que añadas entran en tus Traductores como <strong>Inactivo</strong>; pides cotización y luego los pones Activo si te convienen.</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end;">
-                    <div><label style="font-size:0.8rem;color:#475569;">Idioma</label><select id="dirIdioma" class="form-control"></select></div>
-                    <div><label style="font-size:0.8rem;color:#475569;">Provincia / País</label><input type="text" id="dirProvincia" class="form-control" placeholder="Ej: SEVILLA, MADRID, ALEMANIA..."></div>
-                    <div><label style="font-size:0.8rem;color:#475569;">Texto (nombre/email)</label><input type="text" id="dirQuery" class="form-control" placeholder="opcional"></div>
+
+                <div class="consult-stats" style="display: flex; gap: 16px; align-items:center; flex-wrap:wrap; margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-md);">
+                    <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-secondary);cursor:pointer;">
+                        <input type="checkbox" id="consultSoloActivos" onchange="filterConsultProviders()"> Sólo activos
+                    </label>
+                    <span style="color: var(--text-secondary); font-size:0.85rem;" id="consultProviderCount">0</span>
+                    <button onclick="showAddProviderForm()" class="prov-btn-sm" style="margin-left:auto;background:var(--tradutema-blue,#2563eb);color:#fff;border:none;padding:8px 14px;font-size:0.85rem;">➕ Añadir traductor</button>
+                </div>
+
+                <!-- v3.7.57: formulario de alta -->
+                <div id="addProviderForm" class="hidden" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin-bottom:16px;background:#f8fafc;">
+                    <div style="font-weight:600;margin-bottom:12px;color:#0c4a6e;">➕ Nuevo traductor</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div><label style="font-size:0.8rem;color:#475569;">Nombre</label><input type="text" id="addProvNombre" class="form-control" placeholder="APELLIDOS, Nombre"></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Email (id único)</label><input type="email" id="addProvEmail" class="form-control" placeholder="email@dominio.com"></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Idioma origen</label><select id="addProvOrigen" class="form-control"></select></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Idioma destino</label><select id="addProvDestino" class="form-control"></select></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Tarifa mínima (€)</label><input type="text" id="addProvMin" class="form-control" placeholder="Ej: 20"></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Tarifa por palabra (€)</label><input type="text" id="addProvPalabra" class="form-control" placeholder="Ej: 0.08"></div>
+                        <div style="grid-column:1 / -1;"><label style="font-size:0.8rem;color:#475569;">Comentarios</label><textarea id="addProvComentarios" class="form-control" rows="2" placeholder="Notas sobre el traductor..."></textarea></div>
+                    </div>
+                    <small style="color:#64748b;font-size:11px;display:block;margin-top:6px;">Si el email ya existe, el mínimo y los comentarios se heredan del traductor. Para añadirle más combinaciones de idiomas, mejor usa ✏️ Editar en su ficha.</small>
+                    <div style="display:flex;gap:8px;margin-top:12px;">
+                        <button onclick="submitAddProvider()" class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;padding:8px 16px;">Guardar</button>
+                        <button onclick="document.getElementById('addProviderForm').classList.add('hidden')" class="prov-btn-sm" style="background:#e2e8f0;color:#475569;border:none;padding:8px 16px;">Cancelar</button>
+                    </div>
+                </div>
+
+                <div class="providers-consult-list" id="providersConsultList">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+
+            <!-- ===== PESTAÑA 2: DIRECTORIO OFICIAL MAEC ===== -->
+            <div id="provPaneMaec" class="hidden">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                    Listado oficial del Ministerio. Los que añadas entran en <strong>Mis traductores</strong>
+                    como <strong>Inactivo</strong>; les pides cotización y luego los pones Activo si te convienen.
+                </p>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end;">
+                    <div class="form-group"><label>Idioma jurado</label><select id="dirIdioma" class="form-control"></select></div>
+                    <div class="form-group"><label>Provincia / País</label><input type="text" id="dirProvincia" class="form-control" placeholder="Ej: SEVILLA, MADRID, ALEMANIA..."></div>
+                    <div class="form-group"><label>Texto (nombre/email)</label><input type="text" id="dirQuery" class="form-control" placeholder="opcional"></div>
                 </div>
                 <div style="display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap;">
-                    <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;color:#475569;cursor:pointer;"><input type="checkbox" id="dirSoloEmail" checked> Solo con email</label>
-                    <button onclick="runDirectorioSearch()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Buscar</button>
+                    <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;color:#475569;cursor:pointer;"><input type="checkbox" id="dirSoloEmail" checked> Sólo con email</label>
+                    <button onclick="runDirectorioSearch()" class="prov-btn-sm" style="background:#7c3aed;color:#fff;border:none;padding:8px 16px;">🔎 Buscar</button>
                     <span id="dirCount" style="font-size:0.82rem;color:#64748b;"></span>
+                    <button onclick="backToProviders()" class="prov-btn-sm" style="margin-left:auto;background:#fff;color:#5b21b6;border:1px solid #c4b5fd;">← Volver a mis traductores</button>
                 </div>
-                <div id="directorioResults" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;"></div>
-            </div>
-            
-            <!-- v3.7.57: formulario de alta de proveedor -->
-            <div id="addProviderForm" class="hidden" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin-bottom:16px;background:#f8fafc;">
-                <div style="font-weight:600;margin-bottom:12px;color:#0c4a6e;">➕ Nuevo proveedor</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <div><label style="font-size:0.8rem;color:#475569;">Nombre</label><input type="text" id="addProvNombre" class="form-control" placeholder="Nombre"></div>
-                    <div><label style="font-size:0.8rem;color:#475569;">Email (id único)</label><input type="email" id="addProvEmail" class="form-control" placeholder="email@dominio.com"></div>
-                    <div><label style="font-size:0.8rem;color:#475569;">Idioma origen</label><select id="addProvOrigen" class="form-control"></select></div>
-                    <div><label style="font-size:0.8rem;color:#475569;">Idioma destino</label><select id="addProvDestino" class="form-control"></select></div>
-                    <div><label style="font-size:0.8rem;color:#475569;">Tarifa mínima (€)</label><input type="text" id="addProvMin" class="form-control" placeholder="Ej: 20"></div>
-                    <div><label style="font-size:0.8rem;color:#475569;">Tarifa por palabra (€)</label><input type="text" id="addProvPalabra" class="form-control" placeholder="Ej: 0.08"></div>
-                    <div style="grid-column:1 / -1;"><label style="font-size:0.8rem;color:#475569;">Comentarios</label><textarea id="addProvComentarios" class="form-control" rows="2" placeholder="Notas sobre el proveedor..."></textarea></div>
-                </div>
-                <small style="color:#64748b;font-size:11px;display:block;margin-top:6px;">Si el email ya existe, el mínimo y los comentarios se heredan del proveedor (campos compartidos). Para otro par de idiomas del mismo proveedor, añádelo de nuevo cambiando los idiomas.</small>
-                <div style="display:flex;gap:8px;margin-top:12px;">
-                    <button onclick="submitAddProvider()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Guardar</button>
-                    <button onclick="document.getElementById('addProviderForm').classList.add('hidden')" style="background:#e2e8f0;color:#475569;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Cancelar</button>
-                </div>
-            </div>
-            
-            <div class="providers-consult-list" id="providersConsultList">
-                <!-- Se llena dinámicamente -->
+                <div id="directorioResults" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
             </div>
         </div>
 
@@ -1884,39 +1922,37 @@
         </div>
     </div>
 
-    <!-- Modal Editar Tarifas Proveedor -->
+    <!-- Modal Editar Proveedor (v3.10.24: proveedor entero, no una fila) -->
     <div class="modal-overlay" id="editProviderModal">
-        <div class="modal" style="max-width: 400px;">
+        <div class="modal" style="max-width: 560px;">
             <div class="modal-header">
-                <span class="modal-title">✏️ Editar Tarifas</span>
+                <span class="modal-title">✏️ Editar traductor</span>
                 <button class="modal-close" onclick="closeEditProviderModal()">✕</button>
             </div>
             <div class="modal-body">
-                <div id="editProviderName" style="font-weight: 600; font-size: 1.1rem; margin-bottom: 4px;"></div>
-                <div id="editProviderEmail" style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;"></div>
-                <div id="editProviderIdiomas" style="color: var(--tradutema-blue); font-size: 0.85rem; margin-bottom: 16px;"></div>
-                
-                <div style="margin-bottom: 16px;">
-                    <label style="font-weight: 500; display: block; margin-bottom: 6px;">Tarifa Mínima (€)</label>
+                <div id="editProviderName" style="font-weight: 600; font-size: 1.1rem;"></div>
+                <div id="editProviderEmail" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 2px;"></div>
+                <div id="editProviderMaec" style="color: var(--text-secondary); font-size: 0.78rem; margin-top: 2px;"></div>
+
+                <div style="background: var(--bg-secondary); border-radius: var(--radius-md); padding: 12px; margin: 14px 0;">
+                    <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px;">Datos del traductor — se aplican a todas sus combinaciones</div>
+                    <label style="font-weight: 500; display: block; margin-bottom: 6px; font-size:0.85rem;">Tarifa mínima (€)</label>
                     <input type="text" id="editTarifaMinima" class="form-control" placeholder="Ej: 20">
-                    <small style="color:#64748b;font-size:11px;">Se aplica a todos los pares de idiomas del proveedor.</small>
+                    <label style="font-weight: 500; display: block; margin: 12px 0 6px; font-size:0.85rem;">Comentarios</label>
+                    <textarea id="editComentarios" class="form-control" rows="2" placeholder="Notas sobre este traductor..."></textarea>
                 </div>
-                
-                <div style="margin-bottom: 16px;">
-                    <label style="font-weight: 500; display: block; margin-bottom: 6px;">Tarifa por Palabra (€)</label>
-                    <input type="text" id="editTarifaPalabra" class="form-control" placeholder="Ej: 0.08">
-                    <small style="color:#64748b;font-size:11px;">Solo para este par de idiomas (puede variar por dirección).</small>
-                </div>
-                
-                <div style="margin-bottom: 8px;">
-                    <label style="font-weight: 500; display: block; margin-bottom: 6px;">Comentarios</label>
-                    <textarea id="editComentarios" class="form-control" rows="3" placeholder="Notas sobre este proveedor..."></textarea>
-                    <small style="color:#64748b;font-size:11px;">Se aplican a todos los pares de idiomas del proveedor.</small>
-                </div>
+
+                <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:6px;">Combinaciones de idiomas — la tarifa por palabra y el orden son de cada par</div>
+                <div id="editPairsBox" style="border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden;"></div>
+                <small style="color:#64748b;font-size:11px;display:block;margin-top:6px;">
+                    Los idiomas salen del catálogo de la hoja Tarifas. Cada dirección es una combinación
+                    aparte: Inglés → Español y Español → Inglés pueden tener tarifas distintas.
+                    Lo que quites aquí se borra de la hoja al guardar.
+                </small>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeEditProviderModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveProviderTariffs()">💾 Guardar y volver</button>
+                <button class="btn btn-primary" onclick="saveProviderEditor()">💾 Guardar y volver</button>
             </div>
         </div>
     </div>
@@ -1931,8 +1967,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.20';
-        const HTML_DATE = '24/08/2026';
+        const HTML_VERSION = '3.10.25';
+        const HTML_DATE = '28/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2921,9 +2957,23 @@
             document.getElementById('quickUploadArea').classList.remove('has-files');
         }
         
-        // ====== PROVIDERS CONSULT ======
-        let consultFilteredProviders = [];
-        
+        // ====== PROVIDERS CONSULT (v3.10.24: agrupada por persona) ======
+        //
+        // Antes la lista pintaba una tarjeta por FILA de la hoja Traductores, y
+        // una fila es proveedor + par de idiomas: un traductor con seis pares
+        // salia seis veces y el contador decia "340 proveedores" cuando eran 340
+        // fichas. Ahora se agrupa por email: una tarjeta por persona con sus
+        // combinaciones dentro.
+        let consultGroups = [];          // grupos visibles (uno por traductor)
+        let consultTab = 'mios';         // 'mios' | 'maec'
+
+        // Identidad del proveedor. El email es la clave real en la hoja; si
+        // faltara, se cae al nombre para no fusionar gente distinta.
+        function claveProveedor(p) {
+            const em = String((p && p.email) || '').trim().toLowerCase();
+            return em || ('sin-email:' + String((p && p.nombre) || '').trim().toLowerCase());
+        }
+
         function showProvidersConsult() {
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
@@ -2931,49 +2981,138 @@
             document.getElementById('providersConsultScreen').classList.remove('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
-            
-            // Poblar selectores de idiomas
+
             populateConsultLanguages();
-            
-            // Mostrar todos los proveedores inicialmente
+            switchProviderTab('mios');
             filterConsultProviders();
         }
-        
+
+        // Las dos funciones son excluyentes: o miras tu lista, o buscas en el
+        // listado oficial. Nunca las dos a la vez.
+        function switchProviderTab(tab) {
+            consultTab = (tab === 'maec') ? 'maec' : 'mios';
+            const esMaec = consultTab === 'maec';
+            document.getElementById('provPaneMios').classList.toggle('hidden', esMaec);
+            document.getElementById('provPaneMaec').classList.toggle('hidden', !esMaec);
+            document.getElementById('provTabMios').classList.toggle('active', !esMaec);
+            document.getElementById('provTabMaec').classList.toggle('active', esMaec);
+            if (esMaec) {
+                const sel = document.getElementById('dirIdioma');
+                if (sel && !sel.options.length) {
+                    sel.innerHTML = '<option value="">(todos)</option>' +
+                        MAEC_LANGS.map(l => `<option value="${l}">${l}</option>`).join('');
+                }
+            } else {
+                // Al volver puede haber traductores recien promovidos del MAEC
+                filterConsultProviders();
+            }
+        }
+
         function populateConsultLanguages() {
             const sourceSelect = document.getElementById('consultSourceLang');
             const targetSelect = document.getElementById('consultTargetLang');
-            
-            // Obtener idiomas únicos
-            const sourceLanguages = [...new Set(allProviders.map(p => p.idiomaOrigen))].sort();
-            const targetLanguages = [...new Set(allProviders.map(p => p.idiomaDestino))].sort();
-            
-            // Poblar selector origen
-            sourceSelect.innerHTML = '<option value="">Todos</option>';
-            sourceLanguages.forEach(lang => {
-                if (lang) sourceSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
-            });
-            
-            // Poblar selector destino
-            targetSelect.innerHTML = '<option value="">Todos</option>';
-            targetLanguages.forEach(lang => {
-                if (lang) targetSelect.innerHTML += `<option value="${lang}">${lang}</option>`;
-            });
+            if (!sourceSelect || !targetSelect) return;
+
+            const prevS = sourceSelect.value;
+            const prevT = targetSelect.value;
+            const sourceLanguages = [...new Set(allProviders.map(p => p.idiomaOrigen))].filter(Boolean).sort();
+            const targetLanguages = [...new Set(allProviders.map(p => p.idiomaDestino))].filter(Boolean).sort();
+
+            sourceSelect.innerHTML = '<option value="">Todos</option>' +
+                sourceLanguages.map(l => `<option value="${escapeHtmlAttr(l)}">${l}</option>`).join('');
+            targetSelect.innerHTML = '<option value="">Todos</option>' +
+                targetLanguages.map(l => `<option value="${escapeHtmlAttr(l)}">${l}</option>`).join('');
+
+            if (sourceLanguages.indexOf(prevS) !== -1) sourceSelect.value = prevS;
+            if (targetLanguages.indexOf(prevT) !== -1) targetSelect.value = prevT;
         }
-        
+
         function filterConsultProviders() {
-            const sourceLang = document.getElementById('consultSourceLang').value;
-            const targetLang = document.getElementById('consultTargetLang').value;
-            
-            consultFilteredProviders = allProviders.filter(p => {
-                const matchSource = !sourceLang || p.idiomaOrigen === sourceLang;
-                const matchTarget = !targetLang || p.idiomaDestino === targetLang;
-                return matchSource && matchTarget;
-            }).sort(compareByOrden);
-            
+            const sourceLang = (document.getElementById('consultSourceLang') || {}).value || '';
+            const targetLang = (document.getElementById('consultTargetLang') || {}).value || '';
+            const texto = ((document.getElementById('consultText') || {}).value || '').trim();
+            const soloActivos = !!(document.getElementById('consultSoloActivos') || {}).checked;
+
+            // 1) que FILAS casan con el filtro de idiomas
+            const filas = allProviders.filter(p =>
+                (!sourceLang || p.idiomaOrigen === sourceLang) &&
+                (!targetLang || p.idiomaDestino === targetLang));
+
+            // 2) agrupar por persona (la tarjeta muestra TODAS sus combinaciones,
+            //    marcando las que casan con el filtro)
+            let grupos = agruparProveedores(filas);
+            const clavesHit = new Set(filas.map(claveProveedor));
+            const paresHit = new Set(filas.map(p => claveProveedor(p) + '|' + p.idiomaOrigen + '|' + p.idiomaDestino));
+            grupos.forEach(g => {
+                g.pares.forEach(par => {
+                    par._hit = (sourceLang || targetLang)
+                        ? paresHit.has(g.clave + '|' + par.idiomaOrigen + '|' + par.idiomaDestino)
+                        : false;
+                });
+            });
+            grupos = grupos.filter(g => clavesHit.has(g.clave));
+
+            // 3) filtros que son de la PERSONA, no del par
+            if (soloActivos) grupos = grupos.filter(g => g.activo !== false);
+            if (texto) {
+                const q = normalizeText(texto);
+                grupos = grupos.filter(g => normalizeText((g.nombre || '') + ' ' + (g.email || '')).indexOf(q) !== -1);
+            }
+
+            // 4) orden: mejor prioridad de sus pares visibles, luego alfabetico
+            grupos.sort((a, b) => {
+                const oa = mejorOrden(a), ob = mejorOrden(b);
+                if (oa !== ob) return oa - ob;
+                return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+            });
+
+            consultGroups = grupos;
             renderConsultProviders();
         }
 
-        // v3.7.57: orden por preferencia (1,2,3...); sin orden → al final; empate → por nombre
+        function mejorOrden(g) {
+            let mejor = Infinity;
+            g.pares.forEach(p => {
+                const o = (p.orden == null || p.orden === '') ? Infinity : Number(p.orden);
+                if (o < mejor) mejor = o;
+            });
+            return mejor;
+        }
+
+        // Convierte filas de la hoja en grupos {clave, nombre, email, ..., pares[]}.
+        // Los campos compartidos (minimo, comentarios, activo, datos del MAEC) se
+        // toman de la primera fila que los traiga; si alguna fila dice inactivo,
+        // el proveedor cuenta como inactivo.
+        function agruparProveedores(filasCoincidentes) {
+            const claves = new Set(filasCoincidentes.map(claveProveedor));
+            const map = new Map();
+            allProviders.forEach(p => {
+                const k = claveProveedor(p);
+                if (!claves.has(k)) return;
+                if (!map.has(k)) {
+                    map.set(k, {
+                        clave: k, nombre: '', email: p.email || '',
+                        tarifaMinima: '', comentarios: '', activo: true,
+                        numTIJ: '', provincia: '', anio: '', telefono: '',
+                        pares: []
+                    });
+                }
+                const g = map.get(k);
+                if (!g.nombre && p.nombre) g.nombre = p.nombre;
+                if (!g.tarifaMinima && p.tarifaMinima) g.tarifaMinima = p.tarifaMinima;
+                if (!g.comentarios && p.comentarios) g.comentarios = p.comentarios;
+                if (p.activo === false) g.activo = false;
+                ['numTIJ', 'provincia', 'anio', 'telefono'].forEach(c => {
+                    if (!g[c] && p[c]) g[c] = p[c];
+                });
+                g.pares.push(p);
+            });
+            const grupos = [...map.values()];
+            grupos.forEach(g => g.pares.sort(compareByOrden));
+            return grupos;
+        }
+
+        // v3.7.57: orden por preferencia (1,2,3...); sin orden -> al final; empate -> por nombre
         function compareByOrden(a, b) {
             const oa = (a.orden == null || a.orden === '') ? Infinity : Number(a.orden);
             const ob = (b.orden == null || b.orden === '') ? Infinity : Number(b.orden);
@@ -2981,7 +3120,7 @@
             return (a.nombre || '').localeCompare(b.nombre || '', 'es');
         }
 
-        // v3.7.61: formatea el año de nombramiento a dd/mm/aaaa (el backend puede
+        // v3.7.61: formatea el anio de nombramiento a dd/mm/aaaa (el backend puede
         // devolverlo como objeto fecha "Sat Jan 07 1978 00:00:00 GMT+0100").
         function formatAnio(v) {
             if (!v) return '';
@@ -2994,95 +3133,80 @@
                 const mm = String(d.getMonth() + 1).padStart(2, '0');
                 return `${dd}/${mm}/${d.getFullYear()}`;
             }
-            const ym = s.match(/\b(19|20)\d{2}\b/); // año suelto
+            const ym = s.match(/\b(19|20)\d{2}\b/); // anio suelto
             return ym ? ym[0] : s;
         }
-        
+
         function renderConsultProviders() {
             const list = document.getElementById('providersConsultList');
             const countEl = document.getElementById('consultProviderCount');
-            
-            countEl.textContent = consultFilteredProviders.length;
-            
-            if (consultFilteredProviders.length === 0) {
-                list.innerHTML = `
-                    <div class="no-providers">
-                        <div>No hay proveedores para esta combinación de idiomas</div>
-                    </div>
-                `;
+
+            const nPares = consultGroups.reduce((a, g) => a + g.pares.length, 0);
+            countEl.textContent = consultGroups.length + (consultGroups.length === 1 ? ' traductor' : ' traductores') +
+                                  ' \u00b7 ' + nPares + (nPares === 1 ? ' combinacion' : ' combinaciones');
+
+            if (consultGroups.length === 0) {
+                list.innerHTML = '<div class="no-providers"><div>Ningun traductor con esos filtros</div></div>';
                 return;
             }
-            
+
             let html = '';
-            consultFilteredProviders.forEach((p, index) => {
-                // Construir info de tarifas
-                let tarifasHtml = '';
-                if (p.tarifaMinima || p.tarifaPalabra) {
-                    tarifasHtml = '<div class="provider-consult-tariffs">';
-                    if (p.tarifaMinima) {
-                        tarifasHtml += `<div class="provider-consult-tariff"><span>Mínimo:</span> ${p.tarifaMinima}€</div>`;
-                    }
-                    if (p.tarifaPalabra) {
-                        tarifasHtml += `<div class="provider-consult-tariff"><span>Por palabra:</span> ${p.tarifaPalabra}€</div>`;
-                    }
-                    tarifasHtml += '</div>';
-                } else {
-                    tarifasHtml = '<div class="no-tariffs">Sin tarifas definidas</div>';
-                }
-                
-                // Comentarios
-                let comentarioHtml = '';
-                if (p.comentarios) {
-                    comentarioHtml = `<div class="provider-consult-comment">💬 ${p.comentarios}</div>`;
-                }
-                
-                // v3.7.59: datos del MAEC (si se importaron)
-                let maecHtml = '';
+            consultGroups.forEach(g => {
+                const activo = g.activo !== false;
+                const dim = activo ? '' : 'opacity:0.55;';
+                const badge = activo ? '' : ' <span style="font-size:0.72rem;color:#b91c1c;font-weight:600;">(inactivo)</span>';
+
+                const compartido = [];
+                if (g.tarifaMinima) compartido.push('Minimo: <strong style="color:var(--accent-green);">' + g.tarifaMinima + '\u20ac</strong>');
+                if (g.comentarios) compartido.push('<span style="font-style:italic;">' + g.comentarios + '</span>');
+
                 const maecBits = [];
-                if (p.numTIJ) maecBits.push(`Nº TIJ ${p.numTIJ}`);
-                if (p.provincia) maecBits.push(p.provincia);
-                if (p.anio) maecBits.push(`nombr. ${formatAnio(p.anio)}`);
-                if (p.telefono) maecBits.push(`📞 ${p.telefono}`);
-                if (maecBits.length) {
-                    maecHtml = `<div style="font-size:0.78rem;color:#64748b;margin-top:2px;">${maecBits.join(' · ')}</div>`;
-                }
-                
-                // v3.7.57: controles de activo / orden / eliminar
-                const activo = p.activo !== false;
-                const ordenVal = (p.orden == null || p.orden === '') ? '' : p.orden;
-                const dimStyle = activo ? '' : 'opacity:0.55;';
-                const inactivoBadge = activo ? '' : ' <span style="font-size:0.72rem;color:#b91c1c;font-weight:600;">(inactivo)</span>';
-                
+                if (g.numTIJ) maecBits.push('N.o TIJ ' + g.numTIJ);
+                if (g.provincia) maecBits.push(g.provincia);
+                if (g.anio) maecBits.push('nombr. ' + formatAnio(g.anio));
+                if (g.telefono) maecBits.push('\u260e ' + g.telefono);
+
+                const paresHtml = g.pares.map(par => {
+                    const datos = [];
+                    if (par.tarifaPalabra) datos.push(par.tarifaPalabra + ' \u20ac/pal');
+                    if (par.orden != null && par.orden !== '') datos.push('orden ' + par.orden);
+                    return `<div class="prov-pair ${par._hit ? 'prov-pair-hit' : ''}">
+                        <span class="prov-pair-langs">${par.idiomaOrigen} &rarr; ${par.idiomaDestino}</span>
+                        <span class="prov-pair-data">${datos.length ? datos.join(' \u00b7 ') : 'sin tarifa'}</span>
+                    </div>`;
+                }).join('');
+
                 html += `
-                    <div class="provider-consult-item" style="${dimStyle}">
-                        <div class="provider-consult-info">
-                            <div class="provider-consult-name">${p.nombre}${inactivoBadge}</div>
-                            <div class="provider-consult-email">📧 ${p.email}</div>
-                            <div class="provider-consult-langs">${p.idiomaOrigen} → ${p.idiomaDestino}</div>
-                            ${tarifasHtml}
-                            ${comentarioHtml}
-                            ${maecHtml}
-                            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:0.82rem;color:#475569;">
-                                <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
-                                    <input type="checkbox" ${activo ? 'checked' : ''} onchange="toggleProviderActive(${index}, this.checked)"> Activo
-                                </label>
-                                <label style="display:inline-flex;align-items:center;gap:5px;" title="Orden de preferencia para este par (menor = primero)">
-                                    Orden: <input type="number" min="1" value="${ordenVal}" style="width:60px;" onchange="changeProviderOrder(${index}, this.value)">
-                                </label>
+                    <div class="prov-card" style="${dim}">
+                        <div class="prov-card-head">
+                            <div style="min-width:0;">
+                                <div class="provider-consult-name">${g.nombre || '(sin nombre)'}${badge}</div>
+                                <div class="provider-consult-email">\u2709 ${g.email || '(sin email)'}</div>
+                                ${maecBits.length ? `<div style="font-size:0.78rem;color:#64748b;margin-top:2px;">${maecBits.join(' \u00b7 ')}</div>` : ''}
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                                <button class="prov-btn-sm" style="background:var(--tradutema-blue);color:#fff;border:none;" onclick="openProviderEditor('${g.clave.replace(/'/g, "\\'")}')">\u270f\ufe0f Editar</button>
+                                <button class="prov-btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;" onclick="deleteProviderFE('${g.clave.replace(/'/g, "\\'")}')">\ud83d\uddd1\ufe0f Eliminar</button>
                             </div>
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:6px;">
-                            <button class="provider-consult-edit" onclick="openEditConsultProvider(${index})">✏️ Editar</button>
-                            <button onclick="deleteProviderFE(${index})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;font-size:0.82rem;cursor:pointer;">🗑️ Eliminar</button>
+                        ${compartido.length ? `<div style="font-size:0.83rem;color:var(--text-secondary);margin-top:8px;">${compartido.join(' \u00b7 ')}</div>` : ''}
+                        <div style="margin-top:8px;">
+                            <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;color:#475569;cursor:pointer;">
+                                <input type="checkbox" ${activo ? 'checked' : ''} onchange="toggleProviderActive('${g.clave.replace(/'/g, "\\'")}', this.checked)"> Activo
+                            </label>
+                        </div>
+                        <div class="prov-pairs">
+                            <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px;">Combinaciones (${g.pares.length})</div>
+                            ${paresHtml}
                         </div>
                     </div>
                 `;
             });
-            
+
             list.innerHTML = html;
         }
 
-        // ====== v3.7.57: gestión de proveedores (activo / orden / añadir / eliminar) ======
+        // ====== v3.7.57 / v3.10.24: gestion de proveedores ======
         async function providerApi(payload) {
             const resp = await fetch(apiUrl, {
                 method: 'POST',
@@ -3092,18 +3216,20 @@
             return resp.json();
         }
 
-        // Activo es del proveedor (email) → propaga a todas sus fichas
-        async function toggleProviderActive(index, checked) {
-            const p = consultFilteredProviders[index];
-            if (!p) return;
+        // Activo es del proveedor (email) -> propaga a todas sus fichas
+        async function toggleProviderActive(clave, checked) {
+            const g = consultGroups.find(x => x.clave === clave);
+            if (!g) return;
             try {
-                const data = await providerApi({ action: 'setProviderActive', email: p.email, activo: checked });
+                const data = await providerApi({ action: 'setProviderActive', email: g.email, activo: checked });
                 if (!data.success) throw new Error(data.error || 'Error');
-                [allProviders, filteredProviders, consultFilteredProviders].forEach(arr => {
-                    if (Array.isArray(arr)) arr.forEach(e => { if (e.email === p.email) e.activo = checked; });
-                });
-                renderConsultProviders();
-                showStatus(checked ? '✓ Proveedor activado' : '✓ Proveedor desactivado (no aparecerá al solicitar tasación)', 'success');
+                allProviders.forEach(e => { if (claveProveedor(e) === clave) e.activo = checked; });
+                if (Array.isArray(filteredProviders)) {
+                    filteredProviders.forEach(e => { if (claveProveedor(e) === clave) e.activo = checked; });
+                }
+                filterConsultProviders();
+                showStatus(checked ? '\u2713 Traductor activado'
+                                   : '\u2713 Traductor desactivado (no aparecera al solicitar tasacion)', 'success');
                 setTimeout(hideStatus, 2500);
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
@@ -3111,39 +3237,20 @@
             }
         }
 
-        // Orden es por par de idiomas → solo esta ficha
-        async function changeProviderOrder(index, value) {
-            const p = consultFilteredProviders[index];
-            if (!p) return;
-            const orden = value === '' ? '' : parseInt(value);
+        // Eliminar proveedor ENTERO (todas sus combinaciones)
+        async function deleteProviderFE(clave) {
+            const g = consultGroups.find(x => x.clave === clave);
+            if (!g) return;
+            if (!confirm('Eliminar a ' + g.nombre + ' (' + g.email + ') por completo?\n' +
+                         'Se borraran sus ' + g.pares.length + ' combinacion(es) de idiomas. ' +
+                         'Esta accion no se puede deshacer.')) return;
             try {
-                const data = await providerApi({
-                    action: 'setProviderOrder',
-                    email: p.email, idiomaOrigen: p.idiomaOrigen, idiomaDestino: p.idiomaDestino,
-                    orden: orden
-                });
+                const data = await providerApi({ action: 'deleteProvider', email: g.email });
                 if (!data.success) throw new Error(data.error || 'Error');
-                const apply = (e) => { if (e.email === p.email && e.idiomaOrigen === p.idiomaOrigen && e.idiomaDestino === p.idiomaDestino) e.orden = (orden === '' ? null : orden); };
-                [allProviders, filteredProviders, consultFilteredProviders].forEach(arr => { if (Array.isArray(arr)) arr.forEach(apply); });
-                filterConsultProviders(); // re-filtra y re-ordena
-            } catch (e) {
-                showStatus('Error: ' + e.message, 'error');
-                setTimeout(hideStatus, 3000);
-            }
-        }
-
-        // Eliminar proveedor ENTERO (todos sus pares)
-        async function deleteProviderFE(index) {
-            const p = consultFilteredProviders[index];
-            if (!p) return;
-            const pares = allProviders.filter(e => e.email === p.email).length;
-            if (!confirm(`¿Eliminar a ${p.nombre} (${p.email}) por completo?\nSe borrarán sus ${pares} par(es) de idiomas. Esta acción no se puede deshacer.`)) return;
-            try {
-                const data = await providerApi({ action: 'deleteProvider', email: p.email });
-                if (!data.success) throw new Error(data.error || 'Error');
-                allProviders = allProviders.filter(e => e.email !== p.email);
+                allProviders = allProviders.filter(e => claveProveedor(e) !== clave);
+                populateConsultLanguages();
                 filterConsultProviders();
-                showStatus(`✓ Proveedor eliminado (${data.deleted} fila/s)`, 'success');
+                showStatus('\u2713 Traductor eliminado (' + data.deleted + ' fila/s)', 'success');
                 setTimeout(hideStatus, 2500);
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
@@ -3153,21 +3260,19 @@
 
         function showAddProviderForm() {
             const form = document.getElementById('addProviderForm');
-            // poblar selects de idioma clonando opciones del filtro de consulta
-            ['addProvOrigen', 'addProvDestino'].forEach((id, idx) => {
+            // v3.10.24: los idiomas salen del catalogo (hoja Tarifas), no de los
+            // proveedores existentes. Antes se clonaban las opciones del filtro
+            // de consulta y no se podia dar de alta un idioma que aun no tuviera
+            // ningun traductor.
+            const cat = idiomasDelCatalogo();
+            [['addProvOrigen', ''], ['addProvDestino', 'Espa\u00f1ol']].forEach(([id, porDefecto]) => {
                 const sel = document.getElementById(id);
-                const src = document.getElementById(idx === 0 ? 'consultSourceLang' : 'consultTargetLang');
-                sel.innerHTML = '';
-                Array.from(src.options).forEach(o => {
-                    if (o.value) { // saltar "Todos"
-                        const opt = document.createElement('option');
-                        opt.value = o.value; opt.textContent = o.textContent;
-                        sel.appendChild(opt);
-                    }
-                });
+                if (!sel) return;
+                sel.innerHTML = cat.map(l =>
+                    `<option value="${escapeHtmlAttr(l)}"${l === porDefecto ? ' selected' : ''}>${l}</option>`).join('');
             });
-            // limpiar campos
-            ['addProvNombre','addProvEmail','addProvMin','addProvPalabra','addProvComentarios'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            ['addProvNombre', 'addProvEmail', 'addProvMin', 'addProvPalabra', 'addProvComentarios']
+                .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
             form.classList.remove('hidden');
             document.getElementById('addProvNombre').focus();
         }
@@ -3178,7 +3283,12 @@
             const origen = document.getElementById('addProvOrigen').value;
             const destino = document.getElementById('addProvDestino').value;
             if (!nombre || !email || !origen || !destino) {
-                showStatus('Faltan nombre, email u idiomas', 'warning');
+                showStatus('Faltan nombre, email o idiomas', 'warning');
+                setTimeout(hideStatus, 3000);
+                return;
+            }
+            if (origen === destino) {
+                showStatus('El idioma de origen y el de destino no pueden ser el mismo', 'warning');
                 setTimeout(hideStatus, 3000);
                 return;
             }
@@ -3192,7 +3302,6 @@
                     comentarios: document.getElementById('addProvComentarios').value.trim()
                 });
                 if (!data.success) throw new Error(data.error || 'Error');
-                // añadir en local
                 allProviders.push({
                     nombre: nombre, idiomaOrigen: origen, idiomaDestino: destino, email: email,
                     tarifaMinima: document.getElementById('addProvMin').value.trim(),
@@ -3201,8 +3310,9 @@
                     activo: true, orden: null
                 });
                 document.getElementById('addProviderForm').classList.add('hidden');
+                populateConsultLanguages();
                 filterConsultProviders();
-                showStatus('✓ Proveedor añadido', 'success');
+                showStatus('\u2713 Traductor anadido', 'success');
                 setTimeout(hideStatus, 2500);
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
@@ -3214,27 +3324,14 @@
         const MAEC_LANGS = ["ALEMÁN","ÁRABE","BENGALÍ","BIELORRUSO","BÚLGARO","CATALÁN","CHECO","CHINO","COREANO","CROATA","DANÉS","ESLOVACO","ESLOVENO","ESTONIO","EUSKERA","FINÉS","FRANCÉS","GALLEGO","GRIEGO","HEBREO","HÚNGARO","INGLÉS","ITALIANO","JAPONÉS","LATÍN","LETÓN","LITUANO","MACEDONIO","NEERLANDÉS","NORUEGO","PERSA","POLACO","PORTUGUÉS","RUMANO","RUSO","SERBIO","SUECO","TURCO","UCRANIANO","URDU"];
         let directorioResultsCache = [];
 
-        function toggleDirectorioPanel() {
-            const p = document.getElementById('directorioPanel');
-            if (!p) return;
-            const willShow = p.classList.contains('hidden');
-            p.classList.toggle('hidden');
-            if (willShow) {
-                const sel = document.getElementById('dirIdioma');
-                if (sel && !sel.options.length) {
-                    sel.innerHTML = '<option value="">(todos)</option>' + MAEC_LANGS.map(l => `<option value="${l}">${l}</option>`).join('');
-                }
-            }
-        }
-
-        // v3.7.62: cierra el panel MAEC, refresca la lista de proveedores y
-        // sube a la vista normal para poder editar lo recién añadido.
+        // v3.10.24: el directorio MAEC vive en su propia pestania. Antes se
+        // abria como panel DESPLEGABLE encima de la lista de proveedores, de
+        // modo que quedaban en pantalla dos buscadores a la vez con campos que
+        // se parecen y no significan lo mismo (el "Idioma" del MAEC es uno
+        // solo, en mayusculas; arriba habia "Idioma Origen / Destino", que es
+        // un par). Eso era la confusion.
         function backToProviders() {
-            const p = document.getElementById('directorioPanel');
-            if (p) p.classList.add('hidden');
-            if (typeof filterConsultProviders === 'function') filterConsultProviders();
-            const list = document.getElementById('providersConsultList');
-            if (list && list.scrollIntoView) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            switchProviderTab('mios');
         }
 
         async function runDirectorioSearch() {
@@ -3321,23 +3418,9 @@
             }
         }
 
-        function openEditConsultProvider(index) {
-            const p = consultFilteredProviders[index];
-            if (!p) return;
-            
-            // Usar el mismo modal de edición, pero guardar el índice de consultFilteredProviders
-            editingProviderIndex = index;
-            editingFromConsult = true; // Flag para saber que viene de consulta
-            
-            document.getElementById('editProviderName').textContent = p.nombre;
-            document.getElementById('editProviderEmail').textContent = p.email;
-            document.getElementById('editProviderIdiomas').textContent = `${p.idiomaOrigen} → ${p.idiomaDestino}`;
-            document.getElementById('editTarifaMinima').value = p.tarifaMinima || '';
-            document.getElementById('editTarifaPalabra').value = p.tarifaPalabra || '';
-            document.getElementById('editComentarios').value = p.comentarios || '';
-            
-            document.getElementById('editProviderModal').classList.add('visible');
-        }
+        // v3.10.24: openEditConsultProvider desaparece. La ficha llama
+        // directamente a openProviderEditor(clave), que trabaja sobre el
+        // proveedor entero en vez de sobre una fila suelta de la hoja.
         
         // ====== ANÁLISIS DE CONVERSIONES ======
         
@@ -3813,11 +3896,17 @@
                 // son carpetas distintas y antes compartían un único enlace.
                 const _est = 'font-size:0.78rem;text-decoration:none;font-weight:600;margin-left:14px;';
                 const partesCarpetas = [];
+                // v3.10.21: SIN referencia de cotización no hay presupuesto, así
+                // que ninguno de los dos accesos tiene sentido. Antes bastaba con
+                // que driveUrl tuviera algo, y en las cachés sincronizadas con
+                // versiones anteriores a la 3.7.77 ese campo podía contener la
+                // carpeta del PROYECTO: salía un "Presup. Drive" que abría el
+                // proyecto de un pedido que ni siquiera venía de un presupuesto.
                 if (o.quoteRef) {
                     partesCarpetas.push(`<a href="#" onclick="abrirCarpetaLocalPresupuesto('${o.quoteRef}');return false;" style="${_est}color:#0284c7;" title="Carpeta local del presupuesto ${o.quoteRef}">💻 Presup. local →</a>`);
-                }
-                if (o.driveUrl) {
-                    partesCarpetas.push(`<a href="${o.driveUrl}" target="_blank" style="${_est}color:#0ea5e9;" title="Carpeta del presupuesto en Drive">📂 Presup. Drive →</a>`);
+                    if (o.driveUrl) {
+                        partesCarpetas.push(`<a href="${o.driveUrl}" target="_blank" style="${_est}color:#0ea5e9;" title="Carpeta del presupuesto ${o.quoteRef} en Drive">📂 Presup. Drive →</a>`);
+                    }
                 }
                 partesCarpetas.push(`<a href="#" onclick="abrirCarpetaLocalPedido('${o.orderId}');return false;" style="${_est}color:#7c3aed;" title="Carpeta local del proyecto (requiere tradutema_open.vbs v2)">💻 Proyecto local →</a>`);
                 if (o.driveProject) {
@@ -6253,17 +6342,56 @@
                 const summaryBox = document.getElementById('wordCountSummaryBox');
                 const summaryTable = document.getElementById('wordCountSummaryTable');
                 const summaryTotal = document.getElementById('wordCountSummaryTotal');
-                if (summaryBox && budgetData.wordCount > 0 && budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) {
+                // v3.10.22: listar TODOS los archivos del presupuesto, no solo
+                // los analizados. Antes se recorría fileAnalysis, así que un
+                // archivo añadido después del análisis desaparecía de la tabla
+                // sin ningún aviso y el total parecía completo. Ojo: "Recontar
+                // páginas" no analiza palabras — eso solo se hace desde el
+                // paso 2 —, por eso el archivo nuevo sigue sin recuento.
+                const _analisis = {};
+                (budgetData.fileAnalysis || []).forEach(f => {
+                    const n = f.fileName || f.name || '';
+                    if (n) _analisis[n] = f;
+                });
+                const _todos = (typeof nombresDeArchivos === 'function')
+                    ? nombresDeArchivos()
+                    : Object.keys(_analisis);
+                const _sinAnalizar = _todos.filter(n => !_analisis[n]);
+
+                if (summaryBox && _todos.length > 0 &&
+                    (budgetData.wordCount > 0 || _sinAnalizar.length > 0)) {
                     window.wordCountExtractedTexts = {};
                     let rows = '';
-                    budgetData.fileAnalysis.forEach((f, idx) => {
-                        const fname = f.fileName || f.name || '';
-                        const extractedText = f.extractedText || f.text || '';
-                        rows += `<tr><td style="padding:2px 8px 2px 0;">${fname}</td><td style="text-align:right;font-weight:600;">${(f.words||0).toLocaleString('es-ES')}</td></tr>`;
+                    _todos.forEach(fname => {
+                        const f = _analisis[fname];
+                        if (f) {
+                            rows += `<tr><td style="padding:2px 8px 2px 0;">${escapeHtml(fname)}</td>` +
+                                    `<td style="text-align:right;font-weight:600;">${(f.words || 0).toLocaleString('es-ES')}</td></tr>`;
+                        } else {
+                            rows += `<tr><td style="padding:2px 8px 2px 0;color:#b45309;">${escapeHtml(fname)}</td>` +
+                                    `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td></tr>`;
+                        }
                     });
                     summaryTable.innerHTML = rows;
-                    summaryTotal.textContent = budgetData.wordCount.toLocaleString('es-ES');
+                    summaryTotal.textContent = (budgetData.wordCount || 0).toLocaleString('es-ES');
                     summaryBox.classList.remove('hidden');
+
+                    // Aviso explícito: el total NO incluye lo que falta.
+                    let avisoEl = document.getElementById('wordCountSummaryAviso');
+                    if (!avisoEl) {
+                        avisoEl = document.createElement('div');
+                        avisoEl.id = 'wordCountSummaryAviso';
+                        avisoEl.style.cssText = 'margin-top:8px;font-size:0.8rem;color:#b45309;';
+                        summaryBox.appendChild(avisoEl);
+                    }
+                    if (_sinAnalizar.length > 0) {
+                        avisoEl.innerHTML = '⚠️ ' + _sinAnalizar.length + ' archivo(s) sin analizar: ' +
+                            '<strong>el total no los incluye</strong>. El botón de recontar solo cuenta páginas; ' +
+                            'para las palabras hay que reanalizar desde el paso 2.';
+                        avisoEl.style.display = '';
+                    } else {
+                        avisoEl.style.display = 'none';
+                    }
                 } else if (summaryBox) {
                     summaryBox.classList.add('hidden');
                 }
@@ -9801,20 +9929,24 @@
             filteredProviders.forEach((p, i) => {
                 const selected = selectedProviders.has(i) ? 'selected' : '';
                 
-                // Construir info de tarifas
-                let tarifaInfo = '';
-                if (p.tarifaMinima || p.tarifaPalabra) {
-                    const partes = [];
-                    if (p.tarifaMinima) partes.push(`Mín: ${p.tarifaMinima}€`);
-                    if (p.tarifaPalabra) partes.push(`${p.tarifaPalabra}€/pal`);
-                    tarifaInfo = `<div class="provider-tariff">${partes.join(' · ')}</div>`;
-                }
-                
-                // Comentarios del proveedor
-                let comentarioInfo = '';
-                if (p.comentarios) {
-                    comentarioInfo = `<div class="provider-comment">${p.comentarios}</div>`;
-                }
+                // v3.10.25: la linea de tarifas se pinta SIEMPRE. Antes solo
+                // aparecia si habia algun dato, asi que un traductor sin tarifas
+                // (tipico de los importados del MAEC) se veia igual que si la
+                // pantalla no enseniara tarifas: no se distinguia "no tiene" de
+                // "no se muestra". Lo que falta se dice con todas las letras.
+                // El minimo es del traductor; la tarifa por palabra, de este par.
+                const minTxt = p.tarifaMinima
+                    ? `Mín: ${p.tarifaMinima}€`
+                    : '<span class="provider-tariff-empty">sin mínimo</span>';
+                const palTxt = p.tarifaPalabra
+                    ? `${p.tarifaPalabra}€/pal`
+                    : '<span class="provider-tariff-empty">sin tarifa por palabra</span>';
+                const tarifaInfo = `<div class="provider-tariff" title="El mínimo es del traductor; la tarifa por palabra es de esta combinación de idiomas">${minTxt} · ${palTxt}</div>`;
+
+                // Comentarios del traductor
+                const comentarioInfo = p.comentarios
+                    ? `<div class="provider-comment">${p.comentarios}</div>`
+                    : '<div class="provider-comment provider-comment-empty">sin comentarios</div>';
                 
                 html += `
                     <div class="provider-item ${selected}">
@@ -9857,93 +9989,245 @@
             document.getElementById('sendQuoteBtn').disabled = selectedProviders.size === 0;
         }
 
-        // ====== EDITAR TARIFAS PROVEEDOR ======
-        let editingProviderIndex = null;
-        let editingFromConsult = false; // Flag para saber de dónde viene la edición
-        
+        // ====== EDITOR DE PROVEEDOR (v3.10.24) ======
+        //
+        // Antes el modal recibia el INDICE de una fila de la lista aplanada, asi
+        // que solo conocia un par de idiomas y no podia enseniar -ni cambiar- las
+        // demas combinaciones del traductor. Ahora trabaja sobre el proveedor
+        // entero (identificado por email) y guarda todo de una vez con la accion
+        // saveProviderFull del backend 3.7.78.
+        let editingProvider = null;      // { clave, nombre, email, pares:[...] }
+        let editingReturnTo = 'consult'; // 'consult' | 'step4'
+
+        // Abre el editor. clave = email en minusculas (ver claveProveedor).
+        // resaltar = par que traia el usuario, para dejarlo visible arriba.
+        function openProviderEditor(clave, origen) {
+            const filas = allProviders.filter(p => claveProveedor(p) === clave);
+            if (!filas.length) {
+                showStatus('No encuentro ese traductor', 'error');
+                setTimeout(hideStatus, 2500);
+                return;
+            }
+            const g = agruparProveedores(filas)[0];
+            editingProvider = {
+                clave: clave,
+                nombre: g.nombre,
+                email: g.email,
+                pares: g.pares.map(p => ({
+                    idiomaOrigen: p.idiomaOrigen,
+                    idiomaDestino: p.idiomaDestino,
+                    tarifaPalabra: p.tarifaPalabra || '',
+                    orden: (p.orden == null || p.orden === '') ? '' : p.orden
+                }))
+            };
+            editingReturnTo = (origen === 'step4') ? 'step4' : 'consult';
+
+            document.getElementById('editProviderName').textContent = g.nombre || '(sin nombre)';
+            document.getElementById('editProviderEmail').textContent = g.email || '(sin email)';
+            const maec = [];
+            if (g.numTIJ) maec.push('N.o TIJ ' + g.numTIJ);
+            if (g.provincia) maec.push(g.provincia);
+            if (g.anio) maec.push('nombr. ' + formatAnio(g.anio));
+            if (g.telefono) maec.push('Tel. ' + g.telefono);
+            const elMaec = document.getElementById('editProviderMaec');
+            elMaec.textContent = maec.join(' \u00b7 ');
+            elMaec.style.display = maec.length ? 'block' : 'none';
+
+            document.getElementById('editTarifaMinima').value = g.tarifaMinima || '';
+            document.getElementById('editComentarios').value = g.comentarios || '';
+
+            renderProviderPairsEditor();
+            document.getElementById('editProviderModal').classList.add('visible');
+        }
+
+        function closeEditProviderModal() {
+            document.getElementById('editProviderModal').classList.remove('visible');
+            editingProvider = null;
+        }
+
+        // Idiomas disponibles para dar de alta una combinacion: salen del
+        // catalogo de la hoja Tarifas, NO de los proveedores que ya tienes.
+        // (Antes el alta clonaba las opciones del filtro de consulta, que se
+        // construye desde allProviders: no se podia crear un par con un idioma
+        // que ningun otro traductor tuviera todavia.)
+        function idiomasDelCatalogo() {
+            const set = new Set();
+            (allTariffs || []).forEach(t => {
+                if (t.idiomaOrigen) set.add(t.idiomaOrigen);
+                if (t.idiomaDestino) set.add(t.idiomaDestino);
+            });
+            (allProviders || []).forEach(p => {
+                if (p.idiomaOrigen) set.add(p.idiomaOrigen);
+                if (p.idiomaDestino) set.add(p.idiomaDestino);
+            });
+            return [...set].filter(Boolean).sort((a, b) => String(a).localeCompare(String(b), 'es'));
+        }
+
+        function renderProviderPairsEditor() {
+            const box = document.getElementById('editPairsBox');
+            if (!box || !editingProvider) return;
+            const cat = idiomasDelCatalogo();
+            const opts = (sel) => cat.map(l =>
+                `<option value="${escapeHtmlAttr(l)}"${l === sel ? ' selected' : ''}>${l}</option>`).join('');
+
+            let html = `<div class="prov-edit-row" style="border-top:none;background:var(--bg-secondary);font-size:0.75rem;color:var(--text-secondary);">
+                <span>Combinacion</span><span>&euro;/palabra</span><span>Orden</span><span></span>
+            </div>`;
+
+            editingProvider.pares.forEach((par, i) => {
+                html += `<div class="prov-edit-row">
+                    <span style="font-size:0.88rem;">${par.idiomaOrigen} &rarr; ${par.idiomaDestino}</span>
+                    <input type="text" class="form-control" value="${escapeHtmlAttr(par.tarifaPalabra)}" placeholder="0.08" oninput="setPairField(${i}, 'tarifaPalabra', this.value)">
+                    <input type="number" min="1" class="form-control" value="${escapeHtmlAttr(par.orden)}" placeholder="&mdash;" oninput="setPairField(${i}, 'orden', this.value)">
+                    <button class="prov-btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;" onclick="removePairFromEditor(${i})" title="Quitar esta combinacion">&#128465;</button>
+                </div>`;
+            });
+
+            html += `<div class="prov-edit-row" style="background:var(--bg-secondary);">
+                <span style="display:flex;gap:6px;align-items:center;min-width:0;">
+                    <select id="newPairOrigen" class="form-control" style="min-width:0;">${opts('')}</select>
+                    <span style="color:var(--text-secondary);">&rarr;</span>
+                    <select id="newPairDestino" class="form-control" style="min-width:0;">${opts('Espa\u00f1ol')}</select>
+                </span>
+                <input type="text" id="newPairTarifa" class="form-control" placeholder="0.08">
+                <input type="number" min="1" id="newPairOrden" class="form-control" placeholder="&mdash;">
+                <button class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="addPairToEditor()" title="Anadir esta combinacion">&#10133;</button>
+            </div>`;
+
+            box.innerHTML = html;
+        }
+
+        function escapeHtmlAttr(v) {
+            return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        }
+
+        function setPairField(i, campo, valor) {
+            if (!editingProvider || !editingProvider.pares[i]) return;
+            editingProvider.pares[i][campo] = valor;
+        }
+
+        function addPairToEditor() {
+            if (!editingProvider) return;
+            const o = document.getElementById('newPairOrigen').value;
+            const d = document.getElementById('newPairDestino').value;
+            if (!o || !d) return;
+            if (o === d) {
+                showStatus('El idioma de origen y el de destino no pueden ser el mismo', 'warning');
+                setTimeout(hideStatus, 3000);
+                return;
+            }
+            const ya = editingProvider.pares.some(p => p.idiomaOrigen === o && p.idiomaDestino === d);
+            if (ya) {
+                showStatus('Ese traductor ya tiene la combinacion ' + o + ' \u2192 ' + d, 'warning');
+                setTimeout(hideStatus, 3000);
+                return;
+            }
+            editingProvider.pares.push({
+                idiomaOrigen: o,
+                idiomaDestino: d,
+                tarifaPalabra: document.getElementById('newPairTarifa').value.trim(),
+                orden: document.getElementById('newPairOrden').value.trim()
+            });
+            renderProviderPairsEditor();
+        }
+
+        function removePairFromEditor(i) {
+            if (!editingProvider) return;
+            if (editingProvider.pares.length <= 1) {
+                showStatus('Un traductor debe conservar al menos una combinacion. Para quitarlo entero usa Eliminar en su ficha.', 'warning');
+                setTimeout(hideStatus, 4000);
+                return;
+            }
+            const par = editingProvider.pares[i];
+            if (!confirm('Quitar la combinacion ' + par.idiomaOrigen + ' \u2192 ' + par.idiomaDestino +
+                         ' de ' + editingProvider.nombre + '?\nSe borrara al guardar.')) return;
+            editingProvider.pares.splice(i, 1);
+            renderProviderPairsEditor();
+        }
+
+        // Guarda campos compartidos + la foto completa de combinaciones.
+        async function saveProviderEditor() {
+            if (!editingProvider) return;
+            const tarifaMinima = document.getElementById('editTarifaMinima').value.trim();
+            const comentarios = document.getElementById('editComentarios').value.trim();
+            const pares = editingProvider.pares.map(p => ({
+                idiomaOrigen: p.idiomaOrigen,
+                idiomaDestino: p.idiomaDestino,
+                tarifaPalabra: String(p.tarifaPalabra || '').trim(),
+                orden: (p.orden === '' || p.orden == null) ? '' : parseInt(p.orden)
+            }));
+            if (!pares.length) return;
+
+            showStatus('Guardando...', 'loading');
+            try {
+                const data = await apiPost({
+                    action: 'saveProviderFull',
+                    email: editingProvider.email,
+                    tarifaMinima: tarifaMinima,
+                    comentarios: comentarios,
+                    pares: pares
+                });
+                if (!data.success) throw new Error(data.error || 'Error desconocido');
+
+                aplicarProveedorEnMemoria(editingProvider, tarifaMinima, comentarios, pares);
+
+                // Refrescar la consulta (los idiomas pueden haber cambiado)
+                if (typeof populateConsultLanguages === 'function') populateConsultLanguages();
+                if (typeof filterConsultProviders === 'function') filterConsultProviders();
+
+                // Refrescar el paso 4 conservando lo que hubiera seleccionado:
+                // los indices cambian si el traductor gana o pierde el par activo.
+                if (editingReturnTo === 'step4') {
+                    const emailsSel = [...selectedProviders]
+                        .map(i => filteredProviders[i] && filteredProviders[i].email)
+                        .filter(Boolean);
+                    filterProviders();
+                    selectedProviders.clear();
+                    filteredProviders.forEach((p, i) => {
+                        if (emailsSel.indexOf(p.email) !== -1) selectedProviders.add(i);
+                    });
+                    renderProviders();
+                }
+
+                closeEditProviderModal();
+                const partes = [];
+                if (data.added) partes.push(data.added + ' combinacion(es) nueva(s)');
+                if (data.deleted) partes.push(data.deleted + ' borrada(s)');
+                showStatus('\u2713 Guardado' + (partes.length ? ' \u00b7 ' + partes.join(', ') : ''), 'success');
+                setTimeout(hideStatus, 3000);
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+                setTimeout(hideStatus, 4000);
+            }
+        }
+
+        // Reconstruye en memoria las filas de ese proveedor, para no tener que
+        // recargar la pagina despues de guardar.
+        function aplicarProveedorEnMemoria(prov, tarifaMinima, comentarios, pares) {
+            const previas = allProviders.filter(p => claveProveedor(p) === prov.clave);
+            const base = previas[0] || {};
+            const nuevas = pares.map(par => {
+                const vieja = previas.find(p => p.idiomaOrigen === par.idiomaOrigen &&
+                                                p.idiomaDestino === par.idiomaDestino) || {};
+                return Object.assign({}, base, vieja, {
+                    nombre: prov.nombre,
+                    email: prov.email,
+                    idiomaOrigen: par.idiomaOrigen,
+                    idiomaDestino: par.idiomaDestino,
+                    tarifaMinima: tarifaMinima,
+                    comentarios: comentarios,
+                    tarifaPalabra: par.tarifaPalabra,
+                    orden: (par.orden === '' || par.orden == null) ? null : Number(par.orden)
+                });
+            });
+            allProviders = allProviders.filter(p => claveProveedor(p) !== prov.clave).concat(nuevas);
+        }
+
+        // Entrada desde el paso 4 (lista de traductores de una tasacion)
         function openEditProvider(index) {
             const p = filteredProviders[index];
             if (!p) return;
-            
-            editingProviderIndex = index;
-            editingFromConsult = false; // Viene del paso 4
-            
-            document.getElementById('editProviderName').textContent = p.nombre;
-            document.getElementById('editProviderEmail').textContent = p.email;
-            document.getElementById('editProviderIdiomas').textContent = `${p.idiomaOrigen} → ${p.idiomaDestino}`;
-            document.getElementById('editTarifaMinima').value = p.tarifaMinima || '';
-            document.getElementById('editTarifaPalabra').value = p.tarifaPalabra || '';
-            document.getElementById('editComentarios').value = p.comentarios || '';
-            
-            document.getElementById('editProviderModal').classList.add('visible');
-        }
-        
-        function closeEditProviderModal() {
-            document.getElementById('editProviderModal').classList.remove('visible');
-            editingProviderIndex = null;
-            editingFromConsult = false;
-        }
-        
-        async function saveProviderTariffs() {
-            if (editingProviderIndex === null) return;
-            
-            // Obtener el proveedor del array correcto según el contexto
-            const p = editingFromConsult 
-                ? consultFilteredProviders[editingProviderIndex]
-                : filteredProviders[editingProviderIndex];
-                
-            if (!p) return;
-            
-            const tarifaMinima = document.getElementById('editTarifaMinima').value.trim();
-            const tarifaPalabra = document.getElementById('editTarifaPalabra').value.trim();
-            const comentarios = document.getElementById('editComentarios').value.trim();
-            
-            showStatus('Guardando...', 'loading');
-            
-            try {
-                const data = await apiPost({
-                        action: 'updateProviderTariffs',
-                        email: p.email,
-                        idiomaOrigen: p.idiomaOrigen,
-                        idiomaDestino: p.idiomaDestino,
-                        tarifaMinima: tarifaMinima,
-                        tarifaPalabra: tarifaPalabra,
-                        comentarios: comentarios
-                    });
-                
-                if (data.success) {
-                    // v3.7.56: mínimo y comentarios son del proveedor (email) →
-                    // propagar a TODAS sus fichas; tarifa/palabra solo a la del
-                    // par de idiomas editado.
-                    const applyToEntry = (entry) => {
-                        if (!entry || entry.email !== p.email) return;
-                        entry.tarifaMinima = tarifaMinima;
-                        entry.comentarios = comentarios;
-                        if (entry.idiomaOrigen === p.idiomaOrigen && entry.idiomaDestino === p.idiomaDestino) {
-                            entry.tarifaPalabra = tarifaPalabra;
-                        }
-                    };
-                    [allProviders, filteredProviders, consultFilteredProviders].forEach(arr => {
-                        if (Array.isArray(arr)) arr.forEach(applyToEntry);
-                    });
-                    
-                    // Re-renderizar la lista correcta según el contexto
-                    if (editingFromConsult) {
-                        renderConsultProviders();
-                    } else {
-                        renderProviders();
-                    }
-                    
-                    closeEditProviderModal();
-                    showStatus('✓ Guardado (mínimo y comentarios aplicados a todos los pares del proveedor)', 'success');
-                    setTimeout(hideStatus, 2500);
-                } else {
-                    throw new Error(data.error || 'Error desconocido');
-                }
-            } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
-                setTimeout(hideStatus, 3000);
-            }
+            openProviderEditor(claveProveedor(p), 'step4');
         }
 
         // ====== DEADLINE ======
