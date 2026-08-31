@@ -241,7 +241,8 @@
         .prov-tab.active { color: var(--text-primary); border-bottom-color: var(--tradutema-blue); font-weight: 600; }
         .prov-card { border: 2px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-card); padding: 14px 16px; transition: border-color 0.2s; }
         .prov-card:hover { border-color: var(--tradutema-blue); }
-        .prov-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .prov-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .prov-select { accent-color: var(--tradutema-blue); }
         .prov-btn-sm { border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; cursor: pointer; font-family: inherit; }
         .prov-pairs { border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 8px; }
         .prov-pair { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; padding: 5px 6px; }
@@ -903,6 +904,16 @@
                     </label>
                     <span style="color: var(--text-secondary); font-size:0.85rem;" id="consultProviderCount">0</span>
                     <button onclick="showAddProviderForm()" class="prov-btn-sm" style="margin-left:auto;background:var(--tradutema-blue,#2563eb);color:#fff;border:none;padding:8px 14px;font-size:0.85rem;">➕ Añadir traductor</button>
+                </div>
+
+                <!-- v3.10.26: acciones sobre varios traductores a la vez -->
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+                    <button onclick="selectAllConsult(true)" class="prov-btn-sm" style="background:#fff;color:#334155;border:1px solid #cbd5e1;">Seleccionar todos</button>
+                    <button onclick="selectAllConsult(false)" class="prov-btn-sm" style="background:#fff;color:#334155;border:1px solid #cbd5e1;">Deseleccionar</button>
+                    <span style="width:1px;height:22px;background:#e2e8f0;"></span>
+                    <button id="btnBulkOn" onclick="setSelectedActive(true)" class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;" disabled>✓ Activar seleccionados</button>
+                    <button id="btnBulkOff" onclick="setSelectedActive(false)" class="prov-btn-sm" style="background:#b45309;color:#fff;border:none;" disabled>⊘ Desactivar seleccionados</button>
+                    <span id="consultSelCount" style="font-size:0.82rem;color:var(--text-secondary);margin-left:auto;">0 seleccionados</span>
                 </div>
 
                 <!-- v3.7.57: formulario de alta -->
@@ -1967,7 +1978,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.25';
+        const HTML_VERSION = '3.10.26';
         const HTML_DATE = '28/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2966,6 +2977,7 @@
         // combinaciones dentro.
         let consultGroups = [];          // grupos visibles (uno por traductor)
         let consultTab = 'mios';         // 'mios' | 'maec'
+        let consultSelected = new Set(); // claves marcadas para acciones en lote
 
         // Identidad del proveedor. El email es la clave real en la hoja; si
         // faltara, se cae al nombre para no fusionar gente distinta.
@@ -3059,24 +3071,39 @@
                 grupos = grupos.filter(g => normalizeText((g.nombre || '') + ' ' + (g.email || '')).indexOf(q) !== -1);
             }
 
-            // 4) orden: mejor prioridad de sus pares visibles, luego alfabetico
+            // 4) prioridad en tres niveles (v3.10.26)
             grupos.sort((a, b) => {
-                const oa = mejorOrden(a), ob = mejorOrden(b);
-                if (oa !== ob) return oa - ob;
+                const pa = prioridadProveedor(a), pb = prioridadProveedor(b);
+                if (pa.nivel !== pb.nivel) return pa.nivel - pb.nivel;
+                if (pa.orden !== pb.orden) return pa.orden - pb.orden;
                 return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
             });
 
             consultGroups = grupos;
+            // La seleccion no puede arrastrar a quien ya no se ve
+            consultSelected.forEach(k => {
+                if (!grupos.some(g => g.clave === k)) consultSelected.delete(k);
+            });
             renderConsultProviders();
         }
 
-        function mejorOrden(g) {
+        // v3.10.26: 1) con orden establecido, por orden  2) activos sin orden
+        //           3) inactivos. Dentro de cada nivel, alfabetico.
+        //
+        // El orden se mira SOLO en las combinaciones que casan con el filtro de
+        // idiomas. Antes se cogia el mejor orden de cualquiera de sus pares, asi
+        // que un traductor con prioridad 1 en Portugues subia al primer puesto
+        // de una busqueda de italiano, donde esa prioridad no significa nada.
+        function prioridadProveedor(g) {
+            if (g.activo === false) return { nivel: 3, orden: Infinity };
+            const relevantes = g.pares.filter(p => p._hit);
+            const candidatos = relevantes.length ? relevantes : g.pares;
             let mejor = Infinity;
-            g.pares.forEach(p => {
+            candidatos.forEach(p => {
                 const o = (p.orden == null || p.orden === '') ? Infinity : Number(p.orden);
-                if (o < mejor) mejor = o;
+                if (!isNaN(o) && o < mejor) mejor = o;
             });
-            return mejor;
+            return { nivel: mejor === Infinity ? 2 : 1, orden: mejor };
         }
 
         // Convierte filas de la hoja en grupos {clave, nombre, email, ..., pares[]}.
@@ -3179,7 +3206,11 @@
                 html += `
                     <div class="prov-card" style="${dim}">
                         <div class="prov-card-head">
-                            <div style="min-width:0;">
+                            <input type="checkbox" class="prov-select" title="Seleccionar para activar o desactivar en lote"
+                                   ${consultSelected.has(g.clave) ? 'checked' : ''}
+                                   onchange="toggleConsultSelection('${g.clave.replace(/'/g, "\\'")}', this.checked)"
+                                   style="margin-top:4px;flex-shrink:0;width:16px;height:16px;cursor:pointer;">
+                            <div style="min-width:0;flex:1;">
                                 <div class="provider-consult-name">${g.nombre || '(sin nombre)'}${badge}</div>
                                 <div class="provider-consult-email">\u2709 ${g.email || '(sin email)'}</div>
                                 ${maecBits.length ? `<div style="font-size:0.78rem;color:#64748b;margin-top:2px;">${maecBits.join(' \u00b7 ')}</div>` : ''}
@@ -3204,6 +3235,63 @@
             });
 
             list.innerHTML = html;
+            actualizarBarraSeleccion();
+        }
+
+        function actualizarBarraSeleccion() {
+            const n = consultSelected.size;
+            const el = document.getElementById('consultSelCount');
+            if (el) el.textContent = n + (n === 1 ? ' seleccionado' : ' seleccionados');
+            ['btnBulkOn', 'btnBulkOff'].forEach(id => {
+                const b = document.getElementById(id);
+                if (b) { b.disabled = (n === 0); b.style.opacity = n === 0 ? '0.45' : '1'; }
+            });
+        }
+
+        function toggleConsultSelection(clave, marcado) {
+            if (marcado) consultSelected.add(clave); else consultSelected.delete(clave);
+            actualizarBarraSeleccion();
+        }
+
+        // Actua sobre los que se ven ahora mismo, no sobre los 340 de la hoja
+        function selectAllConsult(marcar) {
+            consultGroups.forEach(g => {
+                if (marcar) consultSelected.add(g.clave); else consultSelected.delete(g.clave);
+            });
+            renderConsultProviders();
+        }
+
+        async function setSelectedActive(activo) {
+            const grupos = consultGroups.filter(g => consultSelected.has(g.clave));
+            const emails = grupos.map(g => g.email).filter(Boolean);
+            if (!emails.length) {
+                showStatus('No hay ningun traductor seleccionado', 'warning');
+                setTimeout(hideStatus, 2500);
+                return;
+            }
+            const verbo = activo ? 'Activar' : 'Desactivar';
+            if (!confirm(verbo + ' ' + emails.length + ' traductor(es)?' +
+                         (activo ? '' : '\nDejaran de aparecer al solicitar tasacion.'))) return;
+
+            showStatus(verbo + '...', 'loading');
+            try {
+                const data = await apiPost({ action: 'setProvidersActiveBulk', emails: emails, activo: activo });
+                if (!data.success) throw new Error(data.error || 'Error desconocido');
+
+                const claves = new Set(grupos.map(g => g.clave));
+                allProviders.forEach(p => { if (claves.has(claveProveedor(p))) p.activo = activo; });
+                if (Array.isArray(filteredProviders)) {
+                    filteredProviders.forEach(p => { if (claves.has(claveProveedor(p))) p.activo = activo; });
+                }
+                consultSelected.clear();
+                filterConsultProviders();
+                showStatus('\u2713 ' + data.providers + ' traductor(es) ' +
+                           (activo ? 'activados' : 'desactivados'), 'success');
+                setTimeout(hideStatus, 3000);
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+                setTimeout(hideStatus, 4000);
+            }
         }
 
         // ====== v3.7.57 / v3.10.24: gestion de proveedores ======
