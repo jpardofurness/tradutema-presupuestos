@@ -1978,7 +1978,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.26';
+        const HTML_VERSION = '3.10.28';
         const HTML_DATE = '28/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2468,6 +2468,30 @@
                 ? nombresDeArchivos().length : 0) || budgetData.numArchivos || 0;
             const palabras = budgetData.wordCount || 0;
             const paginas = budgetData.pageCount || (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.pages) || 0), 0) || 0;
+
+            // v3.10.28: con filtros por archivo, la cabecera dice cuántas se
+            // traducen DE cuántas hay. El cálculo (calcularPaginasATraducir)
+            // ya existía y era correcto, pero esta barra sólo miraba pageCount,
+            // así que marcar "solo la 1-2" de un PDF de 17 no cambiaba nada.
+            let paginasHtml = paginas > 0 ? String(paginas) : '—';
+            let paginasTitulo = '';
+            try {
+                if (typeof calcularPaginasATraducir === 'function') {
+                    const _pg = calcularPaginasATraducir();
+                    if (_pg && _pg.total > 0) {
+                        if (_pg.hayFiltros) {
+                            paginasHtml = '<strong style="color:#b45309;">' + _pg.aTraducir + '</strong>' +
+                                          '<span style="color:#94a3b8;"> de ' + _pg.total + '</span>';
+                            paginasTitulo = _pg.inventario
+                                .filter(f => f.filtro)
+                                .map(f => f.nombre + ': solo ' + f.filtro + ' (' + f.aTraducir + ' de ' + f.paginas + ')')
+                                .join('\n');
+                        } else if (!paginas) {
+                            paginasHtml = String(_pg.total);
+                        }
+                    }
+                }
+            } catch (e) { /* la barra nunca debe romper el render */ }
             const tarifa = parseFloat(budgetData.savedQuotePricePerWord || budgetData.savedQuoteRate || 0);
             const importe = parseFloat(budgetData.savedQuoteTotal || 0);
             const plazo = budgetData.savedQuoteDays || '';
@@ -2491,7 +2515,9 @@
             const _elDocs = document.getElementById('bsBarDocs');
             if (_elDocs) _elDocs.textContent = documentos > 0 ? documentos : '—';
             document.getElementById('bsBarPalabras').textContent = palabras > 0 ? palabras.toLocaleString('es-ES') : '—';
-            document.getElementById('bsBarPaginas').textContent = paginas > 0 ? paginas : '—';
+            const _elPag = document.getElementById('bsBarPaginas');
+            _elPag.innerHTML = paginasHtml;
+            _elPag.title = paginasTitulo || '';
             document.getElementById('bsBarTarifa').textContent = fmtTarifa(tarifa);
             document.getElementById('bsBarImporte').textContent = fmtEuros(importe);
             document.getElementById('bsBarPlazo').textContent = plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—';
@@ -3170,10 +3196,10 @@
 
             const nPares = consultGroups.reduce((a, g) => a + g.pares.length, 0);
             countEl.textContent = consultGroups.length + (consultGroups.length === 1 ? ' traductor' : ' traductores') +
-                                  ' \u00b7 ' + nPares + (nPares === 1 ? ' combinacion' : ' combinaciones');
+                                  ' \u00b7 ' + nPares + (nPares === 1 ? ' combinación' : ' combinaciones');
 
             if (consultGroups.length === 0) {
-                list.innerHTML = '<div class="no-providers"><div>Ningun traductor con esos filtros</div></div>';
+                list.innerHTML = '<div class="no-providers"><div>Ningún traductor con esos filtros</div></div>';
                 return;
             }
 
@@ -3184,11 +3210,11 @@
                 const badge = activo ? '' : ' <span style="font-size:0.72rem;color:#b91c1c;font-weight:600;">(inactivo)</span>';
 
                 const compartido = [];
-                if (g.tarifaMinima) compartido.push('Minimo: <strong style="color:var(--accent-green);">' + g.tarifaMinima + '\u20ac</strong>');
+                if (g.tarifaMinima) compartido.push('Mínimo: <strong style="color:var(--accent-green);">' + g.tarifaMinima + '\u20ac</strong>');
                 if (g.comentarios) compartido.push('<span style="font-style:italic;">' + g.comentarios + '</span>');
 
                 const maecBits = [];
-                if (g.numTIJ) maecBits.push('N.o TIJ ' + g.numTIJ);
+                if (g.numTIJ) maecBits.push('Nº TIJ ' + g.numTIJ);
                 if (g.provincia) maecBits.push(g.provincia);
                 if (g.anio) maecBits.push('nombr. ' + formatAnio(g.anio));
                 if (g.telefono) maecBits.push('\u260e ' + g.telefono);
@@ -3265,13 +3291,13 @@
             const grupos = consultGroups.filter(g => consultSelected.has(g.clave));
             const emails = grupos.map(g => g.email).filter(Boolean);
             if (!emails.length) {
-                showStatus('No hay ningun traductor seleccionado', 'warning');
+                showStatus('No hay ningún traductor seleccionado', 'warning');
                 setTimeout(hideStatus, 2500);
                 return;
             }
             const verbo = activo ? 'Activar' : 'Desactivar';
-            if (!confirm(verbo + ' ' + emails.length + ' traductor(es)?' +
-                         (activo ? '' : '\nDejaran de aparecer al solicitar tasacion.'))) return;
+            if (!confirm('¿' + verbo + ' ' + emails.length + ' traductor(es)?' +
+                         (activo ? '' : '\nDejarán de aparecer al solicitar tasación.'))) return;
 
             showStatus(verbo + '...', 'loading');
             try {
@@ -3317,7 +3343,7 @@
                 }
                 filterConsultProviders();
                 showStatus(checked ? '\u2713 Traductor activado'
-                                   : '\u2713 Traductor desactivado (no aparecera al solicitar tasacion)', 'success');
+                                   : '\u2713 Traductor desactivado (no aparecerá al solicitar tasación)', 'success');
                 setTimeout(hideStatus, 2500);
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
@@ -3330,8 +3356,8 @@
             const g = consultGroups.find(x => x.clave === clave);
             if (!g) return;
             if (!confirm('Eliminar a ' + g.nombre + ' (' + g.email + ') por completo?\n' +
-                         'Se borraran sus ' + g.pares.length + ' combinacion(es) de idiomas. ' +
-                         'Esta accion no se puede deshacer.')) return;
+                         'Se borrarán sus ' + g.pares.length + ' combinación(es) de idiomas. ' +
+                         'Esta acción no se puede deshacer.')) return;
             try {
                 const data = await providerApi({ action: 'deleteProvider', email: g.email });
                 if (!data.success) throw new Error(data.error || 'Error');
@@ -3353,11 +3379,11 @@
             // de consulta y no se podia dar de alta un idioma que aun no tuviera
             // ningun traductor.
             const cat = idiomasDelCatalogo();
-            [['addProvOrigen', ''], ['addProvDestino', 'Espa\u00f1ol']].forEach(([id, porDefecto]) => {
+            ['addProvOrigen', 'addProvDestino'].forEach(id => {
                 const sel = document.getElementById(id);
                 if (!sel) return;
-                sel.innerHTML = cat.map(l =>
-                    `<option value="${escapeHtmlAttr(l)}"${l === porDefecto ? ' selected' : ''}>${l}</option>`).join('');
+                sel.innerHTML = '<option value="">\u2014 elige idioma \u2014</option>' +
+                    cat.map(l => `<option value="${escapeHtmlAttr(l)}">${l}</option>`).join('');
             });
             ['addProvNombre', 'addProvEmail', 'addProvMin', 'addProvPalabra', 'addProvComentarios']
                 .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -3400,7 +3426,7 @@
                 document.getElementById('addProviderForm').classList.add('hidden');
                 populateConsultLanguages();
                 filterConsultProviders();
-                showStatus('\u2713 Traductor anadido', 'success');
+                showStatus('\u2713 Traductor añadido', 'success');
                 setTimeout(hideStatus, 2500);
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
@@ -6359,7 +6385,12 @@
                         pages: budgetData.pageCount,
                         clientEmail: budgetData.clientEmail,
                         clientWhatsApp: budgetData.clientWhatsApp,
-                        internalComments: budgetData.internalComments || ''
+                        internalComments: budgetData.internalComments || '',
+                        // v3.10.28: los ajustes ⚙ por archivo (rango de páginas
+                        // e instrucciones) viajaban SOLO al relanzar el
+                        // análisis. Si escribías "solo 1-2" y guardabas sin
+                        // reanalizar, el dato moría en el navegador.
+                        fileSettings: budgetData.fileSettings || {}
                     });
                 console.log('Datos básicos guardados:', result);
             } catch (error) {
@@ -6449,17 +6480,49 @@
                 if (summaryBox && _todos.length > 0 &&
                     (budgetData.wordCount > 0 || _sinAnalizar.length > 0)) {
                     window.wordCountExtractedTexts = {};
-                    let rows = '';
+
+                    // v3.10.28: la tabla muestra también las páginas de cada
+                    // documento y cuántas se traducen de verdad. Sin esto no
+                    // había manera de comprobar en pantalla si el filtro ⚙ se
+                    // estaba teniendo en cuenta: sólo salían nombre y palabras.
+                    const _inv = {};
+                    try {
+                        (inventarioArchivos() || []).forEach(f => { _inv[f.nombre] = f; });
+                    } catch (e) { /* si falla, la tabla sale sin páginas */ }
+
+                    let rows = '<tr>' +
+                        '<th style="text-align:left;padding:2px 8px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Documento</th>' +
+                        '<th style="text-align:right;padding:2px 10px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Págs.</th>' +
+                        '<th style="text-align:right;padding:2px 10px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">A traducir</th>' +
+                        '<th style="text-align:right;padding:2px 0 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Palabras</th></tr>';
+
+                    let _sumPag = 0, _sumTrad = 0;
                     _todos.forEach(fname => {
                         const f = _analisis[fname];
-                        if (f) {
-                            rows += `<tr><td style="padding:2px 8px 2px 0;">${escapeHtml(fname)}</td>` +
-                                    `<td style="text-align:right;font-weight:600;">${(f.words || 0).toLocaleString('es-ES')}</td></tr>`;
-                        } else {
-                            rows += `<tr><td style="padding:2px 8px 2px 0;color:#b45309;">${escapeHtml(fname)}</td>` +
-                                    `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td></tr>`;
-                        }
+                        const inv = _inv[fname] || {};
+                        const pag = inv.paginas || 0;
+                        const trad = (inv.aTraducir === undefined || inv.aTraducir === null) ? pag : inv.aTraducir;
+                        _sumPag += pag;
+                        _sumTrad += trad;
+                        const celdaTrad = inv.filtro
+                            ? `<td style="text-align:right;padding-right:10px;color:#b45309;font-weight:700;" title="Sólo las páginas ${escapeHtml(inv.filtro)}">${trad} ⚙</td>`
+                            : `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>`;
+                        const celdaPal = f
+                            ? `<td style="text-align:right;font-weight:600;">${(f.words || 0).toLocaleString('es-ES')}</td>`
+                            : `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td>`;
+                        rows += `<tr><td style="padding:2px 8px 2px 0;${f ? '' : 'color:#b45309;'}">${escapeHtml(fname)}</td>` +
+                                `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>` +
+                                celdaTrad + celdaPal + '</tr>';
                     });
+
+                    if (_sumPag > 0) {
+                        const dif = _sumTrad !== _sumPag;
+                        rows += `<tr><td style="padding:6px 8px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:#2b6cb0;">Total páginas</td>` +
+                                `<td style="text-align:right;padding:6px 10px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:#2b6cb0;">${_sumPag}</td>` +
+                                `<td style="text-align:right;padding:6px 10px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:${dif ? '#b45309' : '#2b6cb0'};">${_sumTrad}</td>` +
+                                `<td style="border-top:1px solid #bee3f8;"></td></tr>`;
+                    }
+
                     summaryTable.innerHTML = rows;
                     summaryTotal.textContent = (budgetData.wordCount || 0).toLocaleString('es-ES');
                     summaryBox.classList.remove('hidden');
@@ -6851,8 +6914,14 @@
 
         // Helper: lee settings de cualquier archivo (pendiente → uploadedFiles[i],
         // Drive → budgetData.fileSettings[name])
+        // v3.10.28: "" no es un índice. Se normaliza en un solo sitio.
+        function normPendingIdx(v) {
+            return (v === '' || v === undefined || v === null) ? null : v;
+        }
+
         function readSettingsForFile(name, pendingIdx) {
-            if (pendingIdx !== undefined && pendingIdx !== null && uploadedFiles[pendingIdx]) {
+            pendingIdx = normPendingIdx(pendingIdx);
+            if (pendingIdx !== null && uploadedFiles[pendingIdx]) {
                 const f = uploadedFiles[pendingIdx];
                 return {
                     pagesFilter: f.pagesFilter || '',
@@ -7152,7 +7221,8 @@
 
         // Helper: escribe settings (con persistencia inmediata en estado)
         function writeSettingsForFile(name, pendingIdx, field, value) {
-            if (pendingIdx !== undefined && pendingIdx !== null && uploadedFiles[pendingIdx]) {
+            pendingIdx = normPendingIdx(pendingIdx);
+            if (pendingIdx !== null && uploadedFiles[pendingIdx]) {
                 uploadedFiles[pendingIdx][field] = value;
             } else {
                 getFileSettings(name)[field] = value;
@@ -7167,6 +7237,29 @@
                     aplicarFiltrosAPaginas();
                     sincronizarComentariosPorArchivo();
                 }, 400);
+                // v3.10.28: y se guarda solo. Un ajuste que solo vive en el
+                // navegador hasta que te acuerdes de pulsar Guardar es un
+                // ajuste que se pierde.
+                clearTimeout(window._filtroSaveTimer);
+                window._filtroSaveTimer = setTimeout(() => {
+                    persistFileSettings();
+                }, 1200);
+            }
+        }
+
+        // v3.10.28: guarda los ajustes por archivo sin tocar nada más.
+        async function persistFileSettings() {
+            if (!budgetData.id) return;   // presupuesto aún sin crear
+            try {
+                await apiPost({
+                    action: 'updateBudgetBasicData',
+                    budgetId: budgetData.id,
+                    fileSettings: budgetData.fileSettings || {}
+                }, { retry: false });
+            } catch (e) {
+                console.warn('persistFileSettings:', e);
+                showStatus('No he podido guardar los ajustes de páginas: ' + e.message, 'warning');
+                setTimeout(hideStatus, 5000);
             }
         }
 
@@ -7180,7 +7273,8 @@
         }
 
         function updateSettingsBadge(name, pendingIdx) {
-            const key = pendingIdx !== undefined && pendingIdx !== null ? 'p' + pendingIdx : 'd' + name;
+            pendingIdx = normPendingIdx(pendingIdx);
+            const key = pendingIdx !== null ? 'p' + pendingIdx : 'd' + name;
             const badge = document.getElementById('settingsBadge_' + cssId(key));
             if (!badge) return;
             const s = readSettingsForFile(name, pendingIdx);
@@ -7221,7 +7315,13 @@
             const safeKey = cssId(key);
             const isOpen = window.openSettingsPanels.has(key);
             const sizeClass = sizeBytes > 2 * 1024 * 1024 ? 'file-size-large' : '';
-            const pendingAttr = pendingIdx !== null && pendingIdx !== undefined ? String(pendingIdx) : '""';
+            // v3.10.28: para los archivos de Drive va null, no "". La cadena
+            // vacía pasaba las guardas de tipo y luego rompía la clave del
+            // indicador: updateSettingsBadge calculaba 'p' + "" = 'p', mientras
+            // que el elemento se había pintado con id 'd' + nombre. Buscaba un
+            // id inexistente y salía sin hacer nada, así que tecleabas el rango
+            // y en pantalla no cambiaba absolutamente nada.
+            const pendingAttr = pendingIdx !== null && pendingIdx !== undefined ? String(pendingIdx) : 'null';
             const nameEsc = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             // v3.7.24: combinar size/pages/words en una sola línea de detalle
             const parts = [formatFileSize(sizeBytes)];
@@ -10113,7 +10213,7 @@
             document.getElementById('editProviderName').textContent = g.nombre || '(sin nombre)';
             document.getElementById('editProviderEmail').textContent = g.email || '(sin email)';
             const maec = [];
-            if (g.numTIJ) maec.push('N.o TIJ ' + g.numTIJ);
+            if (g.numTIJ) maec.push('Nº TIJ ' + g.numTIJ);
             if (g.provincia) maec.push(g.provincia);
             if (g.anio) maec.push('nombr. ' + formatAnio(g.anio));
             if (g.telefono) maec.push('Tel. ' + g.telefono);
@@ -10155,19 +10255,21 @@
             const box = document.getElementById('editPairsBox');
             if (!box || !editingProvider) return;
             const cat = idiomasDelCatalogo();
-            const opts = (sel) => cat.map(l =>
-                `<option value="${escapeHtmlAttr(l)}"${l === sel ? ' selected' : ''}>${l}</option>`).join('');
+            // v3.10.27: sin idioma preseleccionado. Antes salia el primero por
+            // orden alfabetico (Aleman) y parecia una propuesta del programa.
+            const opts = (sel) => '<option value="">\u2014 elige idioma \u2014</option>' +
+                cat.map(l => `<option value="${escapeHtmlAttr(l)}"${l === sel ? ' selected' : ''}>${l}</option>`).join('');
 
             let html = `<div class="prov-edit-row" style="border-top:none;background:var(--bg-secondary);font-size:0.75rem;color:var(--text-secondary);">
-                <span>Combinacion</span><span>&euro;/palabra</span><span>Orden</span><span></span>
+                <span>Combinación</span><span>&euro;/palabra</span><span>Orden</span><span></span>
             </div>`;
 
             editingProvider.pares.forEach((par, i) => {
                 html += `<div class="prov-edit-row">
                     <span style="font-size:0.88rem;">${par.idiomaOrigen} &rarr; ${par.idiomaDestino}</span>
-                    <input type="text" class="form-control" value="${escapeHtmlAttr(par.tarifaPalabra)}" placeholder="0.08" oninput="setPairField(${i}, 'tarifaPalabra', this.value)">
-                    <input type="number" min="1" class="form-control" value="${escapeHtmlAttr(par.orden)}" placeholder="&mdash;" oninput="setPairField(${i}, 'orden', this.value)">
-                    <button class="prov-btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;" onclick="removePairFromEditor(${i})" title="Quitar esta combinacion">&#128465;</button>
+                    <input type="text" class="form-control" value="${escapeHtmlAttr(par.tarifaPalabra)}" placeholder="sin tarifa" oninput="setPairField(${i}, 'tarifaPalabra', this.value)">
+                    <input type="number" min="1" class="form-control" value="${escapeHtmlAttr(par.orden)}" placeholder="sin orden" oninput="setPairField(${i}, 'orden', this.value)">
+                    <button class="prov-btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;" onclick="removePairFromEditor(${i})" title="Quitar esta combinación">&#128465;</button>
                 </div>`;
             });
 
@@ -10175,11 +10277,11 @@
                 <span style="display:flex;gap:6px;align-items:center;min-width:0;">
                     <select id="newPairOrigen" class="form-control" style="min-width:0;">${opts('')}</select>
                     <span style="color:var(--text-secondary);">&rarr;</span>
-                    <select id="newPairDestino" class="form-control" style="min-width:0;">${opts('Espa\u00f1ol')}</select>
+                    <select id="newPairDestino" class="form-control" style="min-width:0;">${opts('')}</select>
                 </span>
-                <input type="text" id="newPairTarifa" class="form-control" placeholder="0.08">
-                <input type="number" min="1" id="newPairOrden" class="form-control" placeholder="&mdash;">
-                <button class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="addPairToEditor()" title="Anadir esta combinacion">&#10133;</button>
+                <input type="text" id="newPairTarifa" class="form-control" placeholder="sin tarifa">
+                <input type="number" min="1" id="newPairOrden" class="form-control" placeholder="sin orden">
+                <button class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="addPairToEditor()" title="Añadir esta combinación">&#10133;</button>
             </div>`;
 
             box.innerHTML = html;
@@ -10198,7 +10300,11 @@
             if (!editingProvider) return;
             const o = document.getElementById('newPairOrigen').value;
             const d = document.getElementById('newPairDestino').value;
-            if (!o || !d) return;
+            if (!o || !d) {
+                showStatus('Elige el idioma de origen y el de destino', 'warning');
+                setTimeout(hideStatus, 3000);
+                return;
+            }
             if (o === d) {
                 showStatus('El idioma de origen y el de destino no pueden ser el mismo', 'warning');
                 setTimeout(hideStatus, 3000);
@@ -10206,7 +10312,7 @@
             }
             const ya = editingProvider.pares.some(p => p.idiomaOrigen === o && p.idiomaDestino === d);
             if (ya) {
-                showStatus('Ese traductor ya tiene la combinacion ' + o + ' \u2192 ' + d, 'warning');
+                showStatus('Ese traductor ya tiene la combinación ' + o + ' \u2192 ' + d, 'warning');
                 setTimeout(hideStatus, 3000);
                 return;
             }
@@ -10222,13 +10328,13 @@
         function removePairFromEditor(i) {
             if (!editingProvider) return;
             if (editingProvider.pares.length <= 1) {
-                showStatus('Un traductor debe conservar al menos una combinacion. Para quitarlo entero usa Eliminar en su ficha.', 'warning');
+                showStatus('Un traductor debe conservar al menos una combinación. Para quitarlo entero usa Eliminar en su ficha.', 'warning');
                 setTimeout(hideStatus, 4000);
                 return;
             }
             const par = editingProvider.pares[i];
-            if (!confirm('Quitar la combinacion ' + par.idiomaOrigen + ' \u2192 ' + par.idiomaDestino +
-                         ' de ' + editingProvider.nombre + '?\nSe borrara al guardar.')) return;
+            if (!confirm('¿Quitar la combinación ' + par.idiomaOrigen + ' \u2192 ' + par.idiomaDestino +
+                         ' de ' + editingProvider.nombre + '?\nSe borrará al guardar.')) return;
             editingProvider.pares.splice(i, 1);
             renderProviderPairsEditor();
         }
@@ -10279,7 +10385,7 @@
 
                 closeEditProviderModal();
                 const partes = [];
-                if (data.added) partes.push(data.added + ' combinacion(es) nueva(s)');
+                if (data.added) partes.push(data.added + ' combinación(es) nueva(s)');
                 if (data.deleted) partes.push(data.deleted + ' borrada(s)');
                 showStatus('\u2713 Guardado' + (partes.length ? ' \u00b7 ' + partes.join(', ') : ''), 'success');
                 setTimeout(hideStatus, 3000);
