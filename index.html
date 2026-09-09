@@ -557,7 +557,6 @@
         .margin-status.low { background: rgba(241, 196, 15, 0.15); color: #d4a106; }
         .margin-status.high { background: rgba(231, 76, 60, 0.1); color: #c0392b; }
         .margin-hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
-        .cm-opt.cm-active { background: #dbeafe; box-shadow: inset 0 0 0 2px #3b82f6; }
         .calc-method-option.cm-active { background: #dbeafe; box-shadow: inset 0 0 0 2px var(--primary-blue); font-weight: 600; }
         .calc-method-selector { background: #f8f9fa; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; }
         .calc-method-title { font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
@@ -1329,25 +1328,6 @@
                 </label>
             </div>
 
-            <!-- v3.8.7: selector explícito de carril de recuento (3 opciones) -->
-            <div style="margin-top:10px;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:0.82rem;color:#0c4a6e;">
-                <div style="font-weight:600;margin-bottom:8px;">🔢 Método de recuento</div>
-                <div id="countMethodOptions" style="display:flex;flex-direction:column;gap:6px;">
-                    <label class="cm-opt" data-cm="claude" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0;padding:6px 8px;border-radius:6px;">
-                        <input type="radio" name="countMethod" value="claude" onchange="setCountMethod(this.value)" style="margin-top:2px;">
-                        <span>🤖 <b>Claude</b> — cualquier documento (escaneo, manuscrito, mixto).<br><span style="color:#475569;font-size:0.75rem;">Cuenta SOLO las palabras en el idioma origen. Es el más lento y el único fiable en documentos multilingües.</span></span>
-                    </label>
-                    <label class="cm-opt" data-cm="text" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0;padding:6px 8px;border-radius:6px;">
-                        <input type="radio" name="countMethod" value="text" onchange="setCountMethod(this.value)" style="margin-top:2px;">
-                        <span>⚡ <b>Extracción de texto</b> — PDFs editables, instantáneo y sin coste.<br><span style="color:#475569;font-size:0.75rem;">Cuenta TODAS las palabras, sin filtro de idioma. Si alguna página no tiene texto, ese archivo pasa a Claude.</span></span>
-                    </label>
-                    <label class="cm-opt" data-cm="ocr" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0;padding:6px 8px;border-radius:6px;">
-                        <input type="radio" name="countMethod" value="ocr" onchange="setCountMethod(this.value)" style="margin-top:2px;">
-                        <span>📷 <b>OCR de Google</b> — escaneos limpios en un solo idioma, sin coste de Claude.<br><span style="color:#475569;font-size:0.75rem;">Cuenta TODAS las palabras, sin filtro de idioma. Si el OCR sale sucio o mezcla idiomas, escala a Claude solo.</span></span>
-                    </label>
-                </div>
-            </div>
-
             <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
                 <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false, false)" disabled style="flex:1;min-width:130px;">
                     📁 Crear Carpeta
@@ -1978,8 +1958,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.31';
-        const HTML_DATE = '28/08/2026';
+        const HTML_VERSION = '3.10.32';
+        const HTML_DATE = '09/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2155,17 +2135,6 @@
             const mEl = document.getElementById('uploadMaxMb');
             if (mEl) mEl.value = Math.round(getUploadMaxAutoBytes() / 1048576);
             updateLocalModeUI();   // v3.8.0
-            syncCountMethodUI();   // v3.8.7
-        }
-
-        // v3.9.0 FIX: syncCountMethodUI() solo se llamaba desde showConfig(), o
-        // sea, al abrir Ajustes. El checkbox anterior traía checked en el HTML,
-        // así que se veía marcado; los radios no, y quedaban los tres vacíos
-        // hasta que entrabas en Ajustes. Ahora se sincroniza al arrancar.
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => { try { syncCountMethodUI(); } catch (e) {} });
-        } else {
-            setTimeout(() => { try { syncCountMethodUI(); } catch (e) {} }, 0);
         }
 
         // ====== HOME SCREEN ======
@@ -8429,8 +8398,7 @@
                         sourceLang: budgetData.sourceLang,
                         internalComments: budgetData.internalComments || '',
                         fileSettings: budgetData.fileSettings || {},  // v3.7.19
-                        tryOcrFirst: (countMethod() === 'ocr'),       // v3.8.7
-                        countMethod: countMethod()                     // v3.8.7
+                        countMethod: 'claude'                          // v3.10.32
                     }, { retry: false });
                 } catch (fetchErr) {
                     const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
@@ -8862,102 +8830,26 @@
             return _pdfjsLoading;
         }
 
-        // v3.8.7: tres carriles explícitos. Por defecto CLAUDE, que es el único
-        // que filtra por idioma origen. Los otros dos cuentan TODAS las palabras
-        // del documento, así que solo deben elegirse a sabiendas (documento en un
-        // único idioma). El método usado se registra y se muestra siempre.
-        const COUNT_METHODS = {
+        // v3.10.32: el recuento es siempre con Claude. El selector de tres
+        // carriles (Claude / extracción de texto / OCR de Google, v3.8.7) se ha
+        // retirado de la interfaz y del código: en la práctica solo se usaba
+        // Claude, el único que filtra por idioma origen. Las etiquetas se
+        // conservan porque hay presupuestos antiguos contados por otros
+        // carriles y tienen que seguir diciéndolo.
+        const COUNT_METHOD_LABELS = {
             claude: { label: '🤖 Claude',              nota: 'solo idioma origen' },
             text:   { label: '⚡ Extracción de texto', nota: 'todas las palabras' },
             ocr:    { label: '📷 OCR de Google',       nota: 'todas las palabras' },
             mixto:  { label: '🔀 Mixto',               nota: 'criterios distintos por archivo' }
         };
 
-        function countMethod() {
-            try {
-                const v = localStorage.getItem('tradutema_countmethod');
-                if (v === 'claude' || v === 'text' || v === 'ocr') return v;
-            } catch (e) {}
-            return 'claude';
-        }
-
-        function setCountMethod(v) {
-            if (!COUNT_METHODS[v]) v = 'claude';
-            try { localStorage.setItem('tradutema_countmethod', v); } catch (e) {}
-            syncCountMethodUI();
-        }
-
-        function syncCountMethodUI() {
-            const m = countMethod();
-            document.querySelectorAll('input[name="countMethod"]').forEach(r => {
-                r.checked = (r.value === m);
-                const lab = r.closest('.cm-opt');
-                if (lab) lab.classList.toggle('cm-active', r.value === m);
-            });
-        }
+        function countMethod() { return 'claude'; }
 
         // Etiqueta legible del método, para el log, el banner y _RECUENTO.txt.
         function countMethodLabel(m, sourceLang) {
-            const info = COUNT_METHODS[m] || COUNT_METHODS.claude;
-            if (m === 'claude' && sourceLang) return info.label + ' (solo ' + sourceLang + ')';
+            const info = COUNT_METHOD_LABELS[m] || COUNT_METHOD_LABELS.claude;
+            if ((m || 'claude') === 'claude' && sourceLang) return info.label + ' (solo ' + sourceLang + ')';
             return info.label + ' (' + info.nota + ')';
-        }
-
-        // Compat: el carril "rápido" del frontend (pdf.js) solo actúa si el
-        // método elegido es 'text'.
-        function fastCountEnabled() {
-            return countMethod() === 'text';
-        }
-
-        // Extrae texto por página. Devuelve null si el archivo NO califica
-        // (alguna página sin texto suficiente → escaneo/mixto → Claude).
-        async function fastExtractPdf(file) {
-            const pdfjs = await loadPdfJs();
-            const bin = atob(file.content);
-            const bytes = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            const doc = await pdfjs.getDocument({ data: bytes }).promise;
-            const MIN_CHARS_PAGINA = 40;   // por debajo, huele a escaneo/sello
-            let fullText = '';
-            for (let p = 1; p <= doc.numPages; p++) {
-                const page = await doc.getPage(p);
-                const tc = await page.getTextContent();
-                const pageText = tc.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
-                if (pageText.replace(/[^\p{L}\p{N}]/gu, '').length < MIN_CHARS_PAGINA) {
-                    try { doc.destroy(); } catch (e) {}
-                    return null;   // página sin texto real → no califica
-                }
-                fullText += (fullText ? '\n\n--- Página ' + p + ' ---\n\n' : '') + pageText;
-            }
-            const numPages = doc.numPages;
-            try { doc.destroy(); } catch (e) {}
-            const words = fullText.trim().split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
-            return { words: words, pages: numPages, text: fullText };
-        }
-
-        // Reparte los archivos: los que califican se cuentan aquí; el resto, a Claude.
-        async function fastCountPartition(files) {
-            const fast = [], toClaude = [];
-            for (const f of files) {
-                const esPdf = (f.type === 'application/pdf') || /\.pdf$/i.test(f.name || '');
-                const tieneAjustes = (typeof fileSettings === 'object' && fileSettings && fileSettings[f.name]);
-                if (!fastCountEnabled() || !esPdf || tieneAjustes || !f.content) {
-                    toClaude.push(f);
-                    continue;
-                }
-                try {
-                    const r = await fastExtractPdf(f);
-                    if (r) {
-                        fast.push({ fileName: f.name, words: r.words, pages: r.pages, extractedText: r.text, _fast: true });
-                    } else {
-                        toClaude.push(f);
-                    }
-                } catch (e) {
-                    console.warn('fastExtract falló para', f.name, e);
-                    toClaude.push(f);   // ante la duda, Claude
-                }
-            }
-            return { fast, toClaude };
         }
 
         // ============ v3.8.0: MODO LOCAL (patrón Corpotrad) ============
@@ -9595,35 +9487,10 @@
                     // v3.8.3: DOBLE CARRIL. Los PDF con texto embebido se
                     // cuentan aquí mismo (pdf.js, milisegundos); solo el resto
                     // viaja al backend (OCR de Google y/o Claude).
-                    let _fastResults = [];
-                    let _filesParaBackend = files;
-                    try {
-                        const t0f = performance.now();
-                        const parte = await fastCountPartition(files);
-                        _fastResults = parte.fast;
-                        _filesParaBackend = parte.toClaude;
-                        if (_fastResults.length > 0) {
-                            prodLogDone('fastcount', `⚡ ${_fastResults.length} archivo(s) contados en local · ${Math.round(performance.now() - t0f)}ms · ${_fastResults.reduce((s, f) => s + f.words, 0)} palabras`);
-                        }
-                    } catch (eFast) {
-                        console.warn('fastCount:', eFast);
-                        _fastResults = []; _filesParaBackend = files;
-                    }
-
-                    if (_filesParaBackend.length === 0) {
-                        // Todo resuelto en local: respuesta sintética compatible
-                        claudeResult = {
-                            success: true,
-                            analysis: _fastResults,
-                            totalWords: _fastResults.reduce((s, f) => s + f.words, 0),
-                            totalPages: _fastResults.reduce((s, f) => s + (f.pages || 0), 0),
-                            failedPages: [],
-                            countMethodUsed: 'text',   // v3.8.7
-                            _fast: true
-                        };
-                        budgetData.countMethodUsed = 'text';
-                    } else {
-                    prodLogStart('analyze', `Analizando ${_filesParaBackend.length} archivo(s) en el servidor (OCR/Claude)`);
+                    // v3.10.32: sin carril rápido. Todo va a Claude.
+                    const _filesParaBackend = files;
+                    {
+                    prodLogStart('analyze', `Analizando ${_filesParaBackend.length} archivo(s) en el servidor (Claude)`);
                     try {
                         const claudeResp = await fetch(apiUrl, {
                             method: 'POST',
@@ -9632,24 +9499,12 @@
                                 files: _filesParaBackend,
                                 sourceLang: budgetData.sourceLang,
                                 internalComments: internalComments,
-                                tryOcrFirst: (countMethod() === 'ocr'),   // v3.8.7
-                                countMethod: countMethod()                 // v3.8.7
+                                countMethod: 'claude'                      // v3.10.32
                             })
                         });
                         claudeResult = await claudeResp.json();
-                        // Fusionar los resultados rápidos con los del servidor
-                        if (claudeResult && claudeResult.success && _fastResults.length > 0) {
-                            claudeResult.analysis = _fastResults.concat(claudeResult.analysis || []);
-                            claudeResult.totalWords = (claudeResult.totalWords || 0) + _fastResults.reduce((s, f) => s + f.words, 0);
-                            claudeResult.totalPages = (claudeResult.totalPages || 0) + _fastResults.reduce((s, f) => s + (f.pages || 0), 0);
-                        }
-                        // v3.8.7: método realmente usado. Si el carril elegido no
-                        // cubrió todos los archivos, es MIXTO y hay que decirlo:
-                        // los carriles no cuentan con el mismo criterio.
                         if (claudeResult && claudeResult.success) {
-                            const _backendM = claudeResult.countMethodUsed || 'claude';
-                            budgetData.countMethodUsed = (_fastResults.length > 0 && _backendM !== 'text')
-                                ? 'mixto' : _backendM;
+                            budgetData.countMethodUsed = claudeResult.countMethodUsed || 'claude';
                         }
                     } catch (cErr) {
                         claudeFailedHard = true;
