@@ -1978,7 +1978,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.28';
+        const HTML_VERSION = '3.10.31';
         const HTML_DATE = '28/08/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -3659,6 +3659,26 @@
         // Base propia (no la de los handles) para no tocar su versión.
         const WOO_DB = 'tradutema_woocache';
 
+        // v3.10.29: la copia local se descarta SOLO si sus columnas no son
+        // las que espera esta versión. Antes se tiraba con cada cambio de
+        // número de versión del HTML, y cada descarga son 10.000+ filas por
+        // Apps Script en 12 tramos: minutos, y ocasión de que falle uno.
+        // Si el backend añade una columna, se actualiza esta lista y la
+        // copia vieja se descarta una vez, que es lo que se pretendía.
+        const WOO_CACHE_COLUMNAS = [
+            'orderId', 'date', 'status', 'total', 'currency',
+            'firstName', 'lastName', 'email', 'phone', 'company',
+            'city', 'country', 'quoteRef', 'langs', 'fileNames',
+            'customerNote', 'modified', 'driveUrl', 'langSource', 'langTarget',
+            'invoiceNumber', 'invoiceUrl', 'productName', 'tarifResumen',
+            'driveProject'
+        ];
+        function cacheLocalCompatible(local) {
+            if (!local || !Array.isArray(local.headers)) return false;
+            if (local.headers.length !== WOO_CACHE_COLUMNAS.length) return false;
+            return local.headers.every((c, i) => c === WOO_CACHE_COLUMNAS[i]);
+        }
+
         function _wooDb() {
             return new Promise((res, rej) => {
                 const rq = indexedDB.open(WOO_DB, 1);
@@ -3729,6 +3749,7 @@
                 o._month = month;
                 const totalComma = String(o.total || '').replace('.', ',');
                 o._search = normalizeText(row.join(' ') + ' ' + fechaEs + ' ' + totalComma);
+                o._row = row;   // v3.10.29: para volver a guardar sin redescargar
                 return o;
             });
             if (añadir && Array.isArray(window.wooCacheData)) {
@@ -3736,6 +3757,37 @@
             } else {
                 window.wooCacheData = nuevos;
             }
+        }
+
+        // v3.10.29: fusiona en memoria y en IndexedDB las filas que devuelve
+        // un incremental (upsert por orderId). Devuelve false si las columnas
+        // no cuadran, y entonces el que llama recarga entera.
+        async function fusionarPedidosEnCache(headers, rows) {
+            if (!Array.isArray(headers) || !Array.isArray(rows)) return false;
+            const H = window.wooCacheHeaders || [];
+            if (!H.length || H.length !== headers.length || !H.every((c, i) => c === headers[i])) {
+                console.warn('fusionarPedidosEnCache: columnas distintas, se recarga entera');
+                return false;
+            }
+            if (!Array.isArray(window.wooCacheData)) window.wooCacheData = [];
+            const idx = new Map();
+            window.wooCacheData.forEach((o, i) => idx.set(String(o.orderId), i));
+
+            // Reutilizar el constructor de objetos: montar aparte y luego colocar
+            const antes = window.wooCacheData;
+            montarCacheEnMemoria(H, rows, false);
+            const nuevos = window.wooCacheData;
+            window.wooCacheData = antes;
+
+            let actualizados = 0, insertados = 0;
+            nuevos.forEach(o => {
+                const k = String(o.orderId);
+                if (idx.has(k)) { window.wooCacheData[idx.get(k)] = o; actualizados++; }
+                else { idx.set(k, window.wooCacheData.length); window.wooCacheData.push(o); insertados++; }
+            });
+            await guardarCacheLocalPedidos(H, window.wooCacheData.map(o => o._row), window.wooCacheData.length);
+            console.log('Incremental fusionado: ' + actualizados + ' actualizados, ' + insertados + ' nuevos');
+            return true;
         }
 
         async function loadWooCacheIntoMemory(forzarDescarga) {
@@ -3748,8 +3800,10 @@
                     // Una versión nueva puede haber añadido columnas: la copia
                     // guardada tendría cabeceras viejas y faltarían campos.
                     // Ante la duda, se descarta y se vuelve a bajar una vez.
-                    if (local && local.appVersion !== HTML_VERSION) {
-                        console.log('Caché local de otra versión (' + local.appVersion +
+                    // v3.10.29: se compara por columnas, no por versión.
+                    if (local && !cacheLocalCompatible(local)) {
+                        console.log('Caché local con columnas distintas (' +
+                                    (local.headers || []).length + ' vs ' + WOO_CACHE_COLUMNAS.length +
                                     '): se descarta y se vuelve a descargar.');
                         await borrarCacheLocalPedidos();
                         local = null;
@@ -3829,9 +3883,12 @@
                 populateOrderFilters();
                 await refreshWooCacheStatus();
             } catch(e) {
-                if (el) el.textContent = 'Error cargando caché: ' + e.message;
+                if (el) el.textContent = '⚠️ Descarga cortada: ' + e.message + ' · en memoria ' +
+                    ((window.wooCacheData || []).length).toLocaleString('es-ES') + ' pedidos';
+                console.warn('loadWooCacheIntoMemory:', e);
             } finally {
                 window._wooCargando = false;   // v3.10.15
+                try { renderOrderSearchResults(); } catch (e2) {}   // v3.10.29: repintar con la verdad
             }
         }
 
@@ -3952,7 +4009,36 @@
                         (totalCache ? ' de ' + totalCache.toLocaleString('es-ES') : '') + '.<br>' +
                         '<small style="color:#888;">Sigue cargando: si aparece, se mostrará solo.</small></div>';
                 } else {
-                    cont.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">Sin resultados. Prueba a quitar algún filtro.</div>';
+                    // v3.10.29: decir la verdad sobre lo que hay en memoria.
+                    // "Sin resultados" con la caché a medias (un tramo perdido,
+                    // una descarga cortada) es un fallo silencioso: el pedido
+                    // existe en la hoja y no se enseña.
+                    const enMemoria = (window.wooCacheData || []).length;
+                    const enHoja = window._wooTotalCache || 0;
+                    let msg = '';
+                    if (enHoja > enMemoria) {
+                        msg += '<div style="color:#b45309;font-weight:600;">⚠️ Caché incompleta: ' +
+                            enMemoria.toLocaleString('es-ES') + ' pedidos en memoria de ' +
+                            enHoja.toLocaleString('es-ES') + ' en la hoja (faltan ' +
+                            (enHoja - enMemoria).toLocaleString('es-ES') + ').</div>' +
+                            '<div style="color:#888;margin-top:4px;">Lo que buscas puede estar en la parte que no llegó.</div>' +
+                            '<button onclick="loadWooCacheIntoMemory(true).then(()=>renderOrderSearchResults())" ' +
+                            'style="margin-top:12px;padding:7px 14px;background:#7c3aed;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">⬇️ Volver a descargar la caché</button>';
+                    } else {
+                        msg += '<div>Sin resultados entre los ' + enMemoria.toLocaleString('es-ES') +
+                               ' pedidos. Prueba a quitar algún filtro.</div>';
+                    }
+                    // Una referencia de cotización busca una COTIZACIÓN. Si no
+                    // hay pedido, lo natural es abrirla, no quedarse en blanco.
+                    const refCot = (q || '').match(/^(\d{4}-\d{2}-[mw])$/i);
+                    if (refCot) {
+                        const ref = refCot[1].toUpperCase();
+                        msg += '<div style="margin-top:14px;color:#555;">' + ref + ' es una referencia de cotización. ' +
+                            'Puede que aún no tenga pedido.</div>' +
+                            '<button onclick="loadBudget(\'' + ref + '\')" ' +
+                            'style="margin-top:8px;padding:7px 14px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">📂 Abrir la cotización ' + ref + '</button>';
+                    }
+                    cont.innerHTML = '<div style="text-align:center;padding:30px;">' + msg + '</div>';
                 }
                 return;
             }
@@ -4076,6 +4162,10 @@
 
             let startPage = 1;
             let totalProcessed = 0;
+            // v3.10.29: filas tocadas que devuelve cada lote del incremental
+            let filasSync = [];
+            let headersSync = null;
+            let sinFilas = false;   // algún lote no las trajo -> recarga entera
             // v3.10.17: un incremental sobre una caché vacía no tiene sentido:
             // no hay nada que incrementar. Se convierte en completo, que es lo
             // que el usuario espera al pulsar cualquiera de los dos botones
@@ -4141,6 +4231,14 @@
 
                     reset = false;  // solo resetear en la primera llamada
                     totalProcessed += (data.processed || 0);
+                    if (!full) {
+                        if (Array.isArray(data.rows)) {
+                            if (!headersSync) headersSync = data.headers || null;
+                            data.rows.forEach(r => filasSync.push(r));
+                        } else if ((data.processed || 0) > 0) {
+                            sinFilas = true;   // backend antiguo o lote demasiado grande
+                        }
+                    }
                     // Progreso: en sync completo estimamos sobre 8000; en incremental es indeterminado
                     if (full) {
                         const pct = Math.min(99, Math.round((totalProcessed / 8000) * 100));
@@ -4163,8 +4261,23 @@
                 // v3.10.12: si el incremental no trajo nada, no tiene sentido
                 // volver a bajar las 10.500 filas. Es el caso habitual al entrar
                 // en la pantalla varias veces al día.
+                // v3.10.29: un incremental FUSIONA lo que ha cambiado. Antes,
+                // con un solo pedido tocado, volvía a bajar las 10.000+ filas
+                // (loadWooCacheIntoMemory(true)): eran los minutos de espera en
+                // cada visita, y si un tramo se perdía, "Sin resultados".
                 if (totalProcessed > 0) {
-                    await loadWooCacheIntoMemory(true);
+                    let fusionado = false;
+                    if (!full && !sinFilas && headersSync) {
+                        fusionado = await fusionarPedidosEnCache(headersSync, filasSync);
+                    }
+                    if (fusionado) {
+                        populateOrderFilters();
+                        await refreshWooCacheStatus();
+                        if (txt) txt.textContent = '✓ Actualizado · ' + filasSync.length.toLocaleString('es-ES') +
+                                                   ' pedido(s) fusionado(s) sin redescargar';
+                    } else {
+                        await loadWooCacheIntoMemory(true);
+                    }
                 } else {
                     await refreshWooCacheStatus();
                 }
@@ -5546,7 +5659,7 @@
                 `;
                 
                 html += `
-                    <div class="budget-item" onclick="loadBudget('${b.id}')">
+                    <div class="budget-item" onclick="loadBudget('${b.id}')" onmouseenter="prefetchBudget('${b.id}')" onmouseleave="cancelPrefetchBudget('${b.id}')">
                         <div class="budget-item-header">
                             <span class="budget-item-id">${b.id}</span>
                             <span class="budget-item-status ${statusClass}">${b.estado}</span>
@@ -5639,8 +5752,191 @@
             }
         }
 
+        // ====== v3.10.30: ABRIR AL INSTANTE ======
+        //
+        // Medido con la hoja real: un presupuesto recién creado pesa 0 KB y aun
+        // así tardaba lo mismo en abrirse. El tiempo no está en los datos, está
+        // en el coste fijo de cada llamada a Apps Script (abrir un libro de
+        // 4 MB, redirección de la respuesta, arranque en frío).
+        //
+        // Dos medidas, ninguna de las dos toca el backend:
+        //
+        //  a) PREFETCH: al pasar el ratón por una tarjeta del listado se lanza
+        //     ya la petición getBudget. Cuando llega el clic, suele estar de
+        //     vuelta o a medio camino.
+        //
+        //  b) COPIA LOCAL PRIMERO: si el presupuesto se abrió antes en este
+        //     navegador (hay copia de los 30 últimos desde la 3.8.5), se pinta
+        //     de inmediato desde esa copia y la petición al servidor sigue en
+        //     segundo plano. Al llegar:
+        //       - si es idéntica a la copia, no pasa nada ("✓ al día");
+        //       - si es distinta y aún no has tocado nada, se vuelve a pintar
+        //         con lo del servidor;
+        //       - si es distinta y ya has editado algo, NO se pisa tu edición:
+        //         aparece un aviso con botón para recargar.
+        //     Un presupuesto que nunca se abrió aquí sigue el camino de siempre.
+        let _prefetch = { id: null, promise: null, timer: null, at: 0 };
+        let _verificacion = { id: null, tocado: false };
+
+        function prefetchBudget(id) {
+            if (!id) return;
+            if (_prefetch.id === id && _prefetch.promise) return;
+            clearTimeout(_prefetch.timer);
+            // 120 ms: si el ratón solo cruza la tarjeta, no se llama.
+            _prefetch.timer = setTimeout(() => {
+                _prefetch.id = id;
+                _prefetch.at = Date.now();
+                _prefetch.promise = apiPost({ action: 'getBudget', budgetId: id }, { retry: true, attempts: 4 })
+                    .catch(e => ({ success: false, error: (e && e.message) || String(e) }));
+            }, 120);
+        }
+
+        function cancelPrefetchBudget(id) {
+            // Solo se cancela el temporizador: una petición ya lanzada se deja
+            // terminar, por si el clic llega justo después.
+            if (_prefetch.id !== id || !_prefetch.promise) clearTimeout(_prefetch.timer);
+        }
+
+        // Devuelve la promesa del prefetch si es de este presupuesto y reciente
+        function tomarPrefetch(id) {
+            if (_prefetch.id === id && _prefetch.promise && (Date.now() - _prefetch.at) < 60000) {
+                const p = _prefetch.promise;
+                _prefetch = { id: null, promise: null, timer: null, at: 0 };
+                return p;
+            }
+            return null;
+        }
+
+        // Lo que se compara entre la copia local y el servidor. Se quitan los
+        // campos que no describen el presupuesto (marcas de tiempo, texto
+        // extraído que la copia no guarda, listado de Drive que llega aparte).
+        function firmaPresupuesto(b) {
+            try {
+                const c = JSON.parse(JSON.stringify(b || {}));
+                delete c._cachedAt; delete c._filesDeferred; delete c.analisisDetalle;
+                delete c.archivosEnCarpeta; delete c._perf; delete c._debug;
+                return JSON.stringify(c);
+            } catch (e) { return String(Math.random()); }
+        }
+
+        // Cualquier edición REAL del usuario (isTrusted) marca el presupuesto
+        // como tocado; los eventos que dispara el propio programa no cuentan.
+        document.addEventListener('input',  e => { if (e.isTrusted) _verificacion.tocado = true; }, true);
+        document.addEventListener('change', e => { if (e.isTrusted) _verificacion.tocado = true; }, true);
+
+        function pintarEstadoVerificacion(texto, tipo) {
+            let el = document.getElementById('budgetVerifyBadge');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'budgetVerifyBadge';
+                el.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:9000;padding:8px 14px;border-radius:8px;' +
+                                   'font-size:0.82rem;box-shadow:0 2px 10px rgba(0,0,0,0.15);max-width:360px;line-height:1.35;';
+                document.body.appendChild(el);
+            }
+            const estilos = {
+                loading: 'background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;',
+                ok:      'background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;',
+                warning: 'background:#fffbeb;color:#92400e;border:1px solid #fcd34d;',
+                error:   'background:#fef2f2;color:#991b1b;border:1px solid #fecaca;'
+            };
+            el.style.cssText += estilos[tipo] || estilos.loading;
+            el.innerHTML = texto;
+            el.style.display = 'block';
+            if (tipo === 'ok') setTimeout(() => { if (el.textContent.indexOf('al día') >= 0) el.style.display = 'none'; }, 3000);
+        }
+        function ocultarEstadoVerificacion() {
+            const el = document.getElementById('budgetVerifyBadge');
+            if (el) el.style.display = 'none';
+        }
+
+        // Abre desde la copia local y verifica contra el servidor por detrás.
+        // Devuelve true si se ha ocupado de todo; false si no hay copia y hay
+        // que seguir por el camino normal.
+        async function abrirDesdeCopiaLocal(budgetId) {
+            const cached = getBudgetCache(budgetId);
+            if (!cached) return false;
+
+            const t0 = Date.now();
+            // Lanzar ya la petición (o recoger la del prefetch)
+            const enVuelo = tomarPrefetch(budgetId) ||
+                apiPost({ action: 'getBudget', budgetId: budgetId }, { retry: true, attempts: 4 })
+                    .catch(e => ({ success: false, error: (e && e.message) || String(e) }));
+
+            // Pintar de inmediato desde la copia
+            window._budgetCacheOverride = cached;
+            window._abriendoDesdeCopia = true;
+            try {
+                await loadBudget(budgetId);
+            } finally {
+                window._abriendoDesdeCopia = false;
+            }
+            _verificacion = { id: budgetId, tocado: false };
+            pintarEstadoVerificacion('⟳ Abierto desde la copia local · comprobando el servidor…', 'loading');
+            const tLocal = Date.now() - t0;
+
+            // Cuando llegue el servidor, decidir
+            enVuelo.then(async data => {
+                const tServ = Date.now() - t0;
+                if (_verificacion.id !== budgetId) return;   // ya se abrió otro
+                if (!data || !data.success || !data.budget) {
+                    pintarEstadoVerificacion('⚠️ El servidor no ha respondido: estás viendo la copia local de ' +
+                        budgetId + '. Lo que guardes ahora puede fallar.', 'warning');
+                    console.warn('[abrir] ' + budgetId + ': copia local en ' + tLocal + ' ms · servidor FALLÓ a los ' + tServ + ' ms');
+                    return;
+                }
+                const fresco = data.budget;
+                const igual = firmaPresupuesto(fresco) === firmaPresupuesto(cached);
+                console.log('[abrir] ' + budgetId + ': copia local en ' + tLocal + ' ms · servidor en ' + tServ +
+                            ' ms · ' + (igual ? 'idéntico' : 'DISTINTO') + (_verificacion.tocado ? ' · ya editado' : ''));
+                if (igual) {
+                    saveBudgetCache(fresco);
+                    pintarEstadoVerificacion('✓ Al día con el servidor', 'ok');
+                    return;
+                }
+                if (!_verificacion.tocado) {
+                    // Repintar con lo del servidor por el mismo camino de siempre
+                    window._budgetCacheOverride = fresco;
+                    window._abriendoDesdeCopia = true;
+                    try { await loadBudget(budgetId); } finally { window._abriendoDesdeCopia = false; }
+                    _verificacion = { id: budgetId, tocado: false };
+                    pintarEstadoVerificacion('✓ Actualizado con los datos del servidor', 'ok');
+                } else {
+                    window._budgetFrescoPendiente = fresco;
+                    pintarEstadoVerificacion('⚠️ Este presupuesto ha cambiado en el servidor desde la última vez. ' +
+                        'No he pisado lo que has editado. ' +
+                        '<button onclick="recargarDesdeServidor(\'' + budgetId + '\')" ' +
+                        'style="margin-left:8px;padding:4px 10px;background:#b45309;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Recargar</button>', 'warning');
+                }
+            });
+            return true;
+        }
+
+        async function recargarDesdeServidor(budgetId) {
+            const fresco = window._budgetFrescoPendiente;
+            window._budgetFrescoPendiente = null;
+            if (fresco && fresco.id === budgetId) {
+                window._budgetCacheOverride = fresco;
+                window._abriendoDesdeCopia = true;
+                try { await loadBudget(budgetId); } finally { window._abriendoDesdeCopia = false; }
+                _verificacion = { id: budgetId, tocado: false };
+                pintarEstadoVerificacion('✓ Recargado con los datos del servidor', 'ok');
+            } else {
+                ocultarEstadoVerificacion();
+                window._budgetCacheOverride = null;
+                await loadBudget(budgetId);
+            }
+        }
+
         async function loadBudget(budgetId) {
-            showStatus('Cargando presupuesto...', 'loading');
+            // v3.10.30: si hay copia local, se abre desde ella y se verifica
+            // por detrás. Esta llamada termina aquí; la que pinta es la
+            // reentrada con _budgetCacheOverride puesto.
+            if (!window._abriendoDesdeCopia && !window._budgetCacheOverride) {
+                if (await abrirDesdeCopiaLocal(budgetId)) return;
+                _verificacion = { id: budgetId, tocado: false };
+                ocultarEstadoVerificacion();
+            }
+            showStatus(window._abriendoDesdeCopia ? 'Abriendo…' : 'Cargando presupuesto...', 'loading');
 
             // v3.7.21 FIX bug #1: reset defensivo. Si el usuario crea un
             // presupuesto y luego vuelve al listado para abrir el mismo (o
@@ -5675,7 +5971,13 @@
                     data = { success: true, budget: window._budgetCacheOverride };
                     window._budgetCacheOverride = null;
                 } else {
-                    data = await apiPost({ action: 'getBudget', budgetId: budgetId }, { retry: true, attempts: 4 });
+                    // v3.10.30: si el ratón ya había lanzado la petición, se
+                    // recoge esa en vez de empezar otra.
+                    const pre = tomarPrefetch(budgetId);
+                    data = pre ? await pre : await apiPost({ action: 'getBudget', budgetId: budgetId }, { retry: true, attempts: 4 });
+                    if (pre && (!data || !data.success)) {
+                        data = await apiPost({ action: 'getBudget', budgetId: budgetId }, { retry: true, attempts: 4 });
+                    }
                 }
                 
                 if (data.success) {
@@ -10837,6 +11139,45 @@
             }
         }
         
+        // ====== v3.10.31: PLAZO PARA EL CLIENTE = PLAZO DEL ELEGIDO + 1 ======
+        // Se propone (y se escribe en el campo "Plazo (días laborables)" del
+        // paso 5) en dos momentos: al elegir un traductor que ya tiene plazo,
+        // y al escribir el plazo del traductor que ya está elegido. Es una
+        // propuesta: el campo sigue siendo editable y lo que escribas después
+        // se respeta hasta la siguiente elección o cambio de plazo.
+        //
+        // El plazo del traductor es texto libre ("3", "3 días", "2-3 días",
+        // "48h"). Se toma el número mayor que aparezca; si habla de horas, se
+        // pasa a días redondeando hacia arriba. Sin número, no se propone nada.
+        function diasDePlazoProveedor(texto) {
+            const s = String(texto || '').toLowerCase();
+            const nums = (s.match(/\d+(?:[.,]\d+)?/g) || [])
+                .map(x => parseFloat(x.replace(',', '.')))
+                .filter(n => !isNaN(n) && n > 0);
+            if (!nums.length) return null;
+            const max = Math.max.apply(null, nums);
+            if (/\d\s*h\b|hora/.test(s)) return Math.max(1, Math.ceil(max / 24));
+            return Math.max(1, Math.ceil(max));
+        }
+
+        function proponerPlazoCliente() {
+            const elegido = String(budgetData.chosenProvider || '').trim();
+            if (!elegido || !budgetData.providerQuotes) return false;
+            const q = budgetData.providerQuotes[elegido] || budgetData.providerQuotes[budgetData.chosenProvider] || {};
+            const dias = diasDePlazoProveedor(q.plazo);
+            if (dias === null) return false;
+            const el = document.getElementById('quoteDays');
+            if (!el) return false;
+            const propuesto = dias + 1;
+            if (String(el.value).trim() === String(propuesto)) return false;   // ya está
+            el.value = propuesto;
+            el.title = 'Propuesto: plazo de ' + elegido + ' (' + dias + ') + 1 día. Puedes cambiarlo.';
+            if (typeof updateClientMessage === 'function') { try { updateClientMessage(); } catch (e) {} }
+            showStatus('Plazo para el cliente: ' + propuesto + ' días (' + elegido + ': ' + dias + ' + 1). Puedes cambiarlo.', 'success');
+            setTimeout(hideStatus, 3500);
+            return true;
+        }
+
         // Actualizar cotización de un proveedor
         function updateProviderQuote(providerName, field, value) {
             if (!budgetData.providerQuotes) {
@@ -10848,6 +11189,11 @@
             budgetData.providerQuotes[providerName][field] = value;
             console.log('Cotización actualizada:', providerName, field, value);
             
+            // v3.10.31: si es el elegido y cambió el plazo, proponer el del cliente
+            if (field === 'plazo' && String(budgetData.chosenProvider || '').trim() === String(providerName).trim()) {
+                proponerPlazoCliente();
+            }
+
             // Si es el proveedor elegido y cambió la tarifa, actualizar margen
             if (field === 'tarifa' && budgetData.chosenProvider === providerName) {
                 if (currentCalcMethod === 'words') {
@@ -10887,6 +11233,9 @@
             
             // Actualizar UI
             renderContactedProviders();
+
+            // v3.10.31: si el elegido ya tiene plazo, proponer el del cliente
+            proponerPlazoCliente();
             
             // Recalcular según el método activo
             if (currentCalcMethod === 'words') {
