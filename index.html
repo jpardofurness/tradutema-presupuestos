@@ -1958,8 +1958,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.32';
-        const HTML_DATE = '09/09/2026';
+        const HTML_VERSION = '3.10.35';
+        const HTML_DATE = '10/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -6088,6 +6088,8 @@
                     
                     // Restaurar análisis detallado (array de archivos con palabras/páginas)
                     budgetData.fileAnalysis = b.analisisDetalle || [];
+                    // v3.10.34: los ajustes manuales se reaplican tras restaurar
+                    // fileSettings (unas líneas más abajo); ver aplicarAjustesManuales
                     
                     // Restaurar archivos de la carpeta de Drive
                     budgetData.folderFiles = b.archivosEnCarpeta || [];
@@ -6107,6 +6109,7 @@
                     
                     // v3.7.19: restaurar ajustes por archivo (rango páginas + instrucciones)
                     budgetData.fileSettings = b.fileSettings || {};
+                    aplicarAjustesManuales();   // v3.10.34
                     // v3.9.3: los filtros por archivo guardados mandan sobre el
                     // total de páginas también al retomar la cotización.
                     setTimeout(() => { try { aplicarFiltrosAPaginas(); } catch (e) {} }, 300);
@@ -6657,6 +6660,8 @@
                         clientEmail: budgetData.clientEmail,
                         clientWhatsApp: budgetData.clientWhatsApp,
                         internalComments: budgetData.internalComments || '',
+                        // v3.10.34: con recuento manual, la hoja recibe el total corregido
+                        wordCount: (budgetData.fileAnalysis || []).some(a => a.manual) ? budgetData.wordCount : undefined,
                         // v3.10.28: los ajustes ⚙ por archivo (rango de páginas
                         // e instrucciones) viajaban SOLO al relanzar el
                         // análisis. Si escribías "solo 1-2" y guardabas sin
@@ -6667,6 +6672,137 @@
             } catch (error) {
                 console.error('Error guardando datos básicos:', error);
             }
+        }
+
+        // ====== v3.10.34: POR QUÉ FALLÓ CADA PÁGINA ======
+        // El backend devuelve failedPages = [{fileName, pageNum, errorMsg}].
+        // Hasta ahora el banner decía "1 que faltan" y tiraba el motivo, así
+        // que se reintentaba a ciegas. Se muestra archivo, página y error,
+        // agrupado por archivo, y se guarda en budgetData para el paso 3.
+        function resumenFallos(failedPages) {
+            if (!Array.isArray(failedPages) || !failedPages.length) return '';
+            const porArchivo = {};
+            failedPages.forEach(fp => {
+                const k = fp.fileName || '(archivo desconocido)';
+                if (!porArchivo[k]) porArchivo[k] = { paginas: [], motivos: new Set() };
+                if (fp.pageNum) porArchivo[k].paginas.push(fp.pageNum);
+                const m = String(fp.errorMsg || '').replace(/\s+/g, ' ').trim();
+                if (m) porArchivo[k].motivos.add(m.length > 140 ? m.slice(0, 140) + '…' : m);
+            });
+            return Object.keys(porArchivo).map(k => {
+                const d = porArchivo[k];
+                const pags = d.paginas.length ? ' pág. ' + d.paginas.join(', ') : '';
+                const mot = d.motivos.size ? ' — ' + [...d.motivos].join(' / ') : ' — sin detalle del error';
+                return k + pags + mot;
+            }).join(' · ');
+        }
+
+        // ====== v3.10.33: TABLA "RECUENTO POR DOCUMENTO" DEL PASO 3 ======
+        // Antes este bloque vivía dentro de showCard(4) y solo se ejecutaba al
+        // ENTRAR en la pantalla. El análisis corre en segundo plano: si ya
+        // estabas en el paso 3 cuando terminaba, el banner decía "1255
+        // palabras" y la tabla seguía en "sin analizar · Total: 0". Ahora se
+        // repinta también cada vez que cambia budgetData.fileAnalysis.
+        function renderWordCountSummary() {
+            if (!budgetData || !budgetData.id) return;
+            const summaryBox = document.getElementById('wordCountSummaryBox');
+            const summaryTable = document.getElementById('wordCountSummaryTable');
+            const summaryTotal = document.getElementById('wordCountSummaryTotal');
+            // v3.10.22: listar TODOS los archivos del presupuesto, no solo
+            // los analizados. Antes se recorría fileAnalysis, así que un
+            // archivo añadido después del análisis desaparecía de la tabla
+            // sin ningún aviso y el total parecía completo. Ojo: "Recontar
+            // páginas" no analiza palabras — eso solo se hace desde el
+            // paso 2 —, por eso el archivo nuevo sigue sin recuento.
+            const _analisis = {};
+            (budgetData.fileAnalysis || []).forEach(f => {
+                const n = f.fileName || f.name || '';
+                if (n) _analisis[n] = f;
+            });
+            const _todos = (typeof nombresDeArchivos === 'function')
+                ? nombresDeArchivos()
+                : Object.keys(_analisis);
+            const _sinAnalizar = _todos.filter(n => !_analisis[n]);
+
+            if (summaryBox && _todos.length > 0 &&
+                (budgetData.wordCount > 0 || _sinAnalizar.length > 0)) {
+                window.wordCountExtractedTexts = {};
+
+                // v3.10.28: la tabla muestra también las páginas de cada
+                // documento y cuántas se traducen de verdad. Sin esto no
+                // había manera de comprobar en pantalla si el filtro ⚙ se
+                // estaba teniendo en cuenta: sólo salían nombre y palabras.
+                const _inv = {};
+                try {
+                    (inventarioArchivos() || []).forEach(f => { _inv[f.nombre] = f; });
+                } catch (e) { /* si falla, la tabla sale sin páginas */ }
+
+                let rows = '<tr>' +
+                    '<th style="text-align:left;padding:2px 8px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Documento</th>' +
+                    '<th style="text-align:right;padding:2px 10px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Págs.</th>' +
+                    '<th style="text-align:right;padding:2px 10px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">A traducir</th>' +
+                    '<th style="text-align:right;padding:2px 0 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Palabras</th></tr>';
+
+                let _sumPag = 0, _sumTrad = 0;
+                _todos.forEach(fname => {
+                    const f = _analisis[fname];
+                    const inv = _inv[fname] || {};
+                    const pag = inv.paginas || 0;
+                    const trad = (inv.aTraducir === undefined || inv.aTraducir === null) ? pag : inv.aTraducir;
+                    _sumPag += pag;
+                    _sumTrad += trad;
+                    const celdaTrad = inv.filtro
+                        ? `<td style="text-align:right;padding-right:10px;color:#b45309;font-weight:700;" title="Sólo las páginas ${escapeHtml(inv.filtro)}">${trad} ⚙</td>`
+                        : `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>`;
+                    const celdaPal = f
+                        ? `<td style="text-align:right;font-weight:600;" title="${f.manual ? 'Recuento escrito a mano en ⚙' : ''}">${(f.words || 0).toLocaleString('es-ES')}${f.manual ? ' <span style="color:#7c3aed;">✎</span>' : ''}</td>`
+                        : `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td>`;
+                    rows += `<tr><td style="padding:2px 8px 2px 0;${f ? '' : 'color:#b45309;'}">${escapeHtml(fname)}</td>` +
+                            `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>` +
+                            celdaTrad + celdaPal + '</tr>';
+                });
+
+                if (_sumPag > 0) {
+                    const dif = _sumTrad !== _sumPag;
+                    rows += `<tr><td style="padding:6px 8px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:#2b6cb0;">Total páginas</td>` +
+                            `<td style="text-align:right;padding:6px 10px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:#2b6cb0;">${_sumPag}</td>` +
+                            `<td style="text-align:right;padding:6px 10px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:${dif ? '#b45309' : '#2b6cb0'};">${_sumTrad}</td>` +
+                            `<td style="border-top:1px solid #bee3f8;"></td></tr>`;
+                }
+
+                summaryTable.innerHTML = rows;
+                summaryTotal.textContent = (budgetData.wordCount || 0).toLocaleString('es-ES');
+                summaryBox.classList.remove('hidden');
+
+                // Aviso explícito: el total NO incluye lo que falta.
+                let avisoEl = document.getElementById('wordCountSummaryAviso');
+                if (!avisoEl) {
+                    avisoEl = document.createElement('div');
+                    avisoEl.id = 'wordCountSummaryAviso';
+                    avisoEl.style.cssText = 'margin-top:8px;font-size:0.8rem;color:#b45309;';
+                    summaryBox.appendChild(avisoEl);
+                }
+                    const _fallos = (typeof resumenFallos === 'function') ? resumenFallos(budgetData.failedPages) : '';
+                if (_sinAnalizar.length > 0 || _fallos) {
+                    let txt = '';
+                    if (_sinAnalizar.length > 0) {
+                        txt += '⚠️ ' + _sinAnalizar.length + ' archivo(s) sin analizar: ' +
+                            '<strong>el total no los incluye</strong>. El botón de recontar solo cuenta páginas; ' +
+                            'para las palabras hay que reanalizar desde el paso 2.';
+                    }
+                    if (_fallos) {
+                        txt += (txt ? '<br>' : '') + '⚠️ Páginas que fallaron en el último análisis: ' + escapeHtml(_fallos) +
+                            '. Si vuelve a fallar, escribe el recuento a mano en ⚙ del archivo (paso 2).';
+                    }
+                    avisoEl.innerHTML = txt;
+                    avisoEl.style.display = '';
+                } else {
+                    avisoEl.style.display = 'none';
+                }
+            } else if (summaryBox) {
+                summaryBox.classList.add('hidden');
+            }
+
         }
 
         function showCard(step) {
@@ -6728,95 +6864,9 @@
                     providerCommentsField.value = budgetData.internalComments;
                     budgetData.providerComments = budgetData.internalComments;
                 }
-                // Mostrar resumen de palabras si hay datos
-                const summaryBox = document.getElementById('wordCountSummaryBox');
-                const summaryTable = document.getElementById('wordCountSummaryTable');
-                const summaryTotal = document.getElementById('wordCountSummaryTotal');
-                // v3.10.22: listar TODOS los archivos del presupuesto, no solo
-                // los analizados. Antes se recorría fileAnalysis, así que un
-                // archivo añadido después del análisis desaparecía de la tabla
-                // sin ningún aviso y el total parecía completo. Ojo: "Recontar
-                // páginas" no analiza palabras — eso solo se hace desde el
-                // paso 2 —, por eso el archivo nuevo sigue sin recuento.
-                const _analisis = {};
-                (budgetData.fileAnalysis || []).forEach(f => {
-                    const n = f.fileName || f.name || '';
-                    if (n) _analisis[n] = f;
-                });
-                const _todos = (typeof nombresDeArchivos === 'function')
-                    ? nombresDeArchivos()
-                    : Object.keys(_analisis);
-                const _sinAnalizar = _todos.filter(n => !_analisis[n]);
-
-                if (summaryBox && _todos.length > 0 &&
-                    (budgetData.wordCount > 0 || _sinAnalizar.length > 0)) {
-                    window.wordCountExtractedTexts = {};
-
-                    // v3.10.28: la tabla muestra también las páginas de cada
-                    // documento y cuántas se traducen de verdad. Sin esto no
-                    // había manera de comprobar en pantalla si el filtro ⚙ se
-                    // estaba teniendo en cuenta: sólo salían nombre y palabras.
-                    const _inv = {};
-                    try {
-                        (inventarioArchivos() || []).forEach(f => { _inv[f.nombre] = f; });
-                    } catch (e) { /* si falla, la tabla sale sin páginas */ }
-
-                    let rows = '<tr>' +
-                        '<th style="text-align:left;padding:2px 8px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Documento</th>' +
-                        '<th style="text-align:right;padding:2px 10px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Págs.</th>' +
-                        '<th style="text-align:right;padding:2px 10px 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">A traducir</th>' +
-                        '<th style="text-align:right;padding:2px 0 6px 0;color:#64748b;font-size:0.78rem;font-weight:600;">Palabras</th></tr>';
-
-                    let _sumPag = 0, _sumTrad = 0;
-                    _todos.forEach(fname => {
-                        const f = _analisis[fname];
-                        const inv = _inv[fname] || {};
-                        const pag = inv.paginas || 0;
-                        const trad = (inv.aTraducir === undefined || inv.aTraducir === null) ? pag : inv.aTraducir;
-                        _sumPag += pag;
-                        _sumTrad += trad;
-                        const celdaTrad = inv.filtro
-                            ? `<td style="text-align:right;padding-right:10px;color:#b45309;font-weight:700;" title="Sólo las páginas ${escapeHtml(inv.filtro)}">${trad} ⚙</td>`
-                            : `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>`;
-                        const celdaPal = f
-                            ? `<td style="text-align:right;font-weight:600;">${(f.words || 0).toLocaleString('es-ES')}</td>`
-                            : `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td>`;
-                        rows += `<tr><td style="padding:2px 8px 2px 0;${f ? '' : 'color:#b45309;'}">${escapeHtml(fname)}</td>` +
-                                `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>` +
-                                celdaTrad + celdaPal + '</tr>';
-                    });
-
-                    if (_sumPag > 0) {
-                        const dif = _sumTrad !== _sumPag;
-                        rows += `<tr><td style="padding:6px 8px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:#2b6cb0;">Total páginas</td>` +
-                                `<td style="text-align:right;padding:6px 10px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:#2b6cb0;">${_sumPag}</td>` +
-                                `<td style="text-align:right;padding:6px 10px 0 0;border-top:1px solid #bee3f8;font-weight:700;color:${dif ? '#b45309' : '#2b6cb0'};">${_sumTrad}</td>` +
-                                `<td style="border-top:1px solid #bee3f8;"></td></tr>`;
-                    }
-
-                    summaryTable.innerHTML = rows;
-                    summaryTotal.textContent = (budgetData.wordCount || 0).toLocaleString('es-ES');
-                    summaryBox.classList.remove('hidden');
-
-                    // Aviso explícito: el total NO incluye lo que falta.
-                    let avisoEl = document.getElementById('wordCountSummaryAviso');
-                    if (!avisoEl) {
-                        avisoEl = document.createElement('div');
-                        avisoEl.id = 'wordCountSummaryAviso';
-                        avisoEl.style.cssText = 'margin-top:8px;font-size:0.8rem;color:#b45309;';
-                        summaryBox.appendChild(avisoEl);
-                    }
-                    if (_sinAnalizar.length > 0) {
-                        avisoEl.innerHTML = '⚠️ ' + _sinAnalizar.length + ' archivo(s) sin analizar: ' +
-                            '<strong>el total no los incluye</strong>. El botón de recontar solo cuenta páginas; ' +
-                            'para las palabras hay que reanalizar desde el paso 2.';
-                        avisoEl.style.display = '';
-                    } else {
-                        avisoEl.style.display = 'none';
-                    }
-                } else if (summaryBox) {
-                    summaryBox.classList.add('hidden');
-                }
+                // v3.10.33: la tabla vive en renderWordCountSummary() para poder
+                // repintarla cuando termine un análisis en segundo plano.
+                renderWordCountSummary();
             }
             
             // Si es paso 5 (Cliente), pre-llenar email/whatsapp con datos del paso 1
@@ -7194,13 +7244,21 @@
             pendingIdx = normPendingIdx(pendingIdx);
             if (pendingIdx !== null && uploadedFiles[pendingIdx]) {
                 const f = uploadedFiles[pendingIdx];
+                const sm = (budgetData.fileSettings && budgetData.fileSettings[name]) || {};
                 return {
                     pagesFilter: f.pagesFilter || '',
-                    instructions: f.instructions || ''
+                    instructions: f.instructions || '',
+                    manualWords: (sm.manualWords === undefined || sm.manualWords === null) ? '' : sm.manualWords,
+                    manualPages: (sm.manualPages === undefined || sm.manualPages === null) ? '' : sm.manualPages
                 };
             }
             const s = (budgetData.fileSettings && budgetData.fileSettings[name]) || {};
-            return { pagesFilter: s.pagesFilter || '', instructions: s.instructions || '' };
+            return {
+                pagesFilter: s.pagesFilter || '',
+                instructions: s.instructions || '',
+                manualWords: (s.manualWords === undefined || s.manualWords === null) ? '' : s.manualWords,   // v3.10.34
+                manualPages: (s.manualPages === undefined || s.manualPages === null) ? '' : s.manualPages
+            };
         }
 
         // ====== v3.9.4: RECONTAR PÁGINAS SIN CLAUDE ======
@@ -7493,6 +7551,24 @@
         // Helper: escribe settings (con persistencia inmediata en estado)
         function writeSettingsForFile(name, pendingIdx, field, value) {
             pendingIdx = normPendingIdx(pendingIdx);
+            // v3.10.34: los ajustes manuales de recuento viven en fileSettings
+            // aunque el archivo aún esté pendiente de subir.
+            if (field === 'manualWords' || field === 'manualPages') {
+                const v = String(value == null ? '' : value).trim();
+                const num = v === '' ? '' : parseInt(v, 10);
+                if (v !== '' && (isNaN(num) || num < 0)) return;   // no es un número: se ignora
+                getFileSettings(name)[field] = num;
+                updateSettingsBadge(name, pendingIdx);
+                aplicarAjustesManuales();
+                clearTimeout(window._filtroTimer);
+                window._filtroTimer = setTimeout(() => {
+                    aplicarFiltrosAPaginas();
+                    if (typeof renderStep2Files === 'function') { try { renderStep2Files(); } catch (e) {} }
+                }, 400);
+                clearTimeout(window._filtroSaveTimer);
+                window._filtroSaveTimer = setTimeout(() => { persistFileSettings(); }, 1200);
+                return;
+            }
             if (pendingIdx !== null && uploadedFiles[pendingIdx]) {
                 uploadedFiles[pendingIdx][field] = value;
             } else {
@@ -7518,6 +7594,68 @@
             }
         }
 
+        // ====== v3.10.34: RECUENTO MANUAL POR ARCHIVO ======
+        // Cuando el análisis no llega (escaneo pesado que Claude no procesa,
+        // página que falla siempre), puedes escribir tú las palabras y/o
+        // páginas del archivo en su panel ⚙. El valor manual gana sobre el
+        // del análisis en todo lo que se calcula a partir de él: tarjetas,
+        // cabecera, tabla del paso 3, tarifa y mensaje al cliente.
+        //
+        // Se guarda en fileSettings (persiste con el presupuesto y sobrevive
+        // a un reanálisis) y se aplica escribiendo sobre budgetData.fileAnalysis,
+        // que es lo que lee el resto del programa. Se marca manual:true para
+        // que se vea que ese número lo has puesto tú.
+        function aplicarAjustesManuales() {
+            const fs = budgetData.fileSettings || {};
+            if (!Array.isArray(budgetData.fileAnalysis)) budgetData.fileAnalysis = [];
+            let hayManual = false;
+            // 1) quitar la marca a los que ya no tienen ajuste (por si se borró)
+            budgetData.fileAnalysis.forEach(a => {
+                const s = fs[a.fileName] || {};
+                const tieneW = s.manualWords !== '' && s.manualWords !== undefined && s.manualWords !== null;
+                const tieneP = s.manualPages !== '' && s.manualPages !== undefined && s.manualPages !== null;
+                if (a.manual && !tieneW && !tieneP) {
+                    if (a._wordsAnalisis !== undefined) a.words = a._wordsAnalisis;
+                    if (a._pagesAnalisis !== undefined) a.pages = a._pagesAnalisis;
+                    delete a.manual; delete a._wordsAnalisis; delete a._pagesAnalisis;
+                }
+            });
+            // 2) aplicar los que sí
+            Object.keys(fs).forEach(nombre => {
+                const s = fs[nombre] || {};
+                const tieneW = s.manualWords !== '' && s.manualWords !== undefined && s.manualWords !== null;
+                const tieneP = s.manualPages !== '' && s.manualPages !== undefined && s.manualPages !== null;
+                if (!tieneW && !tieneP) return;
+                hayManual = true;
+                let a = budgetData.fileAnalysis.find(x => x.fileName === nombre);
+                if (!a) {
+                    a = { fileName: nombre, words: 0, pages: 0 };
+                    budgetData.fileAnalysis.push(a);
+                }
+                if (!a.manual) { a._wordsAnalisis = a.words; a._pagesAnalisis = a.pages; }
+                a.manual = true;
+                if (tieneW) a.words = parseInt(s.manualWords, 10) || 0;
+                else if (a._wordsAnalisis !== undefined) a.words = a._wordsAnalisis;
+                if (tieneP) a.pages = parseInt(s.manualPages, 10) || 0;
+                else if (a._pagesAnalisis !== undefined) a.pages = a._pagesAnalisis;
+            });
+            // 3) totales: si hay algún manual, se recalculan desde los archivos
+            if (hayManual || budgetData.fileAnalysis.some(a => a.manual)) {
+                budgetData.wordCount = budgetData.fileAnalysis.reduce((s, a) => s + (parseInt(a.words) || 0), 0);
+                const pags = budgetData.fileAnalysis.reduce((s, a) => s + (parseInt(a.pages) || 0), 0);
+                if (pags > 0) budgetData.pageCount = pags;
+            }
+            // v3.10.35: TODO lo que enseña palabras/páginas se repinta aquí, y
+            // los cinco caminos de análisis pasan por aquí. Antes, tras
+            // Reanalizar, la cabecera cambiaba y la lista del paso 2 seguía con
+            // el recuento viejo hasta que salías y volvías a la pantalla (por
+            // eso la cabecera decía 2719 y la lista 2516 a la vez).
+            if (typeof updateBudgetSummaryBar === 'function') { try { updateBudgetSummaryBar(); } catch (e) {} }
+            if (typeof renderWordCountSummary === 'function') { try { renderWordCountSummary(); } catch (e) {} }
+            if (typeof renderStep2Files === 'function') { try { renderStep2Files(); } catch (e) {} }
+            return hayManual;
+        }
+
         // v3.10.28: guarda los ajustes por archivo sin tocar nada más.
         async function persistFileSettings() {
             if (!budgetData.id) return;   // presupuesto aún sin crear
@@ -7535,10 +7673,15 @@
         }
 
         // Construye el indicador "⚙ págs 1-5 · con instrucciones" en línea
-        function buildSettingsBadge(pagesFilter, instructions) {
+        function buildSettingsBadge(pagesFilter, instructions, manualWords, manualPages) {
             const parts = [];
             if (pagesFilter && pagesFilter.trim()) parts.push('SOLO págs ' + pagesFilter.trim());
             if (instructions && instructions.trim()) parts.push('con instrucciones');
+            // v3.10.34
+            const mw = (manualWords !== '' && manualWords !== undefined && manualWords !== null) ? parseInt(manualWords, 10) : NaN;
+            const mp = (manualPages !== '' && manualPages !== undefined && manualPages !== null) ? parseInt(manualPages, 10) : NaN;
+            if (!isNaN(mw)) parts.push('✎ ' + mw.toLocaleString('es-ES') + ' pal. a mano');
+            if (!isNaN(mp)) parts.push('✎ ' + mp + ' pág. a mano');
             if (!parts.length) return '';
             return `<span class="settings-badge" style="display:inline-block;margin-left:6px;padding:3px 9px;background:#fb923c;color:white;border-radius:10px;font-size:0.72rem;font-weight:700;letter-spacing:0.3px;">⚙ ${parts.join(' · ')}</span>`;
         }
@@ -7549,7 +7692,7 @@
             const badge = document.getElementById('settingsBadge_' + cssId(key));
             if (!badge) return;
             const s = readSettingsForFile(name, pendingIdx);
-            badge.innerHTML = buildSettingsBadge(s.pagesFilter, s.instructions);
+            badge.innerHTML = buildSettingsBadge(s.pagesFilter, s.instructions, s.manualWords, s.manualPages);
             // También actualizar color del botón ⚙
             const toggle = document.getElementById('settingsToggle_' + cssId(key));
             if (toggle) {
@@ -7603,7 +7746,7 @@
             return `
                 <div class="file-item">
                     <div class="file-item-info">
-                        <span class="file-item-name">${previewBtn} ${escHtml(name)}<span id="settingsBadge_${safeKey}">${buildSettingsBadge(s.pagesFilter, s.instructions)}</span></span>
+                        <span class="file-item-name">${previewBtn} ${escHtml(name)}<span id="settingsBadge_${safeKey}">${buildSettingsBadge(s.pagesFilter, s.instructions, s.manualWords, s.manualPages)}</span></span>
                         <span class="file-item-size ${sizeClass}">${detailHtml}</span>
                     </div>
                     <div class="file-item-actions">
@@ -7625,6 +7768,24 @@
                         <textarea rows="2" placeholder="ej: solo las partes resaltadas en amarillo"
                             oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'instructions', this.value)"
                             style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;font-family:inherit;resize:vertical;">${escHtml(s.instructions)}</textarea>
+                    </div>
+                    <!-- v3.10.34: recuento manual, para cuando el análisis no llega -->
+                    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #d1d5db;">
+                        <div style="font-size:0.78rem;color:#6b7280;margin-bottom:6px;">✎ Recuento manual — si el análisis no consigue este archivo, escribe tú el número. Gana sobre el análisis. Vacío = usar el análisis.</div>
+                        <div style="display:flex;gap:10px;">
+                            <div style="flex:1;">
+                                <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Palabras</label>
+                                <input type="number" min="0" step="1" value="${escAttr(s.manualWords)}" placeholder="del análisis"
+                                    oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualWords', this.value)"
+                                    style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Páginas</label>
+                                <input type="number" min="0" step="1" value="${escAttr(s.manualPages)}" placeholder="del análisis"
+                                    oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualPages', this.value)"
+                                    style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -7705,7 +7866,7 @@
                     const pagesShown = paginasDeArchivo(f.name, f.pages, an && an.pages);
                     const pStr = pagesShown ? `${pagesShown} pág${pagesShown > 1 ? 's' : ''}` : '';
                     const wStr = an && an.words != null
-                        ? `${(an.words || 0).toLocaleString('es-ES')} palabras`
+                        ? `${(an.words || 0).toLocaleString('es-ES')} palabras${an.manual ? ' ✎' : ''}`
                         : '';
                     html += renderFileItemWithSettings({
                         name: f.name,
@@ -8449,6 +8610,8 @@
                 if (data.success) {
                     budgetData.countMethodUsed = data.countMethodUsed || countMethod();   // v3.8.7
                     budgetData.fileAnalysis = data.analysis || [];
+                    aplicarAjustesManuales();   // v3.10.34
+                    renderWordCountSummary();   // v3.10.33
                     budgetData.wordCount = data.totalWords || 0;
                     budgetData.pageCount = data.totalPages || budgetData.pageCount;
                     budgetData.hasRecuento = true;  // v3.7.22: se acaba de crear _RECUENTO.txt
@@ -8464,7 +8627,9 @@
                     budgetData.otrosIdiomas = data.otrosIdiomas || null;
                     if (failedCount > 0) {
                         const okPages = totalPages - failedCount;
-                        const msg = `⚠️ Análisis parcial · ${budgetData.id} · ${okPages}/${totalPages} páginas procesadas · ${data.totalWords} palabras. Pulsa Reanalizar para reintentar las ${failedCount} que faltan.`;
+                        budgetData.failedPages = data.failedPages;   // v3.10.34
+                        const msg = `⚠️ Análisis parcial · ${budgetData.id} · ${okPages}/${totalPages} páginas procesadas · ${data.totalWords} palabras. ` +
+                            `Falló: ${resumenFallos(data.failedPages)}. Si al reanalizar sigue igual, escribe el recuento a mano en ⚙ del archivo.`;
                         showGlobalAnalysisBanner('warning', msg);
                         showStatus(msg, 'warning');
                         setTimeout(hideStatus, 12000);
@@ -8994,6 +9159,12 @@
         //   3. analysis.pages — puede venir ya filtrado, no siempre es físico
         // Los ceros caen al siguiente nivel: un 0 nunca es una respuesta válida.
         function paginasDeArchivo(nombre, pagesBackend, pagesAnalisis) {
+            // v3.10.34: páginas escritas a mano en ⚙ ganan a todo lo demás
+            const sm = (budgetData.fileSettings || {})[nombre];
+            if (sm && sm.manualPages !== '' && sm.manualPages !== undefined && sm.manualPages !== null) {
+                const mp = parseInt(sm.manualPages, 10);
+                if (!isNaN(mp) && mp > 0) return mp;
+            }
             const pb = parseInt((budgetData.pagesByFile || {})[nombre]) || 0;
             if (pb > 0) return pb;
             const bk = parseInt(pagesBackend) || 0;
@@ -9581,6 +9752,8 @@
                         budgetData.pageCount = claudeResult.totalPages || budgetData.pageCount;  // v3.7.25
                         bgState.analysisDone = true;
                         if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                        aplicarAjustesManuales();   // v3.10.34: el manual gana sobre el análisis
+                        renderWordCountSummary();   // v3.10.33: la tabla del paso 3, aunque ya estés en él
                         
                         // v3.7.19: construir fileSettings desde los archivos subidos
                         const initialFileSettings = {};
@@ -9672,7 +9845,9 @@
                         budgetData.otrosIdiomas = claudeResult.otrosIdiomas || null;
                         if (failedCount > 0) {
                             const okPages = totalPages - failedCount;
-                            const msg = `⚠️ ${budgetData.id} · Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron). Reanaliza desde paso 2 para reintentar.`;
+                            budgetData.failedPages = claudeResult.failedPages;   // v3.10.34
+                            const msg = `⚠️ ${budgetData.id} · Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron). ` +
+                                `Falló: ${resumenFallos(claudeResult.failedPages)}. Reanaliza desde paso 2; si sigue igual, escribe el recuento a mano en ⚙ del archivo.`;
                             showBgBanner('warning', msg, false);
                             showGlobalAnalysisBanner('warning', msg);
                         } else if (_otros) {
@@ -9861,6 +10036,8 @@
                 if (data._perf) logPerfToConsole(data._perf, 'Re-extraer');  // v3.7.27
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
+                    aplicarAjustesManuales();   // v3.10.34
+                    renderWordCountSummary();   // v3.10.33
                     budgetData.wordCount = data.totalWords || 0;
                     refreshWordCountSummary();
                     hideStatus();
@@ -9901,6 +10078,8 @@
                 
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
+                    aplicarAjustesManuales();   // v3.10.34
+                    renderWordCountSummary();   // v3.10.33
                     budgetData.wordCount = null;  // No contamos palabras
                     budgetData.pageCount = data.totalPages || 0;
                     
@@ -9975,6 +10154,8 @@
                 
                 if (data.success) {
                     budgetData.fileAnalysis = data.analysis || [];
+                    aplicarAjustesManuales();   // v3.10.34
+                    renderWordCountSummary();   // v3.10.33
                     budgetData.wordCount = data.totalWords || 0;
                     budgetData.pageCount = data.totalPages || 0;
                     
