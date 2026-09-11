@@ -1958,7 +1958,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.35';
+        const HTML_VERSION = '3.10.36';
         const HTML_DATE = '10/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2698,6 +2698,13 @@
             uploadedFiles = [];
             selectedProviders.clear();
             completedSteps.clear();
+            // v3.10.36: nada del presupuesto anterior debe sobrevivir en pantalla
+            ['wordCountSummaryTable'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+            ['wordCountSummaryTotal'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+            ['wordCountSummaryPages'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+            const _box = document.getElementById('wordCountSummaryBox'); if (_box) _box.classList.add('hidden');
+            const _av = document.getElementById('wordCountSummaryAviso'); if (_av) _av.style.display = 'none';
+            budgetData.failedPages = null;
             currentStep = 1;
             isResuming = false;
             clientMessageEdited = false;  // Reset flag de mensaje editado
@@ -6704,7 +6711,12 @@
         // palabras" y la tabla seguía en "sin analizar · Total: 0". Ahora se
         // repinta también cada vez que cambia budgetData.fileAnalysis.
         function renderWordCountSummary() {
-            if (!budgetData || !budgetData.id) return;
+            // v3.10.36: SIN guarda por budgetData.id. Al pulsar "Crear carpeta" la
+            // app salta al paso 3 antes de que la carpeta exista, y con la guarda
+            // que puse en la 3.10.33 la función salía sin tocar el DOM: la tabla
+            // se quedaba con la del presupuesto ANTERIOR. Antes de la 3.10.33
+            // este bloque corría con o sin id, y así debe seguir.
+            if (!budgetData) return;
             const summaryBox = document.getElementById('wordCountSummaryBox');
             const summaryTable = document.getElementById('wordCountSummaryTable');
             const summaryTotal = document.getElementById('wordCountSummaryTotal');
@@ -9878,6 +9890,10 @@
                     showBgBanner('success', msg, false);
                     showGlobalAnalysisBanner('success', msg);
                 }
+                // v3.10.36: la carpeta ya existe y el id está puesto: repintar
+                // cabecera, tabla del paso 3 y lista del paso 2 con este
+                // presupuesto, estés en la pantalla que estés.
+                if (typeof aplicarAjustesManuales === 'function') { try { aplicarAjustesManuales(); } catch (e) {} }
                 
                 // Auto-ocultar el banner del paso 2 tras 4s en éxito
                 // (el banner global persiste hasta que el usuario lo cierre)
