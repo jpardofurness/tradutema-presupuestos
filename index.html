@@ -1958,8 +1958,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.36';
-        const HTML_DATE = '10/09/2026';
+        const HTML_VERSION = '3.10.37';
+        const HTML_DATE = '11/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2698,6 +2698,14 @@
             uploadedFiles = [];
             selectedProviders.clear();
             completedSteps.clear();
+            // v3.10.37: ninguna respuesta tardía del presupuesto anterior debe
+            // poder pintarse ni avisar sobre el nuevo
+            try {
+                _verificacion = { id: null, tocado: false };
+                _prefetch = { id: null, promise: null, timer: null, at: 0 };
+                window._budgetFrescoPendiente = null;
+                ocultarEstadoVerificacion();
+            } catch (e) {}
             // v3.10.36: nada del presupuesto anterior debe sobrevivir en pantalla
             ['wordCountSummaryTable'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
             ['wordCountSummaryTotal'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
@@ -5854,6 +5862,10 @@
             enVuelo.then(async data => {
                 const tServ = Date.now() - t0;
                 if (_verificacion.id !== budgetId) return;   // ya se abrió otro
+                // v3.10.37: ...o se empezó uno nuevo. Sin esta comprobación, una
+                // respuesta tardía del servidor con cambios volvía a cargar el
+                // presupuesto ANTERIOR encima del que acababas de empezar.
+                if (!budgetData || budgetData.id !== budgetId) { ocultarEstadoVerificacion(); return; }
                 if (!data || !data.success || !data.budget) {
                     pintarEstadoVerificacion('⚠️ El servidor no ha respondido: estás viendo la copia local de ' +
                         budgetId + '. Lo que guardes ahora puede fallar.', 'warning');
@@ -5890,6 +5902,7 @@
         async function recargarDesdeServidor(budgetId) {
             const fresco = window._budgetFrescoPendiente;
             window._budgetFrescoPendiente = null;
+            if (!budgetData || budgetData.id !== budgetId) { ocultarEstadoVerificacion(); return; }   // v3.10.37
             if (fresco && fresco.id === budgetId) {
                 window._budgetCacheOverride = fresco;
                 window._abriendoDesdeCopia = true;
