@@ -1328,6 +1328,9 @@
                 </label>
             </div>
 
+            <!-- v3.10.38: dónde se va a crear la carpeta, comprobado de verdad -->
+            <div id="localModeBanner" style="margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.85rem;display:none;align-items:center;gap:10px;"></div>
+
             <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
                 <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false, false)" disabled style="flex:1;min-width:130px;">
                     📁 Crear Carpeta
@@ -1958,7 +1961,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.37';
+        const HTML_VERSION = '3.10.39';
         const HTML_DATE = '11/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -6853,6 +6856,7 @@
             // Analizar" y volver atrás), la pedimos al backend antes.
             if (step === 2) {
                 renderStep2Files();
+                if (typeof refreshLocalModeBanner === 'function') refreshLocalModeBanner();   // v3.10.38
                 if (budgetData.folderId && (!budgetData.folderFiles || budgetData.folderFiles.length === 0)) {
                     refreshFolderFilesFromDrive();
                 }
@@ -8922,13 +8926,22 @@
             let ultimoError = null;
 
             for (let intento = 1; intento <= intentos; intento++) {
+                // v3.10.39: tiempo máximo por intento (options.timeoutMs). Sin
+                // esto, una llamada que Google dejaba colgada se quedaba un
+                // minuto o más ANTES del primer reintento. Solo se usa en
+                // llamadas que el servidor sabe deduplicar (createBudgetFolder
+                // con requestId + bloqueo): abortar y reintentar es seguro.
+                const ctrl = (options.timeoutMs && typeof AbortController === 'function') ? new AbortController() : null;
+                const timer = ctrl ? setTimeout(() => ctrl.abort(), options.timeoutMs) : null;
                 try {
                     const resp = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify(payload),
+                        signal: ctrl ? ctrl.signal : undefined
                     });
                     const texto = await resp.text();
+                    if (timer) clearTimeout(timer);
                     const limpio = (texto || '').trim();
 
                     if (limpio.startsWith('<') || !limpio) {
@@ -8948,8 +8961,12 @@
                         throw new Error(`Respuesta no válida del servidor al ${accion}.`);
                     }
                 } catch (e) {
-                    ultimoError = e;
-                    if (intento < intentos && /fetch|network|Failed/i.test(e.message || '')) {
+                    if (timer) clearTimeout(timer);
+                    const abortado = e && (e.name === 'AbortError' || /aborted/i.test(e.message || ''));
+                    ultimoError = abortado
+                        ? new Error(`El servidor tardó más de ${Math.round(options.timeoutMs / 1000)} s al ${accion}; se reintenta.`)
+                        : e;
+                    if (intento < intentos && (abortado || /fetch|network|Failed/i.test(e.message || ''))) {
                         await new Promise(r => setTimeout(r, 1500));
                         continue;
                     }
@@ -8957,6 +8974,21 @@
                 }
             }
             throw ultimoError || new Error('Error desconocido al ' + accion);
+        }
+
+        // v3.10.39: recuperar el presupuesto que el servidor creó para un
+        // requestId cuando su respuesta se perdió o llegó sin código.
+        async function recuperarPorRequestId(requestId, intentos) {
+            if (!requestId) return null;
+            const n = intentos || 3;
+            for (let i = 1; i <= n; i++) {
+                try {
+                    const r = await apiPost({ action: 'findBudgetByRequestId', requestId: requestId }, { retry: false, timeoutMs: 20000 });
+                    if (r && r.success && r.found && r.budgetId) return r;
+                } catch (e) { /* siguiente intento */ }
+                if (i < n) await new Promise(res => setTimeout(res, 2500 * i));
+            }
+            return null;
         }
 
         // ============ v3.8.5: COPIA LOCAL DE PRESUPUESTOS ============
@@ -9127,6 +9159,66 @@
             updateLocalModeUI();
         }
 
+        // v3.10.38: estado REAL del modo local. Antes Ajustes decía "✓ Activo"
+        // con solo haber elegido la carpeta alguna vez, sin comprobar si Chrome
+        // seguía concediendo el permiso de escritura (lo retira al cerrar el
+        // navegador). Resultado: creías estar en local y la app caía a Drive
+        // sin avisar. Devuelve: 'nosoportado' | 'sinconfigurar' | 'sinpermiso' | 'activo'
+        async function estadoModoLocal() {
+            if (!localModeSupported()) return { estado: 'nosoportado', nombre: '' };
+            const handle = await getLocalDirHandle();
+            if (!handle) return { estado: 'sinconfigurar', nombre: '' };
+            try {
+                const perm = await handle.queryPermission({ mode: 'readwrite' });
+                return { estado: perm === 'granted' ? 'activo' : 'sinpermiso', nombre: handle.name || '' };
+            } catch (e) {
+                return { estado: 'sinpermiso', nombre: handle.name || '' };
+            }
+        }
+
+        // Reactivar = volver a pedir el permiso. Chrome exige que sea desde un
+        // clic del usuario, por eso es un botón y no algo automático.
+        async function reactivarCarpetaLocal() {
+            const handle = await localModeReady(true);
+            if (handle) {
+                showStatus('✓ Carpeta local reactivada: ' + handle.name, 'success');
+                setTimeout(hideStatus, 3000);
+            } else {
+                showStatus('Chrome no ha concedido el permiso. Si no ves el aviso, elige la carpeta otra vez en Ajustes.', 'warning');
+                setTimeout(hideStatus, 6000);
+            }
+            updateLocalModeUI();
+            refreshLocalModeBanner();
+        }
+
+        async function refreshLocalModeBanner() {
+            const el = document.getElementById('localModeBanner');
+            if (!el) return;
+            const s = await estadoModoLocal();
+            // Con carpeta ya creada el banner no aplica
+            if (budgetData && budgetData.folderId) { el.style.display = 'none'; return; }
+            let html = '', css = '';
+            if (s.estado === 'activo') {
+                css = 'background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;';
+                html = '<span>💻</span><span style="flex:1;"><b>Modo local activo</b> · la carpeta y los archivos se crearán al instante en <b>' +
+                       escapeHtml(s.nombre) + '</b> y Google Drive Desktop los subirá solo.</span>';
+            } else if (s.estado === 'sinpermiso') {
+                css = 'background:#fffbeb;color:#92400e;border:1px solid #fcd34d;';
+                html = '<span>⚠️</span><span style="flex:1;"><b>Carpeta local configurada, pero Chrome no da permiso en esta sesión.</b> ' +
+                       'Si creas ahora, se subirá a Drive por Apps Script (lento).</span>' +
+                       '<button onclick="reactivarCarpetaLocal()" style="padding:6px 12px;border:none;border-radius:6px;background:#b45309;color:#fff;cursor:pointer;font-weight:600;">💻 Reactivar carpeta local</button>';
+            } else if (s.estado === 'sinconfigurar') {
+                css = 'background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;';
+                html = '<span>☁️</span><span style="flex:1;">Se creará en <b>Drive por Apps Script</b>. En el PC es más rápido y más fiable el modo local: ' +
+                       'elige tu carpeta <b>_PRESUPUESTOS</b> una vez.</span>' +
+                       '<button onclick="chooseLocalFolder().then(refreshLocalModeBanner)" style="padding:6px 12px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;">📁 Elegir carpeta local</button>';
+            } else {
+                el.style.display = 'none'; return;
+            }
+            el.style.cssText = 'margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.85rem;display:flex;align-items:center;gap:10px;' + css;
+            el.innerHTML = html;
+        }
+
         function updateLocalModeUI() {
             const el = document.getElementById('localModeStatus');
             if (!el) return;
@@ -9135,9 +9227,20 @@
                 return;
             }
             const name = localStorage.getItem('tradutema_local_dir_name') || '';
-            el.innerHTML = name
-                ? '✓ Activo · carpeta: <b>' + name + '</b> · <a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>'
-                : 'No configurado (se usa Drive). Elige tu carpeta local _PRESUPUESTOS para crear presupuestos al instante.';
+            if (!name) {
+                el.innerHTML = 'No configurado (se usa Drive). Elige tu carpeta local _PRESUPUESTOS para crear presupuestos al instante.';
+                return;
+            }
+            el.innerHTML = '⏳ comprobando permiso de <b>' + escapeHtml(name) + '</b>…';
+            estadoModoLocal().then(s => {
+                if (s.estado === 'activo') {
+                    el.innerHTML = '✓ Activo · carpeta: <b>' + escapeHtml(s.nombre) + '</b> · <a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>';
+                } else {
+                    el.innerHTML = '⚠️ Configurada (<b>' + escapeHtml(name) + '</b>) pero <b>sin permiso en esta sesión</b>: se usaría Drive. ' +
+                        '<a href="#" onclick="reactivarCarpetaLocal(); return false;"><b>Reactivar</b></a> · ' +
+                        '<a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>';
+                }
+            });
         }
 
         // Escribir la carpeta del presupuesto + archivos en el disco local
@@ -9438,8 +9541,19 @@
                 const totalPages = files.reduce((sum, f) => sum + (f.pages || 1), 0);
 
                 // v3.7.49: log de proceso en pantalla
+                // v3.10.38: el registro dice el modo de verdad. Antes ponía
+                // "subiendo a Drive" en los dos, y era imposible saber cuál
+                // se había usado mirando el proceso.
                 prodLogClear();
-                prodLogStart('folder', `Creando carpeta + subiendo ${files.length} archivo(s) a Drive`);
+                const _localHandle = (bgState && bgState.localHandle) ? bgState.localHandle : await localModeReady(false);
+                if (bgState && bgState.localConfigurada && !_localHandle) {
+                    showStatus('⚠️ La carpeta local está configurada pero sin permiso: este presupuesto se crea en Drive por Apps Script. ' +
+                               'Para el próximo, pulsa "Reactivar carpeta local" en el paso 2.', 'warning');
+                    setTimeout(hideStatus, 9000);
+                }
+                prodLogStart('folder', _localHandle
+                    ? `Registrando presupuesto (modo LOCAL: carpeta y ${files.length} archivo(s) en disco)`
+                    : `Creando carpeta en Drive + subiendo ${files.length} archivo(s) por Apps Script`);
 
                 // v3.7.50 FIX: SECUENCIAL, no en paralelo. Apps Script serializa
                 // las peticiones simultáneas del mismo usuario; al lanzar carpeta
@@ -9459,7 +9573,7 @@
                 // v3.8.0 MODO LOCAL: si está configurado y con permiso, la
                 // carpeta y los archivos se escriben en el disco (instantáneo)
                 // y al backend solo se le pide el código y la fila.
-                const _localHandle = await localModeReady(true);
+                // (v3.10.38: _localHandle ya viene resuelto desde el clic)
 
                 // v3.7.93: requestId único por creación. Se guarda en bgState
                 // para que el botón "Reintentar" reutilice EL MISMO id: si la
@@ -9495,10 +9609,26 @@
                         enHistorico: document.getElementById('docInHistory')?.checked !== false,
                         requestId: bgState.requestId,   // v3.7.93: idempotencia
                         localMode: !!_localHandle       // v3.8.0: solo registrar fila, sin carpeta Drive
-                    }, { retry: true, attempts: 4 });   // v3.7.93: 4 intentos (seguro gracias al requestId)
+                    }, { retry: true, attempts: 4, timeoutMs: 30000 });   // v3.10.39: 30 s por intento, 4 intentos
+                    // v3.7.84: el servidor puede contestar "ocupado" si otra
+                    // creación tiene el bloqueo; entonces lo que buscamos ya
+                    // existe o está a punto: recuperar por requestId.
+                    if (folderResult && !folderResult.success && folderResult.busy) {
+                        prodLogError('folder', 'servidor ocupado; recuperando por requestId');
+                        const rec = await recuperarPorRequestId(bgState.requestId, 4);
+                        if (rec) folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
+                    }
                 } catch (folderErr) {
-                    prodLogError('folder', (folderErr && folderErr.message) || 'sin respuesta');
-                    throw folderErr;
+                    // v3.10.39: antes de rendirse, preguntar al servidor si llegó
+                    // a crearlo (respuesta perdida = caso más frecuente).
+                    prodLogError('folder', ((folderErr && folderErr.message) || 'sin respuesta') + ' · buscando por requestId…');
+                    const rec = await recuperarPorRequestId(bgState.requestId, 3);
+                    if (rec) {
+                        folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
+                        prodLogDone('folder', rec.budgetId + ' (recuperado por requestId tras respuesta perdida)');
+                    } else {
+                        throw folderErr;
+                    }
                 }
 
                 // v3.7.82: ÚNICA ruta de subida — Apps Script, archivo a
@@ -9589,12 +9719,24 @@
                 // v3.7.75: si el backend no devolvió el código (respuesta
                 // incompleta), no seguir con "undefined": intentar recuperarlo.
                 if (!folderResult.budgetId) {
-                    prodLogError('folder', 'respuesta sin código de presupuesto');
-                    const adoptado = await adoptBudgetByFingerprint(files, 10).catch(() => false);
-                    if (!adoptado) {
-                        throw new Error('La carpeta se creó pero no se recibió su código. Pulsa "Reintentar" o recarga para recuperarla.');
+                    // v3.10.38: la respuesta cruda, para saber por dónde vino
+                    // (¿dedup por requestId con fila sin ID? ¿otra cosa?)
+                    let _cruda = '';
+                    try { _cruda = JSON.stringify(folderResult).slice(0, 300); } catch (e) {}
+                    prodLogError('folder', 'respuesta sin código de presupuesto · servidor contestó: ' + _cruda);
+                    console.warn('createBudgetFolder sin budgetId:', folderResult);
+                    // v3.10.39: primero por requestId (exacto), luego por huella
+                    const rec = await recuperarPorRequestId(bgState.requestId, 3);
+                    if (rec) {
+                        folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
+                        prodLogDone('folder', rec.budgetId + ' (recuperado por requestId)');
+                    } else {
+                        const adoptado = await adoptBudgetByFingerprint(files, 10).catch(() => false);
+                        if (!adoptado) {
+                            throw new Error('La carpeta se creó pero no se recibió su código. Pulsa "Reintentar" o recarga para recuperarla.');
+                        }
+                        return;
                     }
-                    return;
                 }
                 
                 // Guardar datos de carpeta
@@ -9993,6 +10135,13 @@
                 pendingWithAnalysis: withAnalysis,
                 pendingInternalComments: internalComments
             };
+
+            // v3.10.38: el permiso de la carpeta local se resuelve AQUÍ, en el
+            // clic, y se guarda en bgState. Chrome solo muestra el aviso de
+            // permiso dentro de un gesto del usuario; pedirlo más tarde, en
+            // segundo plano, podía fallar en silencio y mandar todo a Drive.
+            bgState.localHandle = await localModeReady(true);
+            bgState.localConfigurada = !!(await getLocalDirHandle());
             
             // Modo BACKGROUND: lanzar y avanzar inmediatamente al paso 3
             const filesSnapshot = uploadedFiles.slice();
