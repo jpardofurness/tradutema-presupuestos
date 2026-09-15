@@ -954,6 +954,13 @@
                     <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;color:#475569;cursor:pointer;"><input type="checkbox" id="dirSoloEmail" checked> Sólo con email</label>
                     <button onclick="runDirectorioSearch()" class="prov-btn-sm" style="background:#7c3aed;color:#fff;border:none;padding:8px 16px;">🔎 Buscar</button>
                     <span id="dirCount" style="font-size:0.82rem;color:#64748b;"></span>
+                </div>
+                <!-- v3.10.40: añadir en lote -->
+                <div id="dirBulkBar" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+                    <button onclick="dirSelectAll(true)" class="prov-btn-sm" style="background:#fff;color:#334155;border:1px solid #cbd5e1;">Seleccionar todos los nuevos</button>
+                    <button onclick="dirSelectAll(false)" class="prov-btn-sm" style="background:#fff;color:#334155;border:1px solid #cbd5e1;">Deseleccionar</button>
+                    <button id="dirBulkAddBtn" onclick="promoteSelectedDirectorio()" class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;" disabled>➕ Añadir seleccionados</button>
+                    <span id="dirSelCount" style="font-size:0.82rem;color:#64748b;margin-left:auto;">0 seleccionados</span>
                     <button onclick="backToProviders()" class="prov-btn-sm" style="margin-left:auto;background:#fff;color:#5b21b6;border:1px solid #c4b5fd;">← Volver a mis traductores</button>
                 </div>
                 <div id="directorioResults" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
@@ -1961,8 +1968,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.39';
-        const HTML_DATE = '11/09/2026';
+        const HTML_VERSION = '3.10.40';
+        const HTML_DATE = '15/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -3235,9 +3242,7 @@
                         </div>
                         ${compartido.length ? `<div style="font-size:0.83rem;color:var(--text-secondary);margin-top:8px;">${compartido.join(' \u00b7 ')}</div>` : ''}
                         <div style="margin-top:8px;">
-                            <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;color:#475569;cursor:pointer;">
-                                <input type="checkbox" ${activo ? 'checked' : ''} onchange="toggleProviderActive('${g.clave.replace(/'/g, "\\'")}', this.checked)"> Activo
-                            </label>
+                            ${botonActivo(g)}
                         </div>
                         <div class="prov-pairs">
                             <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px;">Combinaciones (${g.pares.length})</div>
@@ -3318,23 +3323,46 @@
         }
 
         // Activo es del proveedor (email) -> propaga a todas sus fichas
-        async function toggleProviderActive(clave, checked) {
+        // v3.10.40: el estado Activo/Inactivo es un BOTÓN que enseña lo que hay
+        // guardado, no una casilla que cambia antes de guardar. Antes el
+        // checkbox llamaba a un fetch sin reintento; si fallaba, la casilla se
+        // quedaba como la habías puesto y la memoria no, hasta el siguiente
+        // repintado: "a veces se guarda y a veces no". Ahora: clic → el botón
+        // pasa a "guardando…" → apiPost con reintentos → al terminar, el botón
+        // enseña el estado real. Si falla, vuelve al estado anterior y lo dice.
+        const _activoGuardando = new Set();
+
+        function botonActivo(g) {
+            const clave = g.clave.replace(/'/g, "\\'");
+            if (_activoGuardando.has(g.clave)) {
+                return '<button class="prov-btn-sm" disabled style="background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;opacity:0.9;">⏳ guardando…</button>';
+            }
+            return g.activo !== false
+                ? `<button class="prov-btn-sm" onclick="toggleProviderActive('${clave}', false)" title="Pulsa para DESACTIVAR (dejará de aparecer al solicitar tasación)" style="background:#dcfce7;color:#166534;border:1px solid #86efac;">✓ Activo · desactivar</button>`
+                : `<button class="prov-btn-sm" onclick="toggleProviderActive('${clave}', true)" title="Pulsa para ACTIVAR" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">○ Inactivo · activar</button>`;
+        }
+
+        async function toggleProviderActive(clave, nuevo) {
             const g = consultGroups.find(x => x.clave === clave);
-            if (!g) return;
+            if (!g || _activoGuardando.has(clave)) return;
+            _activoGuardando.add(clave);
+            renderConsultProviders();
             try {
-                const data = await providerApi({ action: 'setProviderActive', email: g.email, activo: checked });
+                const data = await apiPost({ action: 'setProviderActive', email: g.email, activo: nuevo }, { retry: true, attempts: 3, timeoutMs: 30000 });
                 if (!data.success) throw new Error(data.error || 'Error');
-                allProviders.forEach(e => { if (claveProveedor(e) === clave) e.activo = checked; });
+                allProviders.forEach(e => { if (claveProveedor(e) === clave) e.activo = nuevo; });
                 if (Array.isArray(filteredProviders)) {
-                    filteredProviders.forEach(e => { if (claveProveedor(e) === clave) e.activo = checked; });
+                    filteredProviders.forEach(e => { if (claveProveedor(e) === clave) e.activo = nuevo; });
                 }
+                _activoGuardando.delete(clave);
                 filterConsultProviders();
-                showStatus(checked ? '\u2713 Traductor activado'
-                                   : '\u2713 Traductor desactivado (no aparecerá al solicitar tasación)', 'success');
+                showStatus((nuevo ? '\u2713 ' + g.nombre + ' activado' : '\u2713 ' + g.nombre + ' desactivado (no aparecerá al solicitar tasación)'), 'success');
                 setTimeout(hideStatus, 2500);
             } catch (e) {
-                showStatus('Error: ' + e.message, 'error');
-                setTimeout(hideStatus, 3000);
+                _activoGuardando.delete(clave);
+                renderConsultProviders();   // vuelve al estado real (el anterior)
+                showStatus('No se pudo guardar el cambio de ' + g.nombre + ': ' + e.message + ' · sigue ' + (g.activo !== false ? 'Activo' : 'Inactivo'), 'error');
+                setTimeout(hideStatus, 5000);
             }
         }
 
@@ -3452,6 +3480,7 @@
                 const data = await apiPost({ action: 'searchDirectorio', idioma, provincia, query, soloConEmail });
                 if (!data.success) throw new Error(data.error || 'Error');
                 directorioResultsCache = data.results || [];
+                dirResetSeleccion();   // v3.10.40
                 const ocultos = data.ocultosTuyos ? ` · ${data.ocultosTuyos} ya en tu lista (ocultos)` : '';
                 countEl.textContent = `${data.total} nuevos${data.capped ? ' (mostrando ' + data.results.length + ')' : ''}${ocultos}`;
                 renderDirectorioResults();
@@ -3460,17 +3489,50 @@
             }
         }
 
+        // v3.10.40: selección para añadir en lote
+        let dirSelected = new Set();
+
+        function dirActualizarBarra() {
+            const bar = document.getElementById('dirBulkBar');
+            const btn = document.getElementById('dirBulkAddBtn');
+            const cnt = document.getElementById('dirSelCount');
+            if (!bar) return;
+            const candidatos = directorioResultsCache.filter(r => !r._added && r.email).length;
+            bar.style.display = candidatos ? 'flex' : 'none';
+            const n = dirSelected.size;
+            if (cnt) cnt.textContent = n + (n === 1 ? ' seleccionado' : ' seleccionados');
+            if (btn) { btn.disabled = n === 0; btn.style.opacity = n === 0 ? '0.45' : '1'; btn.textContent = '➕ Añadir seleccionados' + (n ? ' (' + n + ')' : ''); }
+        }
+
+        function dirToggle(i, marcado) {
+            if (marcado) dirSelected.add(i); else dirSelected.delete(i);
+            dirActualizarBarra();
+        }
+
+        // "Todos" = los que se ven, no están añadidos y tienen email
+        function dirSelectAll(marcar) {
+            dirSelected.clear();
+            if (marcar) directorioResultsCache.forEach((r, i) => { if (!r._added && r.email) dirSelected.add(i); });
+            renderDirectorioResults();
+        }
+
         function renderDirectorioResults() {
             const box = document.getElementById('directorioResults');
-            if (!directorioResultsCache.length) { box.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Sin resultados.</div>'; return; }
+            if (!directorioResultsCache.length) { box.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Sin resultados.</div>'; dirActualizarBarra(); return; }
             box.innerHTML = directorioResultsCache.map((r, i) => {
                 const add = r._added
                     ? '<span style="font-size:0.72rem;color:#166534;background:#dcfce7;padding:4px 10px;border-radius:999px;">✓ añadido (Inactivo)</span>'
-                    : `<button onclick="promoteDirectorioEntry(${i})" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:0.8rem;cursor:pointer;">➕ Añadir (Inactivo)</button>`;
+                    : (r._pendiente
+                        ? '<span style="font-size:0.72rem;color:#3730a3;background:#eef2ff;padding:4px 10px;border-radius:999px;">⏳ añadiendo…</span>'
+                        : `<button onclick="promoteDirectorioEntry(${i})" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:0.8rem;cursor:pointer;">➕ Añadir (Inactivo)</button>`);
+                const casilla = (!r._added && r.email)
+                    ? `<input type="checkbox" ${dirSelected.has(i) ? 'checked' : ''} onchange="dirToggle(${i}, this.checked)" title="Seleccionar para añadir en lote" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">`
+                    : '<span style="width:16px;flex-shrink:0;"></span>';
                 const tel = r.telefono ? ` · 📞 ${r.telefono}` : '';
                 const em = r.email ? ` · 📧 ${r.email}` : ' · <span style="color:#b91c1c;">sin email</span>';
                 return `<div id="dirRes${i}" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;">
-                    <div style="font-size:0.85rem;">
+                    ${casilla}
+                    <div style="font-size:0.85rem;flex:1;">
                         <div style="font-weight:600;">${r.nombre} <span style="font-weight:400;color:#64748b;">· TIJ ${r.numTIJ}</span></div>
                         <div style="color:#475569;">${r.idioma} · ${r.provincia} · nombr. ${formatAnio(r.anio) || '—'}</div>
                         <div style="color:#475569;">${em}${tel}</div>
@@ -3478,6 +3540,80 @@
                     <div style="flex-shrink:0;">${add}</div>
                 </div>`;
             }).join('');
+            dirActualizarBarra();
+        }
+
+        // Al buscar de nuevo, la selección anterior no vale
+        function dirResetSeleccion() { dirSelected.clear(); }
+
+        // Añade a la lista local (ambos sentidos, Inactivo) lo que el servidor
+        // acaba de crear, para no tener que recargar. Compartido por el alta
+        // individual y el lote.
+        function dirIncorporarLocal(r, idiomaHis) {
+            [['Español', idiomaHis], [idiomaHis, 'Español']].forEach(pair => {
+                const o = pair[0], d = pair[1];
+                const yaEsta = allProviders.some(e =>
+                    e.email && r.email && e.email.toLowerCase() === r.email.toLowerCase()
+                    && e.idiomaOrigen === o && e.idiomaDestino === d);
+                if (!yaEsta) {
+                    allProviders.push({
+                        nombre: r.nombre, idiomaOrigen: o, idiomaDestino: d, email: r.email,
+                        tarifaMinima: '', tarifaPalabra: '', comentarios: '',
+                        activo: false, orden: null,
+                        numTIJ: r.numTIJ, provincia: r.provincia, anio: r.anio, telefono: r.telefono
+                    });
+                }
+            });
+        }
+
+        // v3.10.40: añadir todos los seleccionados en UNA llamada (por lotes de 50)
+        async function promoteSelectedDirectorio() {
+            const indices = [...dirSelected].filter(i => directorioResultsCache[i] && !directorioResultsCache[i]._added && directorioResultsCache[i].email);
+            if (!indices.length) return;
+            const btn = document.getElementById('dirBulkAddBtn');
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Añadiendo ' + indices.length + '…'; }
+            indices.forEach(i => { directorioResultsCache[i]._pendiente = true; });
+            renderDirectorioResults();
+
+            let anadidos = 0, filas = 0, yaEstaban = 0, fallidos = 0;
+            const LOTE = 50;
+            for (let k = 0; k < indices.length; k += LOTE) {
+                const trozo = indices.slice(k, k + LOTE);
+                showStatus('Añadiendo traductores ' + (k + 1) + '–' + Math.min(k + LOTE, indices.length) + ' de ' + indices.length + '…', 'loading');
+                try {
+                    const data = await apiPost({
+                        action: 'promoteFromDirectorioBulk',
+                        entries: trozo.map(i => { const r = directorioResultsCache[i]; return {
+                            index: i, nombre: r.nombre, idioma: r.idioma, provincia: r.provincia,
+                            numTIJ: r.numTIJ, email: r.email, telefono: r.telefono, anio: r.anio }; })
+                    }, { retry: true, attempts: 3, timeoutMs: 60000 });
+                    if (!data.success) throw new Error(data.error || 'Error desconocido');
+                    (data.entries || []).forEach(res => {
+                        const r = directorioResultsCache[res.index];
+                        if (!r) return;
+                        r._pendiente = false;
+                        r._added = true;                       // añadido o ya existía: en ambos casos ya está en tu lista
+                        if (res.added > 0) anadidos++; else yaEstaban++;
+                        filas += res.added || 0;
+                        dirIncorporarLocal(r, res.idiomaHis || r.idioma);
+                        dirSelected.delete(res.index);
+                    });
+                } catch (e) {
+                    trozo.forEach(i => { directorioResultsCache[i]._pendiente = false; });
+                    fallidos += trozo.length;
+                    console.warn('promoteFromDirectorioBulk:', e);
+                }
+                renderDirectorioResults();
+            }
+            if (typeof populateConsultLanguages === 'function') populateConsultLanguages();
+            if (typeof filterConsultProviders === 'function') filterConsultProviders();
+            const partes = ['✓ ' + anadidos + ' traductor(es) añadido(s) como Inactivo (' + filas + ' fila(s))'];
+            if (yaEstaban) partes.push(yaEstaban + ' ya estaban');
+            if (fallidos) partes.push(fallidos + ' NO se añadieron (error del servidor; vuelve a intentarlo)');
+            showStatus(partes.join(' · '), fallidos ? 'warning' : 'success');
+            setTimeout(hideStatus, 6000);
+            if (btn) btn.textContent = '➕ Añadir seleccionados';
+            dirActualizarBarra();
         }
 
         async function promoteDirectorioEntry(index) {
@@ -3494,21 +3630,8 @@
                 renderDirectorioResults();
                 // v3.7.62: añadir el nuevo proveedor a la lista LOCAL (ambos sentidos,
                 // Inactivo) para poder editarlo sin recargar la página.
-                const idiomaHis = data.idiomaHis || r.idioma;
-                [['Español', idiomaHis], [idiomaHis, 'Español']].forEach(pair => {
-                    const o = pair[0], d = pair[1];
-                    const yaEsta = allProviders.some(e =>
-                        e.email && r.email && e.email.toLowerCase() === r.email.toLowerCase()
-                        && e.idiomaOrigen === o && e.idiomaDestino === d);
-                    if (!yaEsta) {
-                        allProviders.push({
-                            nombre: r.nombre, idiomaOrigen: o, idiomaDestino: d, email: r.email,
-                            tarifaMinima: '', tarifaPalabra: '', comentarios: '',
-                            activo: false, orden: null,
-                            numTIJ: r.numTIJ, provincia: r.provincia, anio: r.anio, telefono: r.telefono
-                        });
-                    }
-                });
+                dirIncorporarLocal(r, data.idiomaHis || r.idioma);
+                dirSelected.delete(index);
                 // refrescar la lista de proveedores (debajo) para que aparezca ya
                 if (typeof filterConsultProviders === 'function') filterConsultProviders();
                 showStatus(`✓ Añadido como Inactivo. Pulsa "← Volver a proveedores" para editarlo.`, 'success');
