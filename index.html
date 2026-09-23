@@ -1551,6 +1551,24 @@
             <button class="btn btn-primary action-btn" id="sendQuoteBtn" onclick="previewProviderEmail()" disabled>
                 ✉️ Previsualizar y Enviar Tasación
             </button>
+
+            <!-- v3.10.46: tarifa ya acordada con el traductor, sin enviar solicitud -->
+            <div id="agreedRatePanel" style="display:none;margin-top:10px;padding:12px 14px;border:1px solid #bbf7d0;border-radius:8px;background:#f0fdf4;">
+                <div style="font-weight:600;color:#166534;margin-bottom:4px;">🤝 Tarifa ya acordada con <span id="agreedRateName"></span></div>
+                <div style="font-size:0.82rem;color:#475569;margin-bottom:10px;">Si ya habéis hablado y sabes su precio, anótalo aquí: queda como traductor elegido con su cotización, <b>sin enviarle ningún correo</b>.</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+                    <div style="flex:1;min-width:140px;">
+                        <label style="font-size:0.78rem;color:#475569;display:block;margin-bottom:3px;">Cotización (€ total)</label>
+                        <input type="number" step="0.01" min="0" id="agreedRateTotal" class="form-control" placeholder="ej: 85">
+                    </div>
+                    <div style="flex:1;min-width:120px;">
+                        <label style="font-size:0.78rem;color:#475569;display:block;margin-bottom:3px;">Plazo del traductor (días)</label>
+                        <input type="text" id="agreedRateDays" class="form-control" placeholder="ej: 3">
+                    </div>
+                    <button onclick="useAgreedRate()" class="btn btn-secondary" style="white-space:nowrap;background:#16a34a;color:#fff;border-color:#16a34a;">✓ Usar esta tarifa (sin enviar)</button>
+                </div>
+                <div id="agreedRateHint" style="font-size:0.78rem;color:#64748b;margin-top:6px;"></div>
+            </div>
             
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="skipToStep(5)">Saltar a Cliente</button>
@@ -1571,6 +1589,13 @@
                     <span class="section-hint">(introduce la cotización recibida y selecciona el elegido)</span>
                 </div>
                 <div class="contacted-list" id="contactedProvidersList"></div>
+                <!-- v3.10.42: apuntar a mano un traductor contactado por otra vía -->
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+                    <select id="addContactedSelect" class="form-control" style="flex:1;min-width:220px;"></select>
+                    <button onclick="addContactedManual()" class="btn btn-secondary" style="white-space:nowrap;">➕ Añadir como contactado (sin enviar)</button>
+                    <button onclick="recoverContactedFromGmail()" class="btn btn-secondary" style="white-space:nowrap;" title="Busca en Enviados de Gmail los correos de tasación de este presupuesto y apunta a sus destinatarios">📨 Recuperar desde Gmail</button>
+                </div>
+                <small style="color:#64748b;font-size:11px;display:block;margin-top:4px;">Para traductores a los que has pedido tasación por teléfono, WhatsApp o desde tu correo. Aparecerán aquí para anotar su cotización.</small>
             </div>
             
             <div class="lang-toggle">
@@ -1931,9 +1956,34 @@
                 <button class="modal-close" onclick="closeEditProviderModal()">✕</button>
             </div>
             <div class="modal-body">
-                <div id="editProviderName" style="font-weight: 600; font-size: 1.1rem;"></div>
-                <div id="editProviderEmail" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 2px;"></div>
-                <div id="editProviderMaec" style="color: var(--text-secondary); font-size: 0.78rem; margin-top: 2px;"></div>
+                <!-- v3.10.41: datos de contacto editables -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div style="grid-column:1 / -1;">
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Nombre</label>
+                        <input type="text" id="editProviderName" class="form-control" placeholder="APELLIDOS, Nombre">
+                    </div>
+                    <div>
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Email <span title="Es la clave del traductor en la hoja: cambiarlo lo cambia en todas sus combinaciones">ⓘ</span></label>
+                        <input type="email" id="editProviderEmail" class="form-control" placeholder="email@dominio.com">
+                    </div>
+                    <div>
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Teléfono</label>
+                        <input type="text" id="editProviderTelefono" class="form-control" placeholder="+34 …">
+                    </div>
+                    <div>
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Nº TIJ</label>
+                        <input type="text" id="editProviderTIJ" class="form-control" placeholder="opcional">
+                    </div>
+                    <div>
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Provincia</label>
+                        <input type="text" id="editProviderProvincia" class="form-control" placeholder="opcional">
+                    </div>
+                    <div style="grid-column:1 / -1;">
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Fecha de nombramiento</label>
+                        <input type="text" id="editProviderAnio" class="form-control" placeholder="dd/mm/aaaa (opcional)">
+                    </div>
+                </div>
+                <div id="editProviderMaec" style="display:none;"></div>
 
                 <div style="background: var(--bg-secondary); border-radius: var(--radius-md); padding: 12px; margin: 14px 0;">
                     <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px;">Datos del traductor — se aplican a todas sus combinaciones</div>
@@ -1968,8 +2018,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.40';
-        const HTML_DATE = '15/09/2026';
+        const HTML_VERSION = '3.10.46';
+        const HTML_DATE = '23/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1991,7 +2041,15 @@
         let allBudgets = [];
         let filteredBudgets = [];
         let filteredProviders = [];
+        // v3.10.42: la selección guarda EMAILS, no posiciones. Antes guardaba
+        // índices de filteredProviders y los convertía en traductores en el
+        // momento de enviar: si entre marcar y enviar la lista cambiaba
+        // (activar/desactivar, repintar, abrir otro presupuesto), los índices
+        // apuntaban a otras personas o a nada, y se enviaba a quien no era
+        // sin avisar. Con el email da igual cómo cambie la lista.
         let selectedProviders = new Set();
+        function claveSel(p) { return String((p && p.email) || '').trim().toLowerCase() || ('sin-email:' + String((p && p.nombre) || '').trim().toLowerCase()); }
+        function proveedoresSeleccionados() { return filteredProviders.filter(p => selectedProviders.has(claveSel(p))); }
         let uploadedFiles = [];
         let currentStep = 1;
         let completedSteps = new Set();
@@ -6806,6 +6864,8 @@
                         clientEmail: budgetData.clientEmail,
                         clientWhatsApp: budgetData.clientWhatsApp,
                         internalComments: budgetData.internalComments || '',
+                        // v3.10.44: nota — budgetId se lee al ARRANCAR esta llamada, así
+                        // que un cambio de presupuesto durante la espera no la desvía
                         // v3.10.34: con recuento manual, la hoja recibe el total corregido
                         wordCount: (budgetData.fileAnalysis || []).some(a => a.manual) ? budgetData.wordCount : undefined,
                         // v3.10.28: los ajustes ⚙ por archivo (rango de páginas
@@ -7715,7 +7775,10 @@
                 clearTimeout(window._filtroTimer);
                 window._filtroTimer = setTimeout(() => {
                     aplicarFiltrosAPaginas();
-                    if (typeof renderStep2Files === 'function') { try { renderStep2Files(); } catch (e) {} }
+                    const f = document.activeElement;
+                    const escribiendo = f && (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA') && f.closest && f.closest('#fileList');
+                    if (escribiendo) { window._step2RepintadoPendiente = true; }   // v3.10.45
+                    else if (typeof renderStep2Files === 'function') { try { renderStep2Files(); } catch (e) {} }
                 }, 400);
                 clearTimeout(window._filtroSaveTimer);
                 window._filtroSaveTimer = setTimeout(() => { persistFileSettings(); }, 1200);
@@ -7804,9 +7867,24 @@
             // eso la cabecera decía 2719 y la lista 2516 a la vez).
             if (typeof updateBudgetSummaryBar === 'function') { try { updateBudgetSummaryBar(); } catch (e) {} }
             if (typeof renderWordCountSummary === 'function') { try { renderWordCountSummary(); } catch (e) {} }
-            if (typeof renderStep2Files === 'function') { try { renderStep2Files(); } catch (e) {} }
+            // v3.10.45: no repintar la lista si el foco está en un campo de ella
+            // (repintar destruye el campo y expulsa al usuario a cada tecla)
+            const _foco = document.activeElement;
+            const _escribiendo = _foco && (_foco.tagName === 'INPUT' || _foco.tagName === 'TEXTAREA') && _foco.closest && _foco.closest('#fileList');
+            if (_escribiendo) { window._step2RepintadoPendiente = true; }
+            else if (typeof renderStep2Files === 'function') { try { renderStep2Files(); } catch (e) {} }
             return hayManual;
         }
+
+        // v3.10.45: el repintado que se aplazó por estar escribiendo se hace al
+        // salir de la lista de archivos (clic fuera, Tab al siguiente bloque…)
+        document.addEventListener('focusout', (e) => {
+            if (!window._step2RepintadoPendiente) return;
+            const dentro = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#fileList');
+            if (dentro) return;
+            window._step2RepintadoPendiente = false;
+            setTimeout(() => { try { renderStep2Files(); } catch (err) {} }, 50);
+        }, true);
 
         // v3.10.28: guarda los ajustes por archivo sin tocar nada más.
         async function persistFileSettings() {
@@ -7928,13 +8006,13 @@
                             <div style="flex:1;">
                                 <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Palabras</label>
                                 <input type="number" min="0" step="1" value="${escAttr(s.manualWords)}" placeholder="del análisis"
-                                    oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualWords', this.value)"
+                                    onchange="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualWords', this.value)"
                                     style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
                             </div>
                             <div style="flex:1;">
                                 <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Páginas</label>
                                 <input type="number" min="0" step="1" value="${escAttr(s.manualPages)}" placeholder="del análisis"
-                                    oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualPages', this.value)"
+                                    onchange="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualPages', this.value)"
                                     style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
                             </div>
                         </div>
@@ -10754,7 +10832,7 @@
             
             let html = '';
             filteredProviders.forEach((p, i) => {
-                const selected = selectedProviders.has(i) ? 'selected' : '';
+                const selected = selectedProviders.has(claveSel(p)) ? 'selected' : '';
                 
                 // v3.10.25: la linea de tarifas se pinta SIEMPRE. Antes solo
                 // aparecia si habia algun dato, asi que un traductor sin tarifas
@@ -10794,26 +10872,125 @@
         }
 
         function toggleProvider(index) {
-            if (selectedProviders.has(index)) {
-                selectedProviders.delete(index);
+            const p = filteredProviders[index];
+            if (!p) return;
+            const k = claveSel(p);
+            if (selectedProviders.has(k)) {
+                selectedProviders.delete(k);
             } else {
-                selectedProviders.add(index);
+                selectedProviders.add(k);
             }
             renderProviders();
         }
 
         function toggleSelectAll() {
-            if (selectedProviders.size === filteredProviders.length) {
+            if (proveedoresSeleccionados().length === filteredProviders.length && filteredProviders.length > 0) {
                 selectedProviders.clear();
             } else {
-                filteredProviders.forEach((_, i) => selectedProviders.add(i));
+                selectedProviders.clear();
+                filteredProviders.forEach(p => selectedProviders.add(claveSel(p)));
             }
             renderProviders();
         }
 
         function updateSelectedCount() {
-            document.getElementById('selectedCount').textContent = selectedProviders.size + ' seleccionados';
+            document.getElementById('selectedCount').textContent = proveedoresSeleccionados().length + ' seleccionados';
             document.getElementById('sendQuoteBtn').disabled = selectedProviders.size === 0;
+            refreshAgreedRatePanel();   // v3.10.46
+        }
+
+        // ====== v3.10.46: TARIFA ACORDADA SIN ENVIAR ======
+        // Hasta ahora, para anotar la tarifa de un traductor había que pasar
+        // por "Enviar tasación": la pantalla de cotizaciones solo enseña a los
+        // contactados. Si ya has hablado con él y sabes su precio, el correo
+        // sobra. Con UN traductor marcado aparece este panel; propone el
+        // importe a partir de su tarifa (palabras × €/pal, y el mínimo si es
+        // mayor) y lo deja editable.
+        function importePropuesto(p) {
+            const palabras = parseInt(budgetData.wordCount) || 0;
+            const porPal = parseFloat(String(p.tarifaPalabra || '').replace(',', '.')) || 0;
+            const minimo = parseFloat(String(p.tarifaMinima || '').replace(',', '.')) || 0;
+            if (!porPal && !minimo) return { total: null, detalle: 'sin tarifa en su ficha: escribe el importe' };
+            let calc = palabras > 0 && porPal ? palabras * porPal : 0;
+            const partes = [];
+            if (calc) partes.push(palabras.toLocaleString('es-ES') + ' pal. × ' + porPal.toLocaleString('es-ES', { minimumFractionDigits: 3 }) + ' € = ' + (Math.round((calc + 1e-9) * 100) / 100).toFixed(2) + ' €');
+            let total = calc;
+            if (minimo && minimo > total) { total = minimo; partes.push('mínimo ' + minimo.toFixed(2) + ' € (se aplica)'); }
+            else if (minimo) partes.push('mínimo ' + minimo.toFixed(2) + ' €');
+            if (!palabras && porPal) partes.push('aún sin recuento de palabras: solo el mínimo');
+            // Redondeo a céntimos sin el artefacto binario (154,385 → 154,39, no 154,38)
+            total = total ? Math.round((total + 1e-9) * 100) / 100 : 0;
+            return { total: total || null, detalle: 'Propuesto: ' + partes.join(' · ') };
+        }
+
+        function refreshAgreedRatePanel() {
+            const panel = document.getElementById('agreedRatePanel');
+            if (!panel) return;
+            const sel = proveedoresSeleccionados();
+            if (sel.length !== 1 || !budgetData.id) { panel.style.display = 'none'; return; }
+            const p = sel[0];
+            const clave = claveSel(p);
+            document.getElementById('agreedRateName').textContent = p.nombre;
+            // Se rellena al cambiar de traductor, y se recalcula (p. ej. si llega
+            // el recuento de palabras) mientras no hayas tocado el importe a mano
+            const inp = document.getElementById('agreedRateTotal');
+            const prop = importePropuesto(p);
+            const propTxt = prop.total != null ? prop.total.toFixed(2) : '';
+            const cambioTraductor = panel.dataset.clave !== clave;
+            const sinTocar = !inp.value || inp.value === (panel.dataset.propuesto || '');
+            if (cambioTraductor || sinTocar) {
+                inp.value = propTxt;
+                panel.dataset.propuesto = propTxt;
+                document.getElementById('agreedRateHint').textContent = prop.detalle;
+            }
+            if (cambioTraductor) { panel.dataset.clave = clave; document.getElementById('agreedRateDays').value = ''; }
+            panel.style.display = 'block';
+        }
+
+        async function useAgreedRate() {
+            const sel = proveedoresSeleccionados();
+            if (sel.length !== 1) { showStatus('Marca exactamente un traductor', 'warning'); setTimeout(hideStatus, 3000); return; }
+            const p = sel[0];
+            const idFlujo = budgetData.id;
+            const total = String(document.getElementById('agreedRateTotal').value || '').trim().replace(',', '.');
+            const plazo = String(document.getElementById('agreedRateDays').value || '').trim();
+            if (!total || isNaN(parseFloat(total)) || parseFloat(total) <= 0) {
+                showStatus('Escribe la cotización acordada (€ total)', 'warning'); setTimeout(hideStatus, 3000); return;
+            }
+            showStatus('Anotando la tarifa de ' + p.nombre + '…', 'loading');
+            try {
+                // 1) queda como contactado, con historial "(sin envío)"
+                const r1 = await apiPost({ action: 'addContactedProviders', budgetId: idFlujo, providers: [{ nombre: p.nombre, email: p.email }] }, { retry: true, attempts: 3, timeoutMs: 30000 });
+                if (!r1 || !r1.success) throw new Error((r1 && r1.error) || 'No se pudo apuntar como contactado');
+                // 2) su cotización
+                if (!budgetData.providerQuotes) budgetData.providerQuotes = {};
+                budgetData.providerQuotes[p.nombre] = Object.assign({}, budgetData.providerQuotes[p.nombre] || {}, { tarifa: total, plazo: plazo, acordada: true });
+                const r2 = await apiPost({ action: 'saveProviderQuotes', budgetId: idFlujo, quotes: budgetData.providerQuotes }, { retry: true, attempts: 3, timeoutMs: 30000 });
+                if (!r2 || !r2.success) throw new Error((r2 && r2.error) || 'No se pudo guardar la cotización');
+                // 3) elegido
+                const r3 = await apiPost({ action: 'saveChosenProvider', budgetId: idFlujo, chosenProvider: p.nombre }, { retry: true, attempts: 3, timeoutMs: 30000 });
+                if (!r3 || !r3.success) throw new Error((r3 && r3.error) || 'No se pudo marcar como elegido');
+
+                if (!sigueSiendo(idFlujo)) return;   // v3.10.44: otro presupuesto abierto
+                if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
+                if (!budgetData.contactedProviders.some(c => c.nombre === p.nombre)) budgetData.contactedProviders.push({ nombre: p.nombre, email: p.email });
+                if (!budgetData.historialTraductores) budgetData.historialTraductores = {};
+                if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
+                budgetData.historialTraductores[p.nombre].push({ fecha: (r1.fechaEnvio || '') + ' (tarifa acordada, sin envío)', email: p.email, manual: true });
+                budgetData.chosenProvider = p.nombre;
+                completedSteps.add(4);
+                updateProgressSteps();
+                hideStatus();
+                showSuccess('Tarifa anotada', p.nombre + ' · ' + parseFloat(total).toFixed(2) + ' €' + (plazo ? ' · ' + plazo + ' días' : ''));
+                setTimeout(() => {
+                    hideSuccess();
+                    showCard(5);   // la pantalla de cliente, con el traductor ya elegido y su cotización
+                    try { proponerPlazoCliente(); } catch (e) {}
+                    if (currentCalcMethod === 'provider') { try { recalculateFromProvider(); } catch (e) {} }
+                }, 1500);
+            } catch (e) {
+                showStatus('No se pudo anotar: ' + e.message, 'error'); setTimeout(hideStatus, 5000);
+            }
         }
 
         // ====== EDITOR DE PROVEEDOR (v3.10.24) ======
@@ -10849,16 +11026,13 @@
             };
             editingReturnTo = (origen === 'step4') ? 'step4' : 'consult';
 
-            document.getElementById('editProviderName').textContent = g.nombre || '(sin nombre)';
-            document.getElementById('editProviderEmail').textContent = g.email || '(sin email)';
-            const maec = [];
-            if (g.numTIJ) maec.push('Nº TIJ ' + g.numTIJ);
-            if (g.provincia) maec.push(g.provincia);
-            if (g.anio) maec.push('nombr. ' + formatAnio(g.anio));
-            if (g.telefono) maec.push('Tel. ' + g.telefono);
-            const elMaec = document.getElementById('editProviderMaec');
-            elMaec.textContent = maec.join(' \u00b7 ');
-            elMaec.style.display = maec.length ? 'block' : 'none';
+            // v3.10.41: datos de contacto editables
+            document.getElementById('editProviderName').value = g.nombre || '';
+            document.getElementById('editProviderEmail').value = g.email || '';
+            document.getElementById('editProviderTelefono').value = g.telefono || '';
+            document.getElementById('editProviderTIJ').value = g.numTIJ || '';
+            document.getElementById('editProviderProvincia').value = g.provincia || '';
+            document.getElementById('editProviderAnio').value = g.anio ? formatAnio(g.anio) : '';
 
             document.getElementById('editTarifaMinima').value = g.tarifaMinima || '';
             document.getElementById('editComentarios').value = g.comentarios || '';
@@ -10983,6 +11157,32 @@
             if (!editingProvider) return;
             const tarifaMinima = document.getElementById('editTarifaMinima').value.trim();
             const comentarios = document.getElementById('editComentarios').value.trim();
+            // v3.10.41: datos de contacto
+            const contacto = {
+                nombre: document.getElementById('editProviderName').value.trim(),
+                email: document.getElementById('editProviderEmail').value.trim(),
+                telefono: document.getElementById('editProviderTelefono').value.trim(),
+                numTIJ: document.getElementById('editProviderTIJ').value.trim(),
+                provincia: document.getElementById('editProviderProvincia').value.trim(),
+                anio: document.getElementById('editProviderAnio').value.trim()
+            };
+            if (!contacto.nombre) {
+                showStatus('El nombre no puede quedar vacío', 'warning'); setTimeout(hideStatus, 3000); return;
+            }
+            if (!contacto.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contacto.email)) {
+                showStatus('El email no es válido, y es la clave del traductor', 'warning'); setTimeout(hideStatus, 3000); return;
+            }
+            const emailCambia = contacto.email.toLowerCase() !== String(editingProvider.email || '').toLowerCase();
+            if (emailCambia) {
+                const choca = allProviders.some(p => claveProveedor(p) === contacto.email.toLowerCase());
+                if (choca) {
+                    showStatus('Ya hay otro traductor con el email ' + contacto.email + '. Dos traductores no pueden compartir email.', 'warning');
+                    setTimeout(hideStatus, 5000); return;
+                }
+                if (!confirm('Vas a cambiar el email de ' + editingProvider.nombre + ' a ' + contacto.email + '.\n' +
+                             'Es la clave del traductor: cambia en todas sus combinaciones. Los presupuestos antiguos ' +
+                             'conservan el email con el que se enviaron.\n¿Continuar?')) return;
+            }
             const pares = editingProvider.pares.map(p => ({
                 idiomaOrigen: p.idiomaOrigen,
                 idiomaDestino: p.idiomaDestino,
@@ -10998,11 +11198,18 @@
                     email: editingProvider.email,
                     tarifaMinima: tarifaMinima,
                     comentarios: comentarios,
-                    pares: pares
+                    pares: pares,
+                    // v3.10.41
+                    nombre: contacto.nombre,
+                    nuevoEmail: emailCambia ? contacto.email : undefined,
+                    telefono: contacto.telefono,
+                    numTIJ: contacto.numTIJ,
+                    provincia: contacto.provincia,
+                    anio: contacto.anio
                 });
                 if (!data.success) throw new Error(data.error || 'Error desconocido');
 
-                aplicarProveedorEnMemoria(editingProvider, tarifaMinima, comentarios, pares);
+                aplicarProveedorEnMemoria(editingProvider, tarifaMinima, comentarios, pares, contacto);
 
                 // Refrescar la consulta (los idiomas pueden haber cambiado)
                 if (typeof populateConsultLanguages === 'function') populateConsultLanguages();
@@ -11011,14 +11218,10 @@
                 // Refrescar el paso 4 conservando lo que hubiera seleccionado:
                 // los indices cambian si el traductor gana o pierde el par activo.
                 if (editingReturnTo === 'step4') {
-                    const emailsSel = [...selectedProviders]
-                        .map(i => filteredProviders[i] && filteredProviders[i].email)
-                        .filter(Boolean);
+                    // v3.10.42: la selección es por email, sobrevive al refiltrado
+                    const sel = new Set(selectedProviders);
                     filterProviders();
-                    selectedProviders.clear();
-                    filteredProviders.forEach((p, i) => {
-                        if (emailsSel.indexOf(p.email) !== -1) selectedProviders.add(i);
-                    });
+                    selectedProviders = sel;
                     renderProviders();
                 }
 
@@ -11036,15 +11239,20 @@
 
         // Reconstruye en memoria las filas de ese proveedor, para no tener que
         // recargar la pagina despues de guardar.
-        function aplicarProveedorEnMemoria(prov, tarifaMinima, comentarios, pares) {
+        function aplicarProveedorEnMemoria(prov, tarifaMinima, comentarios, pares, contacto) {
             const previas = allProviders.filter(p => claveProveedor(p) === prov.clave);
             const base = previas[0] || {};
+            const c = contacto || {};
             const nuevas = pares.map(par => {
                 const vieja = previas.find(p => p.idiomaOrigen === par.idiomaOrigen &&
                                                 p.idiomaDestino === par.idiomaDestino) || {};
                 return Object.assign({}, base, vieja, {
-                    nombre: prov.nombre,
-                    email: prov.email,
+                    nombre: c.nombre !== undefined ? c.nombre : prov.nombre,
+                    email: c.email !== undefined ? c.email : prov.email,
+                    telefono: c.telefono !== undefined ? c.telefono : base.telefono,   // v3.10.41
+                    numTIJ: c.numTIJ !== undefined ? c.numTIJ : base.numTIJ,
+                    provincia: c.provincia !== undefined ? c.provincia : base.provincia,
+                    anio: c.anio !== undefined ? c.anio : base.anio,
                     idiomaOrigen: par.idiomaOrigen,
                     idiomaDestino: par.idiomaDestino,
                     tarifaMinima: tarifaMinima,
@@ -11112,7 +11320,14 @@
                 hideStatus();
             }
 
-            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
+            // v3.10.42: la lista de destinatarios se fija AQUÍ, al abrir la
+            // previsualización, y el envío usa esta misma lista. Antes se
+            // recalculaba al pulsar Enviar a partir de posiciones.
+            const providers = proveedoresSeleccionados();
+            window._providersToSend = providers.slice();
+            if (!providers.length) {
+                showStatus('No hay ningún traductor seleccionado', 'warning'); setTimeout(hideStatus, 3000); return;
+            }
             const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
             const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
 
@@ -11155,6 +11370,7 @@
             let recipientsHtml = `
                 <div><strong>Asunto:</strong> Nueva Tasación Traducción Jurada ${budgetData.sourceLang} > ${budgetData.targetLang} [${budgetData.id}]</div>
                 <div style="margin-top: 8px;"><strong>Destinatarios (${providers.length}):</strong> ${providers.map(p => p.nombre).join(', ')}</div>
+                ${providers.length === 1 ? '<div style="margin-top:4px;color:#b45309;font-size:0.82rem;">⚠️ Solo UN destinatario. Si querías varios, cierra y vuelve a marcarlos.</div>' : ''}
             `;
 
             const driveFiles = (budgetData.folderFiles || [])
@@ -11303,61 +11519,90 @@
 
             closeProviderModal();
             
-            const providers = Array.from(selectedProviders).map(i => filteredProviders[i]);
+            // v3.10.42: exactamente los que se enseñaron en "Destinatarios (N)"
+            const providers = (window._providersToSend || proveedoresSeleccionados()).filter(p => p && p.email);
+            const idFlujoTas = budgetData.id;   // v3.10.44
+            if (!providers.length) {
+                showStatus('No hay destinatarios: vuelve a seleccionar los traductores', 'error'); setTimeout(hideStatus, 4000);
+                return;
+            }
             const customMessage = document.getElementById('providerMessageEdit').value;
             const additionalComments = document.getElementById('providerComments').value.trim();
             
-            showStatus('Enviando emails a proveedores... (con adjuntos puede tardar ~1 min; no repitas el envío)', 'loading');
-            
+            // v3.10.43: ENVÍO POR LOTES de 4. Cada lote es una llamada corta al
+            // servidor que apunta a sus 4 en la hoja ANTES de mandar los
+            // correos. Con 13 traductores y adjuntos de 17 MB, una sola
+            // llamada podía morir por tiempo después de mandar y antes de
+            // apuntar (caso real: 0915-05-M, 15/09 18:54). Ahora, si algo
+            // falla a mitad, la hoja ya sabe a quién se pidió y en pantalla ves
+            // exactamente qué lote no salió.
+            const LOTE = 4;
+            const lotes = [];
+            for (let k = 0; k < providers.length; k += LOTE) lotes.push(providers.slice(k, k + LOTE));
+            let ok = 0, fallidos = [], loteConError = null;
+            if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
+
             try {
-                // v3.7.96: SIN reintento automático. Enviar emails NO es
-                // idempotente: si la respuesta se pierde tras un envío que sí
-                // salió, el reintento duplicaba los correos (caso real:
-                // duplicados a las 11:31 y 11:32). El backend v3.7.60 añade
-                // además un candado de 2 min por proveedor.
-                const data = await apiPost({
-                        action: 'sendProviderEmails',
-                        providers: providers,
-                        budgetId: budgetData.id,
-                        folderId: budgetData.folderId,
-                        sourceLang: budgetData.sourceLang,
-                        targetLang: budgetData.targetLang,
-                        customMessage: customMessage,  // Mensaje editado por el usuario
-                        additionalComments: additionalComments  // Comentarios para proveedores
-                    }, { retry: false });
-                
-                if (data.success) {
-                    hideStatus();
-                    const ok = data.results.filter(r => r.success).length;
-                    
-                    // AÑADIR nuevos traductores a los ya contactados (sin duplicar)
-                    const newProviders = providers.map(p => ({
-                        nombre: p.nombre,
-                        email: p.email
-                    }));
-                    
-                    // Inicializar si no existe
-                    if (!budgetData.contactedProviders) {
-                        budgetData.contactedProviders = [];
+                for (let li = 0; li < lotes.length; li++) {
+                    const lote = lotes[li];
+                    showStatus(`Enviando a ${lote.map(p => p.nombre).join(', ')} (${li * LOTE + 1}–${Math.min((li + 1) * LOTE, providers.length)} de ${providers.length})… no repitas el envío`, 'loading');
+                    // Sin reintento automático (v3.7.96): enviar correos no es
+                    // idempotente. El candado de 2 min del backend protege si
+                    // alguien reintenta a mano.
+                    let data = null;
+                    try {
+                        data = await apiPost({
+                            action: 'sendProviderEmails',
+                            providers: lote,
+                            budgetId: budgetData.id,
+                            folderId: budgetData.folderId,
+                            sourceLang: budgetData.sourceLang,
+                            targetLang: budgetData.targetLang,
+                            customMessage: customMessage,
+                            additionalComments: li === 0 ? additionalComments : ''   // los comentarios, una vez
+                        }, { retry: false });
+                    } catch (eLote) {
+                        // Respuesta perdida o red caída: el lote puede haber salido
+                        // (y estar ya apuntado en la hoja) o no. Se para aquí y se
+                        // dice exactamente en cuál, para que Recuperar desde Gmail
+                        // o un reenvío acotado lo resuelvan.
+                        data = { success: false, error: (eLote && eLote.message) || 'sin respuesta' };
                     }
-                    
-                    // Añadir solo los que no están ya en la lista
-                    newProviders.forEach(newP => {
-                        const exists = budgetData.contactedProviders.some(
-                            existing => existing.nombre === newP.nombre
-                        );
-                        if (!exists) {
-                            budgetData.contactedProviders.push(newP);
-                        }
+                    if (!data || !data.success) { loteConError = { lote: lote, error: (data && data.error) || 'sin respuesta' }; break; }
+
+                    // El servidor ya los ha apuntado: reflejarlo en memoria
+                    if (!sigueSiendo(idFlujoTas)) { loteConError = null; break; }   // v3.10.44: otro presupuesto abierto, no tocar
+                    lote.forEach(p => {
+                        if (!budgetData.contactedProviders.some(c => c.nombre === p.nombre)) budgetData.contactedProviders.push({ nombre: p.nombre, email: p.email });
+                        if (!budgetData.historialTraductores) budgetData.historialTraductores = {};
+                        if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
+                        budgetData.historialTraductores[p.nombre].push({ fecha: data.fechaEnvio, email: p.email });
                     });
-                    
+                    (data.results || []).forEach(r => { if (r.success) ok++; else fallidos.push(r.provider + (r.error ? ' (' + r.error + ')' : '')); });
+                    try { renderContactedProviders(); } catch (e) {}
+                }
+
+                if (loteConError) {
+                    const pendientes = providers.slice(providers.indexOf(loteConError.lote[0]));
+                    throw new Error('Se envió a ' + ok + ' traductor(es). Falló al llegar a ' + loteConError.lote.map(p => p.nombre).join(', ') +
+                        ': ' + loteConError.error + '. Sin enviar: ' + pendientes.map(p => p.nombre).join(', ') +
+                        '. Vuelve a marcar solo a esos y envía otra vez (los ya enviados están protegidos contra duplicados 2 min; ' +
+                        'si dudas, usa "Recuperar desde Gmail" en el paso 4).');
+                }
+
+                {
+                    hideStatus();
+                    if (fallidos.length) {
+                        showStatus('⚠️ ' + fallidos.length + ' correo(s) no salieron: ' + fallidos.join(' · '), 'warning');
+                        setTimeout(hideStatus, 9000);
+                    }
                     showSuccess('Emails enviados', `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`);
                     
                     // v3.7.55: marcar "1-Tasación Solicitada" salvo que ya esté
                     // en un estado más avanzado (2-Enviado / 3-Pedido).
                     const est = budgetData.estado || '';
-                    if (!est || est.startsWith('0')) {
-                        try { await updateBudgetStatusFE('1-Tasación Solicitada'); } catch(e) { console.warn('estado tasación:', e); }
+                    if (sigueSiendo(idFlujoTas) && (!est || est.startsWith('0'))) {
+                        try { await updateBudgetStatusFE('1-Tasación Solicitada', idFlujoTas); } catch(e) { console.warn('estado tasación:', e); }
                     }
                     
                     completedSteps.add(4);
@@ -11368,8 +11613,6 @@
                         // Ir al paso 5 para introducir cotizaciones
                         showCard(5);
                     }, 2000);
-                } else {
-                    throw new Error(data.error);
                 }
             } catch (error) {
                 // v3.7.96: sin reintento automático, un fallo real llega aquí.
@@ -11387,6 +11630,7 @@
         
         // Renderizar traductores contactados con radio buttons
         function renderContactedProviders() {
+            try { fillAddContactedSelect(); } catch (e) {}   // v3.10.42
             const container = document.getElementById('contactedProvidersList');
             if (!budgetData.contactedProviders || budgetData.contactedProviders.length === 0) {
                 container.innerHTML = '<div class="no-providers">No se han contactado traductores</div>';
@@ -11435,7 +11679,7 @@
                         <div class="contacted-header" onclick="chooseProvider(${idx})">
                             <div class="contacted-radio"></div>
                             <div class="contacted-info">
-                                <div class="contacted-name">${p.nombre}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}</div>
+                                <div class="contacted-name">${p.nombre}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}${quote.acordada ? ' <span style="font-size:0.72rem;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:999px;font-weight:600;">🤝 tarifa acordada</span>' : ''}</div>
                                 <div class="contacted-email">${p.email}</div>
                                 ${sendHistoryHtml}
                             </div>
@@ -11513,6 +11757,74 @@
             showStatus('Plazo para el cliente: ' + propuesto + ' días (' + elegido + ': ' + dias + ' + 1). Puedes cambiarlo.', 'success');
             setTimeout(hideStatus, 3500);
             return true;
+        }
+
+        // ====== v3.10.42: AÑADIR CONTACTADO SIN ENVIAR ======
+        // Rellena el desplegable con los traductores ACTIVOS del par del
+        // presupuesto que aún no figuran como contactados.
+        function fillAddContactedSelect() {
+            const sel = document.getElementById('addContactedSelect');
+            if (!sel) return;
+            const src = budgetData.sourceLang, tgt = budgetData.targetLang;
+            const ya = new Set((budgetData.contactedProviders || []).map(c => String(c.nombre || '').trim().toLowerCase()));
+            const cand = (allProviders || [])
+                .filter(p => p.idiomaOrigen === src && p.idiomaDestino === tgt && p.activo !== false && p.email)
+                .filter(p => !ya.has(String(p.nombre || '').trim().toLowerCase()))
+                .sort(compareByOrden);
+            sel.innerHTML = '<option value="">— elige traductor —</option>' +
+                cand.map(p => `<option value="${escapeHtmlAttr(p.email)}">${p.nombre} · ${p.email}</option>`).join('');
+            sel.parentElement.style.display = cand.length ? 'flex' : 'none';
+        }
+
+        // v3.10.43: reconstruir contactados desde los correos realmente enviados
+        async function recoverContactedFromGmail() {
+            if (!budgetData.id) return;
+            showStatus('Buscando en Enviados de Gmail los correos de ' + budgetData.id + '…', 'loading');
+            try {
+                const data = await apiPost({ action: 'recoverContactedFromGmail', budgetId: budgetData.id }, { retry: true, attempts: 2, timeoutMs: 60000 });
+                if (!data || !data.success) throw new Error((data && data.error) || 'Error desconocido');
+                if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
+                if (!budgetData.historialTraductores) budgetData.historialTraductores = {};
+                let nuevos = 0;
+                (data.providers || []).forEach(p => {
+                    if (!budgetData.contactedProviders.some(c => c.nombre === p.nombre)) { budgetData.contactedProviders.push({ nombre: p.nombre, email: p.email }); nuevos++; }
+                    if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
+                    if (!budgetData.historialTraductores[p.nombre].some(hh => hh.fecha === p.fecha + ' (recuperado de Gmail)')) {
+                        budgetData.historialTraductores[p.nombre].push({ fecha: p.fecha + ' (recuperado de Gmail)', email: p.email });
+                    }
+                });
+                renderContactedProviders();
+                let msg = '✓ ' + (data.providers || []).length + ' destinatario(s) en Gmail · ' + nuevos + ' nuevo(s) apuntado(s)';
+                if (data.unknownEmails && data.unknownEmails.length) msg += ' · sin ficha en Traductores: ' + data.unknownEmails.join(', ');
+                showStatus(msg, nuevos || !(data.unknownEmails || []).length ? 'success' : 'warning');
+                setTimeout(hideStatus, 8000);
+            } catch (e) {
+                showStatus('No se pudo recuperar: ' + e.message, 'error'); setTimeout(hideStatus, 5000);
+            }
+        }
+
+        async function addContactedManual() {
+            const sel = document.getElementById('addContactedSelect');
+            const email = sel ? sel.value : '';
+            if (!email) { showStatus('Elige un traductor', 'warning'); setTimeout(hideStatus, 2500); return; }
+            const p = (allProviders || []).find(x => x.email === email && x.idiomaOrigen === budgetData.sourceLang && x.idiomaDestino === budgetData.targetLang)
+                   || (allProviders || []).find(x => x.email === email);
+            if (!p || !budgetData.id) return;
+            showStatus('Apuntando a ' + p.nombre + '…', 'loading');
+            try {
+                const data = await apiPost({ action: 'addContactedProviders', budgetId: budgetData.id, providers: [{ nombre: p.nombre, email: p.email }] }, { retry: true, attempts: 3, timeoutMs: 30000 });
+                if (!data || !data.success) throw new Error((data && data.error) || 'Error desconocido');
+                if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
+                if (!budgetData.contactedProviders.some(c => c.nombre === p.nombre)) budgetData.contactedProviders.push({ nombre: p.nombre, email: p.email });
+                if (!budgetData.historialTraductores) budgetData.historialTraductores = {};
+                if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
+                budgetData.historialTraductores[p.nombre].push({ fecha: data.fechaEnvio + ' (sin envío)', email: p.email, manual: true });
+                renderContactedProviders();
+                fillAddContactedSelect();
+                showStatus('✓ ' + p.nombre + ' apuntado como contactado', 'success'); setTimeout(hideStatus, 2500);
+            } catch (e) {
+                showStatus('No se pudo apuntar: ' + e.message, 'error'); setTimeout(hideStatus, 4000);
+            }
         }
 
         // Actualizar cotización de un proveedor
@@ -13443,12 +13755,18 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         function _saveClientCopyBackground(tipo, destinatario, labelCanal, historialKey) {
             if (_savingClientCopy) return;   // anti doble clic: ya hay un guardado en marcha
             _savingClientCopy = true;
+            const idFlujo = budgetData.id;   // v3.10.44: el presupuesto de ESTE clic
             (async () => {
                 try {
                     await saveClientData();
-                    const historialResult = await saveClientSendHistoryFE(tipo, destinatario);
-                    await updateBudgetStatusFE('2-Presupuesto Enviado');
+                    const historialResult = await saveClientSendHistoryFE(tipo, destinatario, idFlujo);
+                    await updateBudgetStatusFE('2-Presupuesto Enviado', idFlujo);
 
+                    if (!sigueSiendo(idFlujo)) {
+                        // Se guardó en la hoja del presupuesto correcto; la pantalla ya es otra
+                        console.warn('Copia ' + labelCanal + ' de ' + idFlujo + ' guardada; ya hay otro presupuesto abierto, no se pinta');
+                        return;
+                    }
                     completedSteps.add(5);
                     updateProgressSteps();
 
@@ -13517,13 +13835,14 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
         
         // Guardar historial de envío a cliente en backend
-        async function saveClientSendHistoryFE(tipo, destinatario) {
-            if (!budgetData.id) return null;
+        async function saveClientSendHistoryFE(tipo, destinatario, idFlujo) {
+            const budgetId = idFlujo || budgetData.id;   // v3.10.44
+            if (!budgetId) return null;
             
             try {
                 const data = await apiPost({
                         action: 'saveClientSendHistory',
-                        budgetId: budgetData.id,
+                        budgetId: budgetId,
                         tipo: tipo,
                         destinatario: destinatario
                     });
@@ -13615,18 +13934,32 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
         
         // Función para actualizar estado del presupuesto
-        async function updateBudgetStatusFE(status) {
-            if (!budgetData.id) {
+        // ====== v3.10.44: UN FLUJO, UN PRESUPUESTO ======
+        // Todo lo que encadena llamadas a Apps Script tarda segundos, y en esos
+        // segundos puedes haber empezado otro presupuesto. Las funciones de
+        // abajo leían budgetData.id AL TERMINAR cada llamada, no al empezar:
+        // caso real, 16/09 19:29 → "Copiar WhatsApp" en un presupuesto, nuevo
+        // presupuesto a las 19:31, y la cadena escribió estado
+        // "2-Presupuesto Enviado" y el historial de WhatsApp en el NUEVO, en
+        // pantalla y en la hoja. Ahora cada flujo captura el id al arrancar,
+        // lo pasa a cada llamada y no toca budgetData si ya es otro.
+        function sigueSiendo(idFlujo) {
+            return !!(budgetData && idFlujo && budgetData.id === idFlujo);
+        }
+
+        async function updateBudgetStatusFE(status, idFlujo) {
+            const budgetId = idFlujo || budgetData.id;
+            if (!budgetId) {
                 console.error('updateBudgetStatusFE: No hay budgetData.id');
                 return;
             }
             
-            console.log('Actualizando estado:', budgetData.id, '->', status);
+            console.log('Actualizando estado:', budgetId, '->', status);
             
             try {
                 const result = await apiPost({
                         action: 'updateStatus',
-                        budgetId: budgetData.id,
+                        budgetId: budgetId,
                         status: status
                     });
                 console.log('Respuesta updateStatus:', result);
@@ -13636,8 +13969,13 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 }
                 
                 // v3.7.55: reflejar el estado en local y en la barra de resumen
-                budgetData.estado = status;
-                if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                // v3.10.44: solo si sigue abierto ese presupuesto
+                if (sigueSiendo(budgetId)) {
+                    budgetData.estado = status;
+                    if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                } else {
+                    console.warn('updateBudgetStatusFE: el estado de ' + budgetId + ' se guardó, pero ya hay otro presupuesto abierto; no se toca la pantalla');
+                }
                 
                 return result;
             } catch (error) {
@@ -13647,6 +13985,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         }
 
         async function sendClientEmail() {
+            const idFlujoEmail = budgetData.id;   // v3.10.44
             const emailRaw = document.getElementById('clientEmail').value.trim();
             const email = extractEmail(emailRaw);
             const whatsapp = document.getElementById('clientWhatsApp').value.trim();
@@ -13682,6 +14021,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 if (data.success) {
                     // Actualizar historial local
                     if (data.fechaEnvio) {
+                        if (!sigueSiendo(idFlujoEmail)) { console.warn('email de ' + idFlujoEmail + ' enviado; ya hay otro presupuesto abierto'); return; }   // v3.10.44
                         if (!budgetData.historialCliente) budgetData.historialCliente = {};
                         if (!budgetData.historialCliente.email) budgetData.historialCliente.email = [];
                         budgetData.historialCliente.email.push({ fecha: data.fechaEnvio, destinatario: email });
