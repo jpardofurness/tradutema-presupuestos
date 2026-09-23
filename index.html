@@ -1694,7 +1694,12 @@
                 <!-- Tarifa por palabra según idiomas (de hoja Tarifas) -->
                 <div class="margin-calc-row">
                     <span class="margin-label">Tarifa referencia:</span>
-                    <span class="margin-value" id="referenceRateDisplay">-</span>
+                    <input type="number" id="referenceRateInput" min="0" step="0.001" placeholder="€/pal"
+                           onchange="onReferenceRateEdit()" style="width: 90px;" title="Tarifa proveedor por palabra (editable)">
+                    <span class="margin-value">€/pal</span>
+                    <button type="button" class="btn btn-secondary btn-sm" id="referenceRateRestoreBtn"
+                            onclick="restoreReferenceRate()" style="display:none; padding: 2px 8px;"
+                            title="Volver a la tarifa de la hoja Tarifas">↺ hoja</button>
                     <span class="margin-hint" id="referenceRateHint">(€/palabra, de hoja Tarifas)</span>
                 </div>
                 
@@ -2018,7 +2023,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.46';
+        const HTML_VERSION = '3.10.47';
         const HTML_DATE = '23/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -2070,6 +2075,7 @@
             fileAnalysis: [],
             folderFiles: [],           // Archivos de la carpeta de Drive
             tariffPerWord: 0,
+            tariffPerWordManual: null, // v3.10.47: tarifa €/pal editada a mano en paso 5
             tariffPage1: 0,
             tariffPage2: 0,
             contactedProviders: [],    // Traductores a los que se envió tasación
@@ -2758,7 +2764,7 @@
                 clientEmail: '', clientWhatsApp: '',
                 wordCount: null, pageCount: null, fileAnalysis: [],
                 folderFiles: [],
-                tariffPerWord: 0, tariffPage1: 0, tariffPage2: 0,
+                tariffPerWord: 0, tariffPerWordManual: null, tariffPage1: 0, tariffPage2: 0,
                 contactedProviders: [], chosenProvider: null,
                 historialTraductores: {}, historialCliente: {},
                 fileSettings: {}
@@ -12492,6 +12498,9 @@
                 otrosIdiomas: budgetData.otrosIdiomas || null,   // v3.8.8
                 sourceLang: budgetData.sourceLang || '',
                 targetLang: budgetData.targetLang || '',
+                // v3.10.47: tarifa €/pal editada a mano (null = la de hoja Tarifas)
+                tariffManual: (parseFloat(budgetData.tariffPerWordManual) > 0) ? parseFloat(budgetData.tariffPerWordManual) : null,
+                tariffSheet: parseFloat(budgetData.tariffPerWord) || 0,
                 providerName: provName,
                 providerQuote: provQuote,
                 savedAt: new Date().toISOString()
@@ -12501,6 +12510,9 @@
         function applyQuoteConfig(cfg) {
             if (!cfg || typeof cfg !== 'object') return;
             try {
+                // 0) v3.10.47: tarifa €/pal manual, ANTES de recalcular
+                const tm = parseFloat(cfg.tariffManual);
+                budgetData.tariffPerWordManual = (!isNaN(tm) && tm > 0) ? tm : null;
                 // 1) método: marcar el radio y desplegar su caja
                 const m = CALC_METHOD_LABELS[cfg.method] ? cfg.method : 'pages';
                 const radio = document.querySelector(`input[name="calcMethod"][value="${m}"]`);
@@ -12520,6 +12532,7 @@
                     const el = document.getElementById(id);
                     if (el) el.checked = !!cfg.checks[id];
                 });
+                if (m === 'words' && typeof pintarTarifaReferencia === 'function') pintarTarifaReferencia();
                 renderQuoteConfigStamp(cfg);
             } catch (e) {
                 console.warn('applyQuoteConfig:', e);
@@ -12779,22 +12792,69 @@
         }
         
         // Recalcular desde palabras
+        // ====== v3.10.47: TARIFA €/PALABRA EDITABLE EN PASO 5 ======
+        // La tarifa de referencia viene de la hoja Tarifas (budgetData.tariffPerWord),
+        // pero se puede sobreescribir a mano. El valor manual vive en
+        // budgetData.tariffPerWordManual y se guarda con la ficha de tarificación
+        // (quoteConfig.tariffManual) para que sobreviva al reabrir el presupuesto.
+        function tarifaPalabraEfectiva() {
+            const m = parseFloat(budgetData.tariffPerWordManual);
+            if (!isNaN(m) && m > 0) return m;
+            return parseFloat(budgetData.tariffPerWord) || 0;
+        }
+        function pintarTarifaReferencia() {
+            const input = document.getElementById('referenceRateInput');
+            const hint = document.getElementById('referenceRateHint');
+            const btn = document.getElementById('referenceRateRestoreBtn');
+            if (!input || !hint) return;
+            const sheet = parseFloat(budgetData.tariffPerWord) || 0;
+            const manual = parseFloat(budgetData.tariffPerWordManual);
+            const esManual = !isNaN(manual) && manual > 0;
+            const rate = tarifaPalabraEfectiva();
+            // No pisar lo que el usuario está tecleando ahora mismo
+            if (document.activeElement !== input) {
+                input.value = rate > 0 ? String(Math.round(rate * 1000) / 1000) : '';
+            }
+            const par = (budgetData.sourceLang || '?') + ' → ' + (budgetData.targetLang || '?');
+            if (esManual) {
+                hint.textContent = sheet > 0
+                    ? `(editada a mano · hoja Tarifas: ${sheet.toFixed(3)} €)`
+                    : '(editada a mano · sin tarifa en hoja Tarifas)';
+                input.style.borderColor = 'var(--warning, #f59e0b)';
+            } else if (sheet > 0) {
+                hint.textContent = `(de hoja Tarifas · ${par})`;
+                input.style.borderColor = '';
+            } else {
+                hint.textContent = '(no definida en hoja Tarifas · escríbela aquí)';
+                input.style.borderColor = '';
+            }
+            if (btn) btn.style.display = (esManual && sheet > 0) ? '' : 'none';
+        }
+        function onReferenceRateEdit() {
+            const input = document.getElementById('referenceRateInput');
+            if (!input) return;
+            const v = parseFloat(String(input.value).replace(',', '.'));
+            const sheet = parseFloat(budgetData.tariffPerWord) || 0;
+            if (isNaN(v) || v <= 0 || Math.abs(v - sheet) < 1e-9) {
+                // vacío, 0 o igual a la hoja => vuelve a modo "hoja"
+                budgetData.tariffPerWordManual = null;
+            } else {
+                budgetData.tariffPerWordManual = v;
+            }
+            recalculateFromWords();
+            if (typeof updateClientMessage === 'function') updateClientMessage();
+        }
+        function restoreReferenceRate() {
+            budgetData.tariffPerWordManual = null;
+            recalculateFromWords();
+            if (typeof updateClientMessage === 'function') updateClientMessage();
+        }
+
         function recalculateFromWords() {
             const wordCount = parseInt(document.getElementById('quoteWordCount').value) || 0;
-            // Usar tarifa de la hoja Tarifas según combinación de idiomas
-            const rate = budgetData.tariffPerWord || 0;
-            
-            // Mostrar tarifa de referencia
-            const rateDisplay = document.getElementById('referenceRateDisplay');
-            if (rate > 0) {
-                rateDisplay.textContent = rate.toFixed(3) + ' €';
-                document.getElementById('referenceRateHint').textContent = 
-                    `(${budgetData.sourceLang} → ${budgetData.targetLang})`;
-            } else {
-                rateDisplay.textContent = 'No definida';
-                document.getElementById('referenceRateHint').textContent = 
-                    '(Añadir en hoja Tarifas)';
-            }
+            // Tarifa de la hoja Tarifas, o la editada a mano (v3.10.47)
+            const rate = tarifaPalabraEfectiva();
+            pintarTarifaReferencia();
             
             // Coste proveedor = tarifa × palabras
             const providerCost = rate * wordCount;
@@ -12834,7 +12894,7 @@
         
         // Actualizar visualización cuando cambia la tarifa
         function onWordsAmountChange() {
-            const rate = budgetData.tariffPerWord || 0;
+            const rate = tarifaPalabraEfectiva();
             const wordCount = parseInt(document.getElementById('quoteWordCount').value) || 0;
             const providerCost = rate * wordCount;
             const suggestedMargin = calculateSuggestedMargin(providerCost);
