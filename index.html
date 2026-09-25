@@ -557,6 +557,16 @@
         .margin-status.low { background: rgba(241, 196, 15, 0.15); color: #d4a106; }
         .margin-status.high { background: rgba(231, 76, 60, 0.1); color: #c0392b; }
         .margin-hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
+        /* v3.10.53: la tabla de recuento (paso 3) se salía de la tarjeta con nombres de
+           archivo largos sin espacios (p. ej. "Апостиль_по_заявлению_№_19512_…pdf"):
+           la columna del nombre no podía partirse, la tabla crecía más que la caja y
+           las demás columnas se apretaban ("sin / analizar" en dos líneas). */
+        #wordCountSummaryBox { overflow-x: auto; min-width: 0; }
+        #wordCountSummaryTable { width: 100%; max-width: 100%; table-layout: auto; }
+        #wordCountSummaryTable th { white-space: nowrap; }
+        #wordCountSummaryTable td { vertical-align: top; }
+        #wordCountSummaryTable td:first-child { overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
+        #wordCountSummaryTable td:not(:first-child) { white-space: nowrap; }
         .calc-method-option.cm-active { background: #dbeafe; box-shadow: inset 0 0 0 2px var(--primary-blue); font-weight: 600; }
         .calc-method-selector { background: #f8f9fa; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; }
         .calc-method-title { font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
@@ -2003,7 +2013,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.51';
+        const HTML_VERSION = '3.10.53';
         const HTML_DATE = '25/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -5565,14 +5575,85 @@
         let budgetsShowingAll = false; // ¿está cargado el listado completo?
         let budgetsLoadingAll = false; // v3.7.91: carga del completo en curso
 
+        // ====== v3.10.52: COPIA LOCAL COMPLETA DEL LISTADO ======
+        // Caso 25/09 17:50: "Retomar" enseñaba "No hay presupuestos" y tardó 4
+        // minutos en pintar. Dos causas: (1) el backend leía la hoja entera
+        // (4,3 MB, el 88 % son análisis y mensajes que el listado no usa) en
+        // CADA llamada — corregido en el Apps Script 3.7.89 —, y (2) el
+        // navegador dependía de esa llamada: si una respuesta llegaba vacía
+        // o se perdía, la copia local de los 50 recientes se pisaba con [].
+        // Ahora:
+        //   · el listado COMPLETO se guarda en el navegador (IndexedDB, misma
+        //     base que la caché de pedidos) y se pinta al instante: buscar
+        //     un presupuesto antiguo ya no necesita al servidor;
+        //   · al entrar se piden solo los 50 recientes con tiempo máximo y se
+        //     FUNDEN con la copia (nuevos y cambios de estado); la copia
+        //     completa se renueva sola en segundo plano cada 12 h o si el
+        //     servidor dice que hay más presupuestos de los que tenemos;
+        //   · una respuesta vacía o sin listado se trata como error: nunca
+        //     sustituye a una copia con datos.
+        const BUDGETS_ALL_MAX_AGE_MS = 12 * 3600 * 1000;
+        let budgetsAllSavedAt = 0;      // cuándo se guardó la copia completa
+        let budgetsRefreshing = false;  // refresco (ligero o completo) en curso
+
+        async function leerCacheLocalPresupuestos() {
+            try {
+                const db = await _wooDb();
+                return await new Promise((res, rej) => {
+                    const tx = db.transaction('cache', 'readonly');
+                    const rq = tx.objectStore('cache').get('presupuestos');
+                    rq.onsuccess = () => res(rq.result || null);
+                    rq.onerror = () => rej(rq.error);
+                });
+            } catch (e) { return null; }
+        }
+        async function guardarCacheLocalPresupuestos(budgets, total, completa) {
+            if (!Array.isArray(budgets) || !budgets.length) return;   // nunca guardar vacío
+            try {
+                const db = await _wooDb();
+                await new Promise((res, rej) => {
+                    const tx = db.transaction('cache', 'readwrite');
+                    tx.objectStore('cache').put(
+                        { budgets: budgets, total: total || budgets.length, completa: !!completa,
+                          savedAt: Date.now(), appVersion: HTML_VERSION },
+                        'presupuestos');
+                    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+                });
+            } catch (e) { console.warn('No se pudo guardar la copia local del listado:', e); }
+        }
+        // Funde los recientes en la copia completa (por id) y reordena por fecha.
+        function fundirPresupuestos(base, recientes) {
+            const porId = new Map();
+            (base || []).forEach(b => { if (b && b.id) porId.set(String(b.id), b); });
+            (recientes || []).forEach(b => { if (b && b.id) porId.set(String(b.id), b); });
+            const out = Array.from(porId.values());
+            out.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+            return out;
+        }
+        function textoHace(ms) {
+            const m = Math.round(ms / 60000);
+            if (m < 1) return 'ahora mismo';
+            if (m < 60) return 'hace ' + m + ' min';
+            const h = Math.round(m / 60);
+            if (h < 48) return 'hace ' + h + ' h';
+            return 'hace ' + Math.round(h / 24) + ' días';
+        }
+
         async function fetchBudgetsData(limit) {
-            // v3.8.4: también lectura idempotente → reintentos generosos
-            const data = await apiPost({ action: 'getBudgets', limit: limit || 0 }, { retry: true, attempts: 4 });
-            if (!data.success) throw new Error(data.error || 'Error desconocido');
-            const budgets = data.budgets || [];
-            budgetsTotal = data.total || budgets.length;
-            if (limit) {
-                // solo se cachea el listado ligero (es el que arranca rápido)
+            // v3.8.4: lectura idempotente → reintentos generosos.
+            // v3.10.52: con tiempo máximo por intento (antes una llamada colgada
+            // por Google bloqueaba minutos) y validando la respuesta.
+            const data = await apiPost({ action: 'getBudgets', limit: limit || 0 },
+                { retry: true, attempts: limit ? 4 : 2, timeoutMs: limit ? 25000 : 90000 });
+            if (!data || !data.success) throw new Error((data && data.error) || 'Error desconocido');
+            if (!Array.isArray(data.budgets)) throw new Error('El servidor no devolvió el listado');
+            const budgets = data.budgets;
+            const total = parseInt(data.total, 10) || budgets.length;
+            if (budgets.length === 0 && total > 0) throw new Error('Listado vacío inesperado (el servidor dice que hay ' + total + ')');
+            if (budgets.length === 0 && allBudgets.length > 0) throw new Error('Listado vacío inesperado');
+            budgetsTotal = total;
+            if (limit && budgets.length) {
+                // copia ligera de arranque (compatibilidad con la 3.7.88)
                 try { localStorage.setItem('tradutema_budgets_cache', JSON.stringify(budgets)); } catch (e) {}
             }
             return budgets;
@@ -5600,53 +5681,106 @@
                 bar.innerHTML = `Mostrando los <b>${allBudgets.length}</b> más recientes de <b>${budgetsTotal}</b> · ` +
                     `<a href="#" onclick="loadAllBudgets(); return false;" style="font-weight:600;">📥 Cargar todos</a>`;
                 bar.style.display = 'block';
+            } else if (budgetsShowingAll && allBudgets.length) {
+                // v3.10.52: copia local completa — se dice cuándo se actualizó
+                const cuando = budgetsAllSavedAt ? textoHace(Date.now() - budgetsAllSavedAt) : '';
+                bar.innerHTML = `<b>${allBudgets.length}</b> presupuestos` +
+                    (cuando ? ` · copia local actualizada ${cuando}` : '') +
+                    (budgetsRefreshing ? ' · <span class="spinner dark" style="width:10px;height:10px;"></span> actualizando…'
+                                       : ` · <a href="#" onclick="loadAllBudgets(); return false;" title="Volver a descargar el listado completo">⟳ actualizar</a>`);
+                bar.style.display = 'block';
             } else {
                 bar.style.display = 'none';
             }
         }
 
-        async function loadAllBudgets() {
+        async function loadAllBudgets(silencioso) {
             if (budgetsLoadingAll) return;   // v3.7.91: ya en curso
             budgetsLoadingAll = true;
+            budgetsRefreshing = true;
             const bar = document.getElementById('loadAllBudgetsBar');
-            if (bar) {
+            if (bar && !silencioso) {
                 bar.style.display = 'block';
                 bar.innerHTML = '<span class="spinner dark"></span> Cargando todos los presupuestos...';
+            } else if (bar) {
+                updateLoadAllBudgetsBar();
             }
             try {
                 const budgets = await fetchBudgetsData(0);   // sin límite
                 budgetsShowingAll = true;
+                budgetsAllSavedAt = Date.now();
+                budgetsRefreshing = false;
                 applyBudgets(budgets);
+                guardarCacheLocalPresupuestos(budgets, budgetsTotal, true);   // v3.10.52
             } catch (e) {
-                if (bar) bar.innerHTML = 'No se pudo cargar el listado completo: ' + e.message +
-                    ' · <a href="#" onclick="loadAllBudgets(); return false;">Reintentar</a>';
+                budgetsRefreshing = false;
+                if (silencioso) {
+                    console.warn('Refresco completo del listado falló (se sigue con la copia local):', e.message);
+                    updateLoadAllBudgetsBar();
+                } else if (bar) {
+                    bar.innerHTML = 'No se pudo cargar el listado completo: ' + e.message +
+                        ' · <a href="#" onclick="loadAllBudgets(); return false;">Reintentar</a>';
+                }
             } finally {
                 budgetsLoadingAll = false;
             }
         }
 
         async function loadBudgets() {
-            budgetsShowingAll = false;   // cada entrada empieza en modo ligero
+            budgetsShowingAll = false;
             let cacheAplicada = false;
-            try {
-                const raw = localStorage.getItem('tradutema_budgets_cache');
-                if (raw) {
-                    applyBudgets(JSON.parse(raw));
-                    cacheAplicada = true;
-                }
-            } catch (e) {}
+
+            // 1) v3.10.52: copia local COMPLETA (IndexedDB) → se pinta al instante
+            let copiaCompleta = null;
+            try { copiaCompleta = await leerCacheLocalPresupuestos(); } catch (e) {}
+            if (copiaCompleta && Array.isArray(copiaCompleta.budgets) && copiaCompleta.budgets.length) {
+                budgetsTotal = Math.max(parseInt(copiaCompleta.total, 10) || 0, copiaCompleta.budgets.length);
+                budgetsAllSavedAt = copiaCompleta.savedAt || 0;
+                budgetsShowingAll = !!copiaCompleta.completa;
+                applyBudgets(copiaCompleta.budgets);
+                cacheAplicada = true;
+            } else {
+                // 2) copia ligera (50 recientes) de versiones anteriores
+                try {
+                    const raw = localStorage.getItem('tradutema_budgets_cache');
+                    const lite = raw ? JSON.parse(raw) : null;
+                    if (Array.isArray(lite) && lite.length) { applyBudgets(lite); cacheAplicada = true; }
+                } catch (e) {}
+            }
 
             if (cacheAplicada) {
-                // Refresco silencioso: si falla, se sigue con la copia local
+                // 3) refresco silencioso de los recientes, FUNDIDO con la copia.
+                //    Si falla, se sigue con la copia local tal cual.
+                budgetsRefreshing = true; updateLoadAllBudgetsBar();
                 fetchBudgetsData(BUDGETS_DEFAULT_LIMIT)
-                    .then(budgets => { if (!budgetsShowingAll) applyBudgets(budgets); })
-                    .catch(err => console.warn('Refresco de presupuestos falló (se usa la copia local):', err.message));
+                    .then(recientes => {
+                        budgetsRefreshing = false;
+                        if (budgetsLoadingAll) return;   // ya viene el completo
+                        if (budgetsShowingAll) {
+                            const fundido = fundirPresupuestos(allBudgets, recientes);
+                            applyBudgets(fundido);
+                            guardarCacheLocalPresupuestos(fundido, budgetsTotal, true);
+                            // hay presupuestos que la copia no tiene (creados fuera, copia
+                            // antigua…) o la copia ya es vieja → completo en segundo plano
+                            if (budgetsTotal > fundido.length || (Date.now() - budgetsAllSavedAt) > BUDGETS_ALL_MAX_AGE_MS) {
+                                loadAllBudgets(true);
+                            }
+                        } else {
+                            applyBudgets(recientes);
+                            loadAllBudgets(true);   // primera vez: construir la copia completa
+                        }
+                    })
+                    .catch(err => {
+                        budgetsRefreshing = false; updateLoadAllBudgetsBar();
+                        console.warn('Refresco de presupuestos falló (se usa la copia local):', err.message);
+                    });
                 return;
             }
 
             document.getElementById('budgetList').innerHTML = '<div class="no-budgets"><span class="spinner dark"></span> Cargando...</div>';
             try {
                 applyBudgets(await fetchBudgetsData(BUDGETS_DEFAULT_LIMIT));
+                loadAllBudgets(true);   // v3.10.52: construir la copia completa sin molestar
             } catch (error) {
                 document.getElementById('budgetList').innerHTML =
                     `<div class="no-budgets">Error: ${error.message}<br>` +
@@ -5695,7 +5829,7 @@
             // listado completo; al llegar, applyBudgets vuelve a filtrar solo.
             const hayFiltro = !!(code || status || channel || source || target || email || whatsapp || dateFrom);
             if (hayFiltro && !budgetsShowingAll && !budgetsLoadingAll && budgetsTotal > allBudgets.length) {
-                loadAllBudgets();
+                loadAllBudgets();   // sin copia completa todavía: como antes
             }
             
             filteredBudgets = allBudgets.filter(b => {
