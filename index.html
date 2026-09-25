@@ -2003,7 +2003,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.50';
+        const HTML_VERSION = '3.10.51';
         const HTML_DATE = '25/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -11559,7 +11559,20 @@
                         budgetData.historialTraductores[p.nombre].push({ fecha: data.fechaEnvio, email: p.email });
                     });
                     (data.results || []).forEach(r => { if (r.success) ok++; else fallidos.push(r.provider + (r.error ? ' (' + r.error + ')' : '')); });
+                    // v3.10.51 (caso 0925-02-W): el backend pone "1-Tasación
+                    // Solicitada" al registrar el lote, así que la pantalla lo
+                    // refleja YA, sin esperar a otra llamada que puede fallar
+                    // o llegar tarde. Y el aviso "marcados sin solicitud" se
+                    // recalcula, que se quedaba colgado hasta cambiar de paso.
+                    {
+                        const est = budgetData.estado || '';
+                        if (!est || est.startsWith('0')) {
+                            budgetData.estado = '1-Tasación Solicitada';
+                            if (typeof updateBudgetSummaryBar === 'function') { try { updateBudgetSummaryBar(); } catch (e) {} }
+                        }
+                    }
                     try { renderContactedProviders(); } catch (e) {}
+                    try { refreshStep4ContinueHint(); } catch (e) {}
                 }
 
                 if (loteConError) {
@@ -11579,9 +11592,11 @@
                     
                     // v3.7.55: marcar "1-Tasación Solicitada" salvo que ya esté
                     // en un estado más avanzado (2-Enviado / 3-Pedido).
+                    // v3.10.51: normalmente ya está en "1-…" (ver lote); esto
+                    // solo actúa si algo quedó a medias, y sin esperar.
                     const est = budgetData.estado || '';
                     if (sigueSiendo(idFlujoTas) && (!est || est.startsWith('0'))) {
-                        try { await updateBudgetStatusFE('1-Tasación Solicitada', idFlujoTas); } catch(e) { console.warn('estado tasación:', e); }
+                        updateBudgetStatusFE('1-Tasación Solicitada', idFlujoTas).catch(e => console.warn('estado tasación:', e));
                     }
                     
                     completedSteps.add(4);
