@@ -624,6 +624,8 @@
             <div style="display: flex; align-items: center; gap: 8px;">
                 <button class="home-link" onclick="showHomeScreen()" id="homeBtn" style="display: none;">🏠 Inicio</button>
                 <div class="budget-id" id="budgetIdDisplay">Sin crear</div>
+                <!-- v3.10.54: trabajos en segundo plano (creación / recuento) -->
+                <button id="jobsBadge" onclick="prodLogShow()" style="display:none;background:#f59e0b;color:white;border:0;border-radius:5px;padding:6px 9px;cursor:pointer;font-size:0.78rem;white-space:nowrap;flex-shrink:0;"></button>
                 <!-- v3.7.20: botones de acceso rápido -->
                 <button id="hdrBtnDriveFolder" onclick="openDriveFolder()" title="Abrir carpeta del presupuesto en Google Drive" style="display:none;background:#34a853;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📂 Drive</button>
                 <button id="hdrBtnLocalFolder" onclick="openLocalFolder()" title="Abrir la carpeta local del presupuesto en el Explorador (y copiar la ruta)" style="display:none;background:#0ea5e9;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">💻 Local</button>
@@ -738,13 +740,6 @@
                         <div class="home-btn-desc">Cargar un presupuesto pendiente</div>
                     </div>
                 </button>
-                <button class="home-btn" onclick="showQuickCount()">
-                    <span class="home-btn-icon">🔢</span>
-                    <div class="home-btn-text">
-                        <div class="home-btn-title">Contar Palabras</div>
-                        <div class="home-btn-desc">Recuento rápido sin crear presupuesto</div>
-                    </div>
-                </button>
                 <button class="home-btn" onclick="showProvidersConsult()">
                     <span class="home-btn-icon">👥</span>
                     <div class="home-btn-text">
@@ -800,70 +795,6 @@
                         📊 Abrir Google Sheet
                     </a>
                 </div>
-            </div>
-        </div>
-
-        <!-- QUICK WORD COUNT SCREEN -->
-        <div class="card hidden" id="quickCountScreen">
-            <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
-            
-            <div class="card-title">Contar Palabras y Páginas</div>
-            
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
-                Sin crear tasación ni presupuesto.
-            </p>
-            
-            <div class="file-upload-area" id="quickUploadArea" onclick="document.getElementById('quickFileInput').click()">
-                <div class="file-upload-icon">📄</div>
-                <div class="file-upload-text">
-                    <strong>Arrastra archivos aquí o toca para seleccionar</strong><br>
-                    <small>PDF, imágenes (max 20MB total)</small>
-                </div>
-                <input type="file" id="quickFileInput" class="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.tiff,.bmp,.heic,.heif" onchange="handleQuickFiles(this.files)">
-            </div>
-            
-            <div class="form-group" style="margin-top:12px;">
-                <label>Idioma origen del documento</label>
-                <select id="quickSourceLang" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;">
-                    <option value="">Seleccionar idioma...</option>
-                </select>
-            </div>
-            
-            <div class="form-group" style="margin-top:8px;">
-                <label>Instrucciones especiales (opcional)</label>
-                <textarea id="quickInternalComments" placeholder="Ej: Solo página 2, Documento bilingüe contar solo columna izquierda..." style="width:100%;min-height:50px;padding:8px;border-radius:6px;border:1px solid #ddd;font-size:0.85rem;resize:vertical;box-sizing:border-box;"></textarea>
-            </div>
-            
-            <div class="file-list" id="quickFileList"></div>
-            <div class="file-total" id="quickFileTotal" style="display:none;"></div>
-            
-            <div style="display:flex; gap:8px; flex-wrap:wrap;" id="quickActionButtons">
-                <button class="btn btn-primary btn-orange action-btn" id="quickCountBtn" onclick="doQuickCount()" style="display:none; flex:1; min-width:140px;">
-                    🔢 Contar Palabras
-                </button>
-                <button class="btn action-btn" id="quickExtractBtn" onclick="doQuickExtract()" style="display:none; flex:1; min-width:140px; background:#7c3aed; color:white;">
-                    📄 Extraer
-                </button>
-            </div>
-            
-            <div class="results-box hidden" id="quickCountResults">
-                <div class="results-title">Resultado del análisis</div>
-                <table class="word-count-table" id="quickCountTable">
-                    <thead>
-                        <tr>
-                            <th>Archivo</th>
-                            <th style="text-align:right">Palabras</th>
-                            <th style="text-align:right">Páginas</th>
-                        </tr>
-                    </thead>
-                    <tbody id="quickCountBody"></tbody>
-                </table>
-                
-                <div class="totals-row" id="quickCountTotals"></div>
-                
-                <button class="btn btn-primary action-btn" onclick="copyQuickResults()" style="margin-top: 12px;">
-                    📋 Copiar Resultado
-                </button>
             </div>
         </div>
 
@@ -1349,11 +1280,11 @@
             <div id="localModeBanner" style="margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.85rem;display:none;align-items:center;gap:10px;"></div>
 
             <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
-                <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false, false)" disabled style="flex:1;min-width:130px;">
-                    📁 Crear Carpeta
+                <button class="btn btn-secondary action-btn" id="step2BtnOnly" onclick="createFolderAndContinue(false)" style="flex:1;min-width:150px;order:1;">
+                    📁 Crear carpeta
                 </button>
-                <button class="btn btn-primary action-btn" id="step2Btn" onclick="continuarPaso2()" disabled style="flex:2;min-width:200px;order:99;" title="Sin carpeta: la crea, analiza los documentos y extrae los TXT. Con carpeta: pasa a Solic. Tasación">
-                    Continuar →
+                <button class="btn btn-primary btn-gold action-btn" id="step2Btn" onclick="createFolderAndContinue(true)" disabled style="flex:2;min-width:230px;order:2;" title="Crea la carpeta con los documentos, lanza el recuento de palabras en segundo plano y pasa al paso 3">
+                    📁+🔢 Crear carpeta y contar palabras →
                 </button>
             </div>
             
@@ -2013,8 +1944,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.53';
-        const HTML_DATE = '25/09/2026';
+        const HTML_VERSION = '3.10.54';
+        const HTML_DATE = '28/09/2026';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2137,25 +2068,6 @@
                 handleFiles(files);
             }, false);
             
-            // Setup drag & drop for quick count
-            const quickDropArea = document.getElementById('quickUploadArea');
-            
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                quickDropArea.addEventListener(eventName, preventDefaults, false);
-            });
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                quickDropArea.addEventListener(eventName, () => quickDropArea.classList.add('dragover'), false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                quickDropArea.addEventListener(eventName, () => quickDropArea.classList.remove('dragover'), false);
-            });
-            
-            quickDropArea.addEventListener('drop', (e) => {
-                const files = e.dataTransfer.files;
-                handleQuickFiles(files);
-            }, false);
         });
 
         // ====== CONFIG ======
@@ -2206,7 +2118,6 @@
             document.getElementById('homeScreen').classList.remove('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
-            document.getElementById('quickCountScreen').classList.add('hidden');
             document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
             document.getElementById('budgetIdDisplay').textContent = 'Sin crear';
             document.getElementById('homeBtn').style.display = 'none';
@@ -2762,6 +2673,9 @@
             uploadedFiles = [];
             selectedProviders.clear();
             completedSteps.clear();
+            // v3.10.54: el estado de creación pertenece al trabajo; aquí uno limpio
+            bgState = { folderCreated: false, folderError: null, analysisDone: false, analysisError: null,
+                        pendingFiles: null, pendingWithAnalysis: false, pendingInternalComments: '' };
             // v3.10.37: ninguna respuesta tardía del presupuesto anterior debe
             // poder pintarse ni avisar sobre el nuevo
             try {
@@ -2950,6 +2864,7 @@
         }
 
         function startNewBudget() {
+            if (typeof avisarSiCreando === 'function' && avisarSiCreando()) return;   // v3.10.54
             resetBudgetState();
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
@@ -3014,7 +2929,6 @@
         async function showBudgetList() {
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.remove('hidden');
-            document.getElementById('quickCountScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
 
@@ -3022,27 +2936,6 @@
             await loadBudgets();
         }
 
-        // ====== QUICK WORD COUNT ======
-        let quickFiles = [];
-        
-        function showQuickCount() {
-            document.getElementById('homeScreen').classList.add('hidden');
-            document.getElementById('budgetListScreen').classList.add('hidden');
-            document.getElementById('quickCountScreen').classList.remove('hidden');
-            document.getElementById('providersConsultScreen').classList.add('hidden');
-            document.getElementById('progressContainer').classList.add('hidden');
-            document.getElementById('homeBtn').style.display = 'flex';
-            
-            // Reset quick count state
-            quickFiles = [];
-            document.getElementById('quickFileList').innerHTML = '';
-            document.getElementById('quickFileTotal').style.display = 'none';
-            document.getElementById('quickCountBtn').style.display = 'none';
-            document.getElementById('quickCountResults').classList.add('hidden');
-            document.getElementById('quickFileInput').value = '';
-            document.getElementById('quickUploadArea').classList.remove('has-files');
-        }
-        
         // ====== PROVIDERS CONSULT (v3.10.24: agrupada por persona) ======
         //
         // Antes la lista pintaba una tarjeta por FILA de la hoja Traductores, y
@@ -3064,7 +2957,6 @@
         function showProvidersConsult() {
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
-            document.getElementById('quickCountScreen').classList.add('hidden');
             document.getElementById('providersConsultScreen').classList.remove('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
             document.getElementById('homeBtn').style.display = 'flex';
@@ -4460,7 +4352,6 @@
         async function showAnalysis() {
             document.getElementById('homeScreen').classList.add('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
-            document.getElementById('quickCountScreen').classList.add('hidden');
             document.getElementById('providersConsultScreen').classList.add('hidden');
             document.getElementById('analysisScreen').classList.remove('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
@@ -4999,487 +4890,6 @@
             container.innerHTML = html;
         }
 
-        function handleQuickFiles(files) {
-            let loadedCount = 0;
-            const totalFiles = files.length;
-            
-            for (const file of files) {
-                if (quickFiles.some(f => f.name === file.name)) {
-                    loadedCount++;
-                    continue;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64 = e.target.result.split(',')[1];
-                    quickFiles.push({
-                        name: file.name,
-                        size: file.size,
-                        type: file.type || 'application/octet-stream',
-                        content: base64,
-                        pages: null, // Se obtendrá del backend
-                        pagesFilter: '',  // v3.7.19
-                        instructions: ''  // v3.7.19
-                    });
-                    loadedCount++;
-                    
-                    // Cuando todos los archivos estén cargados, obtener páginas
-                    if (loadedCount === totalFiles) {
-                        renderQuickFiles();
-                        fetchQuickFilesPages();
-                    }
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-        
-        async function fetchQuickFilesPages() {
-            if (quickFiles.length === 0) return;
-            
-            const btn = document.getElementById('quickCountBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Contando páginas...';
-            
-            try {
-                const data = await apiPost({
-                        action: 'getFilesPages',
-                        files: quickFiles
-                    });
-                
-                if (data.success) {
-                    // Actualizar páginas en quickFiles
-                    data.files.forEach((f, idx) => {
-                        if (quickFiles[idx]) {
-                            quickFiles[idx].pages = f.pages;
-                        }
-                    });
-                    renderQuickFiles();
-                }
-            } catch (error) {
-                console.error('Error obteniendo páginas:', error);
-            }
-            
-            btn.disabled = false;
-            btn.innerHTML = '🔢 Contar Palabras';
-        }
-        
-        // v3.7.19: estado de paneles abiertos para quickFiles
-        window.openQuickSettingsPanels = window.openQuickSettingsPanels || new Set();
-
-        function writeQuickFileSetting(idx, field, value) {
-            if (!quickFiles[idx]) return;
-            quickFiles[idx][field] = value;
-            const badge = document.getElementById('quickSettingsBadge_' + idx);
-            if (badge) {
-                badge.innerHTML = buildSettingsBadge(quickFiles[idx].pagesFilter, quickFiles[idx].instructions);
-            }
-            const toggle = document.getElementById('quickSettingsToggle_' + idx);
-            if (toggle) {
-                const hasAny = !!(quickFiles[idx].pagesFilter || quickFiles[idx].instructions);
-                toggle.style.color = hasAny ? '#d97706' : '#6b7280';
-            }
-        }
-
-        function toggleQuickSettingsPanel(idx) {
-            const panel = document.getElementById('quickSettingsPanel_' + idx);
-            if (!panel) return;
-            // v3.7.21 FIX: ver toggleSettingsPanel. style.display='' = visible.
-            const isCurrentlyVisible = panel.style.display !== 'none';
-            panel.style.display = isCurrentlyVisible ? 'none' : '';
-            if (isCurrentlyVisible) window.openQuickSettingsPanels.delete(idx);
-            else window.openQuickSettingsPanels.add(idx);
-        }
-
-        function renderQuickFiles() {
-            const list = document.getElementById('quickFileList');
-            const total = document.getElementById('quickFileTotal');
-            const area = document.getElementById('quickUploadArea');
-            const btn = document.getElementById('quickCountBtn');
-            const btnExtract = document.getElementById('quickExtractBtn');
-
-            if (quickFiles.length === 0) {
-                list.innerHTML = '';
-                total.style.display = 'none';
-                area.classList.remove('has-files');
-                btn.style.display = 'none';
-                if (btnExtract) btnExtract.style.display = 'none';
-                return;
-            }
-
-            area.classList.add('has-files');
-            btn.style.display = 'inline-block';
-            if (btnExtract) btnExtract.style.display = 'inline-block';
-            
-            let html = '';
-            let totalSize = 0;
-            let totalPages = 0;
-            quickFiles.forEach((file, idx) => {
-                totalSize += file.size;
-                const pages = file.pages || 1;
-                totalPages += pages;
-                const sizeStr = file.size > 1024*1024 
-                    ? (file.size / (1024*1024)).toFixed(1) + ' MB'
-                    : (file.size / 1024).toFixed(0) + ' KB';
-                const pagesStr = file.pages !== null ? `<span style="color: var(--primary-color); font-weight: 500;">${pages} pág.</span>` : '<span style="color: #999;">...</span>';
-                const pFilter = file.pagesFilter || '';
-                const pInstr = file.instructions || '';
-                const hasAny = !!(pFilter || pInstr);
-                const isOpen = window.openQuickSettingsPanels.has(idx);
-                const badgeHtml = buildSettingsBadge(pFilter, pInstr);
-                html += `
-                    <div class="file-item">
-                        <div class="file-item-info">
-                            <span class="file-item-name">${escHtml(file.name)}<span id="quickSettingsBadge_${idx}">${badgeHtml}</span></span>
-                            <span class="file-item-size">${sizeStr} · ${pagesStr}</span>
-                        </div>
-                        <div class="file-item-actions" style="display:flex;align-items:center;gap:4px;">
-                            <button id="quickSettingsToggle_${idx}" type="button" onclick="toggleQuickSettingsPanel(${idx})" title="${hasAny ? 'Ajustes configurados — pulsa para editar' : 'Configurar páginas e instrucciones'}" style="background:transparent;border:0;font-size:1.05rem;cursor:pointer;color:${hasAny ? '#d97706' : '#6b7280'};padding:4px 8px;">⚙</button>
-                            <button class="file-remove" onclick="removeQuickFile(${idx})">✕</button>
-                        </div>
-                    </div>
-                    <div id="quickSettingsPanel_${idx}" style="display:${isOpen ? '' : 'none'};margin:0 0 10px 12px;padding:10px 12px;background:#fafafa;border:1px solid #e5e7eb;border-radius:6px;">
-                        <div>
-                            <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Páginas a procesar (vacío = todas)</label>
-                            <input type="text" value="${escAttr(pFilter)}" placeholder="ej: 1-5, 7, 9-12"
-                                oninput="writeQuickFileSetting(${idx}, 'pagesFilter', this.value)"
-                                style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
-                        </div>
-                        <div style="margin-top:8px;">
-                            <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Instrucciones para este archivo (opc.)</label>
-                            <textarea rows="2" placeholder="ej: solo las partes resaltadas en amarillo"
-                                oninput="writeQuickFileSetting(${idx}, 'instructions', this.value)"
-                                style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;font-family:inherit;resize:vertical;">${escHtml(pInstr)}</textarea>
-                        </div>
-                    </div>
-                `;
-            });
-            list.innerHTML = html;
-            
-            const totalStr = totalSize > 1024*1024 
-                ? (totalSize / (1024*1024)).toFixed(1) + ' MB'
-                : (totalSize / 1024).toFixed(0) + ' KB';
-            const pagesInfo = quickFiles.some(f => f.pages !== null) 
-                ? ` · <strong style="color: var(--primary-color);">${totalPages} páginas</strong>`
-                : '';
-            total.innerHTML = `${quickFiles.length} archivo(s) - <strong>${totalStr}</strong>${pagesInfo}`;
-            total.style.display = 'block';
-        }
-        
-        function removeQuickFile(idx) {
-            quickFiles.splice(idx, 1);
-            // Limpiar paneles abiertos (los índices cambian)
-            if (window.openQuickSettingsPanels) window.openQuickSettingsPanels.clear();
-            renderQuickFiles();
-        }
-        
-        async function doQuickCount() {
-            if (quickFiles.length === 0) return;
-            
-            const btn = document.getElementById('quickCountBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Contando...';
-            
-            try {
-                showStatus('Analizando documentos...', 'loading');
-                
-                const data = await apiPost({
-                        action: 'quickCount',
-                        files: quickFiles,
-                        sourceLang: document.getElementById('quickSourceLang').value || '',
-                        internalComments: document.getElementById('quickInternalComments').value.trim() || ''
-                    });
-                
-                if (data.success) {
-                    hideStatus();
-                    
-                    // Guardar datos para desglose
-                    window.quickAnalysisData = data;
-                    
-                    // Render results table
-                    const tbody = document.getElementById('quickCountBody');
-                    let html = '';
-                    let totalWords = 0;
-                    let totalPages = 0;
-                    let hasBreakdown = false;
-                    
-                    // Guardar textos extraídos para acceso por índice
-                    window.quickExtractedTexts = {};
-                    
-                    (data.analysis || []).forEach((f, idx) => {
-                        totalWords += f.words || 0;
-                        totalPages += f.pages || 0;
-                        if (f.breakdown && f.breakdown.length > 0) hasBreakdown = true;
-                        const fname = f.fileName || f.name || '';
-                        html += `
-                            <tr>
-                                <td>${fname}</td>
-                                <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
-                                <td style="text-align:right">${f.pages || 0}</td>
-                            </tr>
-                        `;
-                    });
-                    tbody.innerHTML = html;
-                    
-                    // Totals
-                    document.getElementById('quickCountTotals').innerHTML = `
-                        <div class="results-grid">
-                            <div class="result-item">
-                                <div class="result-label">Total palabras</div>
-                                <div class="result-value">${totalWords.toLocaleString('es-ES')}</div>
-                            </div>
-                            <div class="result-item">
-                                <div class="result-label">Total páginas</div>
-                                <div class="result-value">${totalPages}</div>
-                            </div>
-                        </div>
-                        ${hasBreakdown ? '<button class="btn btn-secondary btn-breakdown" onclick="showQuickBreakdownModal()" style="margin-top:12px;width:100%;">📄 Ver desglose por página</button>' : ''}
-                    `;
-                    
-                    document.getElementById('quickCountResults').classList.remove('hidden');
-                    
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
-                setTimeout(hideStatus, 3000);
-            }
-            
-            btn.disabled = false;
-            btn.style.display = 'none';
-            const data = window.quickAnalysisData;
-            if (!data || !data.analysis || data.analysis.length === 0) {
-                showStatus('No hay datos de análisis', 'error');
-                return;
-            }
-            
-            window.analysisData = data;  // Para reusar las funciones de desglose
-            showBreakdownModal(0);  // Mostrar primer archivo
-        }
-
-        // v3.7.16: doQuickExtract — extrae texto sin presupuesto, sin escribir
-        // en Drive. Los TXTs se exponen como elementos arrastrables (drag-out)
-        // que el usuario suelta en la carpeta de su PC que prefiera.
-        async function doQuickExtract() {
-            if (quickFiles.length === 0) return;
-
-            const btn = document.getElementById('quickExtractBtn');
-            const btnCount = document.getElementById('quickCountBtn');
-            btn.disabled = true;
-            btnCount.disabled = true;
-            const origLabel = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner"></span> Extrayendo...';
-
-            try {
-                showStatus('Extrayendo texto de los documentos...', 'loading');
-
-                const data = await apiPost({
-                        action: 'quickExtract',
-                        files: quickFiles,
-                        sourceLang: document.getElementById('quickSourceLang').value || ''
-                    });
-                if (data._perf) logPerfToConsole(data._perf, 'Recuento rápido');  // v3.7.27
-                if (!data.success) throw new Error(data.error || 'Error desconocido');
-
-                hideStatus();
-
-                // Liberar URLs anteriores antes de regenerar
-                releaseQuickExtractBlobUrls();
-
-                // Mostrar resultado en la tabla habitual
-                window.quickAnalysisData = data;
-                const tbody = document.getElementById('quickCountBody');
-                let html = '';
-                (data.analysis || []).forEach(f => {
-                    html += `
-                        <tr>
-                            <td>${escapeHtml(f.fileName || f.name || '')}</td>
-                            <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
-                            <td style="text-align:right">${f.pages || 0}</td>
-                        </tr>
-                    `;
-                });
-                tbody.innerHTML = html;
-
-                const failedCount = Array.isArray(data.failedPages) ? data.failedPages.length : (data.failedPages || 0);
-                const failedNote = (failedCount > 0)
-                    ? `<div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:6px;color:#92400e;font-size:0.85rem;">⚠️ ${failedCount} página(s) no se pudieron procesar. Vuelve a pulsar "Contar palabras" para reintentar.</div>`
-                    : '';
-
-                document.getElementById('quickCountTotals').innerHTML = `
-                    <div class="results-grid">
-                        <div class="result-item">
-                            <div class="result-label">Total palabras</div>
-                            <div class="result-value">${(data.totalWords || 0).toLocaleString('es-ES')}</div>
-                        </div>
-                        <div class="result-item">
-                            <div class="result-label">Total páginas</div>
-                            <div class="result-value">${data.totalPages || 0}</div>
-                        </div>
-                    </div>
-                    <div id="quickExtractDragPanel" style="margin-top:14px;padding:14px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;">
-                        <div style="font-weight:600;color:#5b21b6;margin-bottom:6px;">📂 Archivos extraídos</div>
-                        <div style="font-size:0.85rem;color:#6d28d9;margin-bottom:10px;">
-                            Arrastra cualquier elemento a una carpeta de tu PC para guardarlo.
-                            También puedes pulsar el botón de descarga (⬇) para descargarlo a tu carpeta de Descargas.
-                        </div>
-                        <div id="quickExtractDragList" style="display:flex;flex-direction:column;gap:6px;"></div>
-                    </div>
-                    ${failedNote}
-                `;
-
-                renderQuickExtractDragList(data);
-
-                document.getElementById('quickCountResults').classList.remove('hidden');
-
-            } catch(error) {
-                showStatus('Error: ' + error.message, 'error');
-                setTimeout(hideStatus, 4000);
-            }
-
-            btn.disabled = false;
-            btnCount.disabled = false;
-            btn.innerHTML = origLabel;
-        }
-
-        // ── Drag-out de los textos extraídos por quickExtract ──
-        // Genera un blob por archivo + ZIP con todos + _RECUENTO.txt y los hace
-        // arrastrables vía DownloadURL (Chromium/Chrome/Edge).
-        window.quickExtractBlobUrls = window.quickExtractBlobUrls || [];
-
-        function releaseQuickExtractBlobUrls() {
-            (window.quickExtractBlobUrls || []).forEach(u => {
-                try { URL.revokeObjectURL(u); } catch(e) {}
-            });
-            window.quickExtractBlobUrls = [];
-        }
-
-        function makeDraggableItem({ icon, fileName, mimeType, getBlob, subtitle }) {
-            const row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;background:white;border:1px solid #e5e7eb;border-radius:6px;cursor:grab;user-select:none;';
-            row.draggable = true;
-            row.title = 'Arrastra este elemento a una carpeta de tu PC';
-
-            row.innerHTML = `
-                <div style="font-size:1.3rem;">${icon}</div>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:500;color:#1f2937;font-size:0.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(fileName)}</div>
-                    ${subtitle ? `<div style="font-size:0.78rem;color:#6b7280;">${escapeHtml(subtitle)}</div>` : ''}
-                </div>
-                <button class="qx-dl-btn" type="button" title="Descargar a la carpeta Descargas" style="background:#7c3aed;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">⬇</button>
-            `;
-
-            // Pre-generar el blob URL al construir el item para que el primer
-            // drag-out tenga la URL disponible de forma síncrona.
-            let cachedUrl = null;
-            let preparing = null;
-            const ensureUrl = () => {
-                if (cachedUrl) return Promise.resolve(cachedUrl);
-                if (preparing) return preparing;
-                preparing = Promise.resolve()
-                    .then(() => getBlob())
-                    .then(blob => {
-                        cachedUrl = URL.createObjectURL(blob);
-                        window.quickExtractBlobUrls.push(cachedUrl);
-                        return cachedUrl;
-                    });
-                return preparing;
-            };
-            // Disparar la generación cuanto antes
-            ensureUrl().catch(err => {
-                console.error('Error preparando blob para ' + fileName + ':', err);
-            });
-
-            row.addEventListener('dragstart', (ev) => {
-                row.style.cursor = 'grabbing';
-                if (!cachedUrl) {
-                    // Aún no listo: cancelar este drag y dejar que el usuario lo
-                    // reintente en un instante.
-                    ev.preventDefault();
-                    return;
-                }
-                ev.dataTransfer.effectAllowed = 'copy';
-                ev.dataTransfer.setData('DownloadURL',
-                    `${mimeType}:${fileName}:${cachedUrl}`);
-            });
-            row.addEventListener('dragend', () => { row.style.cursor = 'grab'; });
-
-            // Botón de descarga clásica como fallback
-            row.querySelector('.qx-dl-btn').addEventListener('click', async (ev) => {
-                ev.stopPropagation();
-                try {
-                    const url = await ensureUrl();
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = fileName;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                } catch(e) {
-                    alert('Error preparando el archivo: ' + e.message);
-                }
-            });
-
-            return row;
-        }
-
-        function renderQuickExtractDragList(data) {
-            const list = document.getElementById('quickExtractDragList');
-            if (!list) return;
-            list.innerHTML = '';
-
-            const files = (data.analysis || []).filter(f => f.extractedText);
-
-            // 1. ZIP con todo (primero, para destacarlo)
-            if (files.length > 1) {
-                const zipName = 'extraccion_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.zip';
-                list.appendChild(makeDraggableItem({
-                    icon: '📦',
-                    fileName: zipName,
-                    mimeType: 'application/zip',
-                    subtitle: `${files.length} TXTs + recuento`,
-                    getBlob: async () => {
-                        if (typeof JSZip === 'undefined') {
-                            throw new Error('JSZip no cargó. Comprueba tu conexión.');
-                        }
-                        const zip = new JSZip();
-                        files.forEach(f => {
-                            zip.file(stripExtension(f.fileName) + '.txt', f.extractedText || '');
-                        });
-                        if (data.recuentoTxt) zip.file('_RECUENTO.txt', data.recuentoTxt);
-                        return await zip.generateAsync({ type: 'blob' });
-                    }
-                }));
-            }
-
-            // 2. Un TXT por archivo
-            files.forEach(f => {
-                const txtName = stripExtension(f.fileName) + '.txt';
-                list.appendChild(makeDraggableItem({
-                    icon: '📄',
-                    fileName: txtName,
-                    mimeType: 'text/plain',
-                    subtitle: `${(f.words || 0).toLocaleString('es-ES')} palabras · ${f.pages || 0} pág.`,
-                    getBlob: async () => new Blob([f.extractedText || ''], { type: 'text/plain;charset=utf-8' })
-                }));
-            });
-
-            // 3. _RECUENTO.txt
-            if (data.recuentoTxt) {
-                list.appendChild(makeDraggableItem({
-                    icon: '🧾',
-                    fileName: '_RECUENTO.txt',
-                    mimeType: 'text/plain',
-                    subtitle: 'Resumen TSV',
-                    getBlob: async () => new Blob([data.recuentoTxt], { type: 'text/plain;charset=utf-8' })
-                }));
-            }
-        }
-
-        function stripExtension(name) {
-            return (name || '').replace(/\.[^.\/\\]+$/, '');
-        }
-
         function escapeHtml(s) {
             return String(s == null ? '' : s)
                 .replace(/&/g, '&amp;')
@@ -5487,73 +4897,6 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
-        }
-
-        function applyQuickBreakdown() {
-            // Recalcular totales para quick count
-            const data = window.quickAnalysisData;
-            if (!data) return;
-            
-            let totalWords = 0;
-            let totalPages = 0;
-            
-            (data.analysis || []).forEach(file => {
-                if (file.breakdown && file.breakdown.length > 0) {
-                    const included = file.breakdown.filter(b => b.included);
-                    file.words = included.reduce((sum, b) => sum + b.words, 0);
-                    file.pages = included.length;
-                }
-                totalWords += file.words;
-                totalPages += file.pages;
-            });
-            
-            data.totalWords = totalWords;
-            data.totalPages = totalPages;
-            
-            // Re-render
-            const tbody = document.getElementById('quickCountBody');
-            let html = '';
-            (data.analysis || []).forEach(f => {
-                html += `
-                    <tr>
-                        <td>${f.fileName || f.name}</td>
-                        <td style="text-align:right">${(f.words || 0).toLocaleString('es-ES')}</td>
-                        <td style="text-align:right">${f.pages || 0}</td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
-            
-            // Update totals display
-            const totalsDiv = document.getElementById('quickCountTotals');
-            totalsDiv.querySelector('.result-value').textContent = totalWords.toLocaleString('es-ES');
-            totalsDiv.querySelectorAll('.result-value')[1].textContent = totalPages;
-        }
-        
-        function copyQuickResults() {
-            const tbody = document.getElementById('quickCountBody');
-            const rows = tbody.querySelectorAll('tr');
-            
-            let text = 'Archivo\tPalabras\tPáginas\n';
-            let totalWords = 0;
-            let totalPages = 0;
-            
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                const name = cells[0].textContent;
-                const words = parseInt(cells[1].textContent.replace(/\./g, '')) || 0;
-                const pages = parseInt(cells[2].textContent) || 0;
-                totalWords += words;
-                totalPages += pages;
-                text += `${name}\t${words}\t${pages}\n`;
-            });
-            
-            text += `\nTOTAL\t${totalWords}\t${totalPages}`;
-            
-            navigator.clipboard.writeText(text).then(() => {
-                showStatus('✓ Copiado al portapapeles', 'success');
-                setTimeout(hideStatus, 2000);
-            });
         }
 
         // Guardar contacto del cliente
@@ -6102,7 +5445,8 @@
         function firmaPresupuesto(b) {
             try {
                 const c = JSON.parse(JSON.stringify(b || {}));
-                delete c._cachedAt; delete c._filesDeferred; delete c.analisisDetalle;
+                delete c._cachedAt; delete c._filesDeferred;
+                c.analisisDetalle = analisisLite(c.analisisDetalle);   // v3.10.54: se compara sin el texto
                 delete c.archivosEnCarpeta; delete c._perf; delete c._debug;
                 return JSON.stringify(c);
             } catch (e) { return String(Math.random()); }
@@ -6254,7 +5598,11 @@
             // v3.9.8: soltar el handle del presupuesto ANTERIOR antes de nada.
             // Sin esto, cualquier escritura hecha antes del reenganche iría a
             // la carpeta del presupuesto que estaba abierto hasta ahora.
-            if (bgState) bgState.localFolderHandle = null;
+            // v3.10.54: objeto nuevo, sin tocar el del trabajo que pudiera seguir en marcha
+            bgState = { folderCreated: false, folderError: null, analysisDone: false, analysisError: null,
+                        pendingFiles: null, pendingWithAnalysis: false, pendingInternalComments: '' };
+            // y el presupuesto que se abre no "es" ningún trabajo de creación
+            if (budgetData) budgetData._jid = null;
             if (window.openSettingsPanels) window.openSettingsPanels.clear();
             // v3.7.33: ocultar también el banner de error de creación de
             // carpeta (bgStatusBanner) si quedó visible de un intento previo.
@@ -6562,6 +5910,14 @@
                     
                     showCard(targetStep);
                     
+                    // v3.10.54: si este presupuesto tiene un recuento en marcha, decirlo
+                    try {
+                        const _tj = (typeof trabajoDe === 'function') ? trabajoDe(budgetData.id) : null;
+                        if (_tj) {
+                            showGlobalAnalysisBanner('loading', `⏳ ${budgetData.id} · ${textoFase(_tj)} desde hace ${fmtMmSs(Date.now() - _tj.inicio)}. La pantalla se actualizará sola al terminar.`);
+                            if (typeof updateStep2Buttons === 'function') updateStep2Buttons();
+                        }
+                    } catch (e) {}
                     // Cargar mensaje guardado o generar nuevo
                     if (budgetData.savedClientMessage) {
                         document.getElementById('clientMessageEdit').value = budgetData.savedClientMessage;
@@ -7099,9 +6455,12 @@
                     const celdaTrad = inv.filtro
                         ? `<td style="text-align:right;padding-right:10px;color:#b45309;font-weight:700;" title="Sólo las páginas ${escapeHtml(inv.filtro)}">${trad} ⚙</td>`
                         : `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>`;
+                    const _contando = (typeof trabajoDelAbierto === 'function') && !!trabajoDelAbierto();   // v3.10.54
                     const celdaPal = f
                         ? `<td style="text-align:right;font-weight:600;" title="${f.manual ? 'Recuento escrito a mano en ⚙' : ''}">${(f.words || 0).toLocaleString('es-ES')}${f.manual ? ' <span style="color:#7c3aed;">✎</span>' : ''}</td>`
-                        : `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td>`;
+                        : (_contando
+                            ? `<td style="text-align:right;font-weight:600;color:#b45309;">⏳ contando…</td>`
+                            : `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td>`);
                     rows += `<tr><td style="padding:2px 8px 2px 0;${f ? '' : 'color:#b45309;'}">${escapeHtml(fname)}</td>` +
                             `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>` +
                             celdaTrad + celdaPal + '</tr>';
@@ -7128,7 +6487,12 @@
                     summaryBox.appendChild(avisoEl);
                 }
                     const _fallos = (typeof resumenFallos === 'function') ? resumenFallos(budgetData.failedPages) : '';
-                if (_sinAnalizar.length > 0 || _fallos) {
+                const _trabajoAbierto = (typeof trabajoDelAbierto === 'function') ? trabajoDelAbierto() : null;   // v3.10.54
+                if (_trabajoAbierto && _sinAnalizar.length > 0) {
+                    avisoEl.innerHTML = '⏳ Recuento en curso (' + textoFase(_trabajoAbierto) + ' · ' + fmtMmSs(Date.now() - _trabajoAbierto.inicio) +
+                        '). La tabla se rellenará sola al terminar; puedes ir a Inicio y seguir con otro presupuesto.';
+                    avisoEl.style.display = '';
+                } else if (_sinAnalizar.length > 0 || _fallos) {
                     let txt = '';
                     if (_sinAnalizar.length > 0) {
                         txt += '⚠️ ' + _sinAnalizar.length + ' archivo(s) sin analizar: ' +
@@ -8354,189 +7718,120 @@
         //   - Sin carpeta · con pendientes      → Crear Carpeta / Crear y Analizar (enabled)  + Extraer (disabled)
         //   - Con carpeta · sin archivos        → Reanalizar (disabled) + Extraer (disabled)
         //   - Con carpeta · con archivos        → Reanalizar (enabled)  + Extraer (sólo si hay archivos en Drive)
+        // ====== v3.10.54: BOTONES DEL PASO 2 SEGÚN EL ESTADO ======
+        //   A · sin código:  [📁 Crear carpeta] [📁+🔢 Crear carpeta y contar palabras →]
+        //   B · con código, nada nuevo:  [🔄 Recontar palabras →]  (+ enlace Actualizar desde Drive)
+        //   C · con código, recuento hecho y archivos nuevos:
+        //       [📤 Solo subir] [🔢 Recontar páginas] [📤+🔢 Subir y contar palabras →]
+        // "Recontar páginas" solo existe en C (antes se quedaba visible en un
+        // presupuesto nuevo: era el botón del presupuesto anterior de la misma
+        // sesión, que nunca se ocultaba). No hay "Continuar": el trabajo
+        // avanza solo al paso 3; para saltar sin hacer nada, los pasos de arriba.
+        function _btnPaso2(id, clase, estilo, onclick, contenedor) {
+            let b = document.getElementById(id);
+            if (!b) {
+                b = document.createElement('button');
+                b.id = id; b.type = 'button'; b.className = clase; b.style.cssText = estilo;
+                b.onclick = onclick;
+                contenedor.appendChild(b);
+            }
+            return b;
+        }
+        async function actualizarDesdeDrive(el) {
+            const prev = el ? el.innerHTML : '';
+            if (el) { el.style.pointerEvents = 'none'; el.innerHTML = '⏳ Leyendo Drive...'; }
+            try {
+                const antes = (budgetData.folderFiles || []).length;
+                await refreshFolderFilesFromDrive();
+                const ahora = (budgetData.folderFiles || []).length;
+                const nuevos = ahora - antes;
+                showStatus(nuevos > 0
+                    ? `✓ ${nuevos} archivo(s) nuevo(s) detectado(s) en la carpeta (${ahora} en total)`
+                    : `Carpeta leída: ${ahora} archivo(s). Si acabas de copiarlos, espera a que Drive termine de sincronizar y vuelve a pulsar.`,
+                    nuevos > 0 ? 'success' : 'warning');
+                setTimeout(hideStatus, 5000);
+            } catch (e) {
+                showStatus('Error leyendo la carpeta: ' + e.message, 'error');
+                setTimeout(hideStatus, 4000);
+            } finally {
+                if (el) { el.innerHTML = prev; el.style.pointerEvents = ''; }
+            }
+        }
         function updateStep2Buttons() {
             const btnCreateOnly = document.getElementById('step2BtnOnly');
             const btnCreateAndAnalyze = document.getElementById('step2Btn');
-            // v3.7.29: btnExtract eliminado del DOM; cualquier acceso debe ser tolerante.
-            const btnExtract = document.getElementById('step2BtnExtract');
-            let btnReanalyze = document.getElementById('reanalyzeBtn');
-
             if (!btnCreateOnly || !btnCreateAndAnalyze) return;
+            const cont = btnCreateAndAnalyze.parentNode;
 
-            const hasFolder = !!budgetData.folderId;
-            // v3.7.22: docx/doc/txt/_RECUENTO.txt están excluidos del listado
-            // de Drive. Para detectar si ya hay análisis previo, miramos:
-            //  - hasRecuento (flag dedicado del backend, basado en
-            //    _RECUENTO.txt existente)
-            //  - o el wordCount/fileAnalysis ya cargados en budgetData.
-            const sourceFilesInDrive = (budgetData.folderFiles || []);
-            const hasFilesInDrive = sourceFilesInDrive.length > 0;
+            const tieneCodigo = !!budgetData.id;
+            const hasFilesInDrive = (budgetData.folderFiles || []).length > 0;
             const hasPendingFiles = (uploadedFiles || []).length > 0;
             const hasAnyFiles = hasFilesInDrive || hasPendingFiles;
-            const hasRecuento = !!budgetData.hasRecuento;
-            const hasAnalysis = hasRecuento ||
+            const hasAnalysis = !!budgetData.hasRecuento ||
                 (budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0) ||
                 (budgetData.wordCount && budgetData.wordCount > 0);
+            const trabajo = (typeof trabajoDelAbierto === 'function') ? trabajoDelAbierto() : null;
+            const enCurso = !!(trabajo && enMarcha(trabajo));
 
-            if (hasFolder) {
-                // Carpeta ya existe: "Crear carpeta" no aplica; "Continuar →"
-                // (v3.10.50) sigue visible y simplemente avanza.
-                btnCreateOnly.style.display = 'none';
-                btnCreateAndAnalyze.style.display = '';
-                btnCreateAndAnalyze.disabled = false;
-                btnCreateAndAnalyze.title = 'Pasar a Solic. Tasación';
+            const btnReanalyze = _btnPaso2('reanalyzeBtn', 'btn btn-primary btn-gold action-btn', 'flex:2;min-width:220px;order:50;', () => reanalyzeFromFolder(), cont);
+            const btnUploadOnly = _btnPaso2('uploadOnlyBtn', 'btn btn-secondary action-btn', 'flex:1;min-width:130px;order:10;', () => uploadOnlyFromFolder(), cont);
+            const btnRecuento = _btnPaso2('btnRecontarPaginas', 'btn btn-secondary action-btn', 'flex:1;min-width:140px;order:20;', () => actualizarArchivosYPaginas(), cont);
+            btnUploadOnly.title = 'Sube los documentos nuevos a Drive y actualiza el nº de páginas, sin contar palabras';
+            btnRecuento.title = 'Cuenta archivos y páginas reales con pdf.js. No consume Claude ni cambia el recuento de palabras.';
+            let linkSync = document.getElementById('syncDriveLink');
+            if (!linkSync) {
+                linkSync = document.createElement('div');
+                linkSync.id = 'syncDriveLink';
+                linkSync.style.cssText = 'font-size:0.8rem;color:#64748b;margin-top:8px;text-align:center;';
+                linkSync.innerHTML = '<a href="#" onclick="actualizarDesdeDrive(this); return false;" style="color:#2563eb;font-weight:600;">🔄 Actualizar desde Drive</a> ' +
+                    '<span>(si copiaste archivos a mano en la carpeta)</span>';
+                cont.parentNode.insertBefore(linkSync, cont.nextSibling);
+            }
 
-                // v3.7.44: botón "Solo subir" (sube pendientes a Drive SIN analizar).
-                // Útil para presupuestos por página, que no necesitan recuento Claude.
-                let btnUploadOnly = document.getElementById('uploadOnlyBtn');
-                if (!btnUploadOnly) {
-                    btnUploadOnly = document.createElement('button');
-                    btnUploadOnly.id = 'uploadOnlyBtn';
-                    btnUploadOnly.type = 'button';
-                    btnUploadOnly.className = 'btn btn-secondary action-btn';
-                    btnUploadOnly.style.cssText = 'flex:1;min-width:150px;';
-                    btnUploadOnly.onclick = () => uploadOnlyFromFolder();
-                    const container = btnCreateAndAnalyze.parentNode;
-                    if (container) container.appendChild(btnUploadOnly);
-                }
-                // Solo se muestra/activa si hay archivos pendientes de subir
-                btnUploadOnly.style.display = hasPendingFiles ? '' : 'none';
-                btnUploadOnly.disabled = !hasPendingFiles;
-                btnUploadOnly.innerHTML = '📤 Solo subir a Drive';
-                btnUploadOnly.title = 'Sube los documentos nuevos a Drive y actualiza el nº de páginas, sin analizar con IA (para presupuesto por página)';
-
-                // Crear botón Reanalizar dentro del mismo flex container, si no existe.
-                // v3.7.33 FIX: antes se usaba btnExtract.parentNode.insertBefore(...)
-                // pero btnExtract fue eliminado en v3.7.29, así que la inserción
-                // fallaba silenciosamente. Ahora insertamos al final del contenedor
-                // de botones Crear (que siempre existe).
-                if (!btnReanalyze) {
-                    btnReanalyze = document.createElement('button');
-                    btnReanalyze.id = 'reanalyzeBtn';
-                    btnReanalyze.type = 'button';
-                    btnReanalyze.className = 'btn btn-primary btn-gold action-btn';
-                    btnReanalyze.style.cssText = 'flex:2;min-width:200px;';
-                    btnReanalyze.onclick = () => reanalyzeFromFolder();
-                    const container = btnCreateAndAnalyze.parentNode;
-                    if (container) container.appendChild(btnReanalyze);
-                }
-                // v3.7.66: botón para releer la carpeta de Drive. Necesario cuando
-                // los documentos se copian a mano en la carpeta sincronizada desde
-                // el explorador: la app no se entera hasta que relee el listado.
-                let btnSync = document.getElementById('syncDriveBtn');
-                if (!btnSync) {
-                    btnSync = document.createElement('button');
-                    btnSync.id = 'syncDriveBtn';
-                    btnSync.type = 'button';
-                    btnSync.className = 'btn btn-secondary action-btn';
-                    btnSync.style.cssText = 'flex:1;min-width:150px;';
-                    btnSync.title = 'Vuelve a leer la carpeta de Drive para detectar los archivos que hayas copiado a mano desde el explorador';
-                    btnSync.innerHTML = '🔄 Actualizar desde Drive';
-                    btnSync.onclick = async () => {
-                        btnSync.disabled = true;
-                        const prev = btnSync.innerHTML;
-                        btnSync.innerHTML = '⏳ Leyendo Drive...';
-                        try {
-                            const antes = (budgetData.folderFiles || []).length;
-                            await refreshFolderFilesFromDrive();
-                            const ahora = (budgetData.folderFiles || []).length;
-                            const nuevos = ahora - antes;
-                            showStatus(nuevos > 0
-                                ? `✓ ${nuevos} archivo(s) nuevo(s) detectado(s) en la carpeta (${ahora} en total)`
-                                : `Carpeta leída: ${ahora} archivo(s). Si acabas de copiarlos, espera a que Drive termine de sincronizar y vuelve a pulsar.`,
-                                nuevos > 0 ? 'success' : 'warning');
-                            setTimeout(hideStatus, 5000);
-                        } catch (e) {
-                            showStatus('Error leyendo la carpeta: ' + e.message, 'error');
-                            setTimeout(hideStatus, 4000);
-                        } finally {
-                            btnSync.innerHTML = prev;
-                            btnSync.disabled = false;
-                        }
-                    };
-                    const containerSync = btnCreateAndAnalyze.parentNode;
-                    if (containerSync) containerSync.appendChild(btnSync);
-                }
-                btnSync.style.display = '';
-
-                // v3.9.5 FIX: en la v3.9.4 este botón se insertaba con
-                // btnSync.parentNode ANTES de que btnSync estuviera en el DOM,
-                // así que parentNode era null y el botón no llegaba a crearse
-                // nunca. Ahora se añade al mismo contenedor, ya resuelto.
-                let btnRecuento = document.getElementById('btnRecontarPaginas');
-                if (!btnRecuento) {
-                    btnRecuento = document.createElement('button');
-                    btnRecuento.id = 'btnRecontarPaginas';
-                    btnRecuento.type = 'button';
-                    btnRecuento.className = 'btn btn-secondary action-btn';
-                    btnRecuento.style.cssText = 'flex:1;min-width:150px;';
-                    btnRecuento.title = 'Cuenta archivos y páginas reales con pdf.js. No consume Claude ni cambia el recuento de palabras.';
-                    btnRecuento.innerHTML = '🔢 Recontar páginas';
-                    btnRecuento.onclick = actualizarArchivosYPaginas;
-                    const cont2 = btnCreateAndAnalyze.parentNode;
-                    if (cont2) cont2.appendChild(btnRecuento);
-                }
-                btnRecuento.style.display = '';
-
-                btnReanalyze.style.display = '';
-                // No machacar el botón si está en modo "Analizando..." (data-busy)
-                if (btnReanalyze.dataset.busy !== 'true') {
-                    btnReanalyze.disabled = !hasAnyFiles;
-                    // v3.7.44: etiqueta más clara según haya pendientes o no
-                    if (hasPendingFiles) {
-                        btnReanalyze.innerHTML = '🔢 Subir y Analizar →';
-                    } else {
-                        btnReanalyze.innerHTML = hasAnalysis
-                            ? '🔄 Reanalizar →'
-                            : '🔢 Analizar →';
-                    }
-                }
-
-                if (btnExtract) {
-                    btnExtract.style.display = '';
-                    btnExtract.disabled = !hasFilesInDrive;
-                }
-            } else {
-                // No hay carpeta: estado inicial. Botones Crear* aparecen,
-                // habilitados sólo si hay pendientes
+            if (!tieneCodigo) {
+                // ----- A: presupuesto nuevo -----
                 btnCreateOnly.style.display = '';
                 btnCreateAndAnalyze.style.display = '';
-                // v3.7.66: "Crear Carpeta" SIEMPRE disponible, aunque no haya
-                // archivos adjuntos: permite crear el presupuesto + su carpeta y
-                // luego copiar los documentos a mano desde el explorador (Drive
-                // los sincroniza) y pulsar "Actualizar desde Drive".
-                btnCreateOnly.disabled = false;
+                btnCreateOnly.disabled = enCurso;
+                btnCreateOnly.innerHTML = '📁 Crear carpeta';
                 btnCreateOnly.title = hasPendingFiles
-                    ? 'Crea la carpeta y sube los documentos adjuntos, sin analizar'
+                    ? 'Crea la carpeta y guarda los documentos adjuntos, sin contar palabras'
                     : 'Crea el presupuesto y su carpeta vacía. Luego puedes copiar los archivos a la carpeta desde el explorador y pulsar "Actualizar desde Drive"';
-                // v3.10.50: "Continuar →" siempre disponible: con adjuntos crea
-                // + analiza + extrae; sin adjuntos crea la carpeta vacía.
-                btnCreateAndAnalyze.disabled = false;
-                btnCreateAndAnalyze.title = hasPendingFiles
-                    ? 'Crea la carpeta, analiza los documentos y extrae los TXT, y pasa a Solic. Tasación'
-                    : 'Crea el presupuesto con su carpeta vacía y pasa a Solic. Tasación';
-
-                // v3.7.44: ocultar botón Solo subir cuando no hay carpeta
-                const btnUploadOnly = document.getElementById('uploadOnlyBtn');
-                if (btnUploadOnly) {
-                    btnUploadOnly.style.display = 'none';
-                    btnUploadOnly.disabled = true;
-                }
-
-                if (btnReanalyze) {
-                    btnReanalyze.style.display = 'none';
-                    btnReanalyze.disabled = true;
-                }
-
-                // v3.7.66: sin carpeta todavía, no hay nada que releer
-                const btnSync = document.getElementById('syncDriveBtn');
-                if (btnSync) btnSync.style.display = 'none';
-
-                if (btnExtract) {
-                    btnExtract.style.display = '';
-                    btnExtract.disabled = true;
-                }
+                btnCreateAndAnalyze.disabled = enCurso || !hasPendingFiles;
+                btnCreateAndAnalyze.innerHTML = enCurso
+                    ? '<span class="spinner"></span> ' + (trabajo ? textoFase(trabajo) : 'creando carpeta') + '…'
+                    : '📁+🔢 Crear carpeta y contar palabras →';
+                btnCreateAndAnalyze.title = 'Crea la carpeta con los documentos, lanza el recuento de palabras en segundo plano y pasa al paso 3';
+                btnReanalyze.style.display = 'none';
+                btnUploadOnly.style.display = 'none';
+                btnRecuento.style.display = 'none';
+                linkSync.style.display = 'none';
+                return;
             }
+            // ----- B / C: presupuesto con código -----
+            btnCreateOnly.style.display = 'none';
+            btnCreateAndAnalyze.style.display = 'none';
+            btnReanalyze.style.display = '';
+            if (enCurso) {
+                btnReanalyze.disabled = true;
+                btnReanalyze.innerHTML = '<span class="spinner"></span> ' + textoFase(trabajo) + '…';
+                btnReanalyze.title = 'Recuento en curso: puedes ir a Inicio y seguir con otro presupuesto';
+            } else {
+                btnReanalyze.disabled = !hasAnyFiles;
+                btnReanalyze.innerHTML = hasPendingFiles
+                    ? '📤+🔢 Subir y contar palabras →'
+                    : (hasAnalysis ? '🔄 Recontar palabras →' : '🔢 Contar palabras →');
+                btnReanalyze.title = hasPendingFiles
+                    ? 'Sube los archivos nuevos y cuenta las palabras de toda la carpeta (en segundo plano)'
+                    : 'Cuenta las palabras de los documentos de la carpeta (en segundo plano)';
+            }
+            btnUploadOnly.style.display = hasPendingFiles ? '' : 'none';
+            btnUploadOnly.disabled = !hasPendingFiles || enCurso;
+            if (!enCurso) btnUploadOnly.innerHTML = '📤 Solo subir';
+            btnRecuento.style.display = (hasPendingFiles && hasAnalysis) ? '' : 'none';
+            btnRecuento.disabled = enCurso;
+            if (!enCurso && btnRecuento.innerHTML.indexOf('Contando') === -1) btnRecuento.innerHTML = '🔢 Recontar páginas';
+            linkSync.style.display = '';
         }
 
         // Wrappers de compatibilidad: cualquier código existente que llame a
@@ -8853,193 +8148,6 @@
             if (typeof updateClientMessage === 'function') updateClientMessage();
         }
 
-        async function reanalyzeFromFolder() {
-            // v3.8.0: en modo local, la carpeta puede no estar aún en Drive
-            // (Drive Desktop sincronizando). Resolver antes de analizar.
-            if (!budgetData.folderId && budgetData.id) {
-                showStatus('⏳ Esperando a que Google Drive Desktop sincronice la carpeta local...', 'loading');
-                const r = await resolveLocalFolderId(budgetData.id, 4);
-                if (r && r.folderId) {
-                    budgetData.folderId = r.folderId;
-                    budgetData.folderUrl = r.folderUrl || '';
-                } else {
-                    showStatus('La carpeta aún no aparece en Drive. Comprueba que Google Drive Desktop esté sincronizando y reintenta en unos segundos.', 'warning');
-                    setTimeout(hideStatus, 6000);
-                    return;
-                }
-            }
-            const btn = document.getElementById('reanalyzeBtn');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner"></span> Analizando...';
-                btn.dataset.busy = 'true';
-            }
-            showStatus('Analizando documentos con Claude...', 'loading');
-            // v3.7.24: banner global persistente "analizando"
-            const numFiles = (budgetData.folderFiles || []).filter(f =>
-                f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_'
-            ).length;
-            showGlobalAnalysisBanner('loading',
-                `⏳ Analizando ${numFiles} archivo(s) del presupuesto ${budgetData.id}... Puedes navegar; este aviso se mantendrá visible.`
-            );
-
-            // v3.7.32: instrumentación global
-            const t_start = performance.now();
-
-            // v3.7.50: log de proceso en pantalla (se reinicia en cada análisis)
-            prodLogClear();
-
-            // v3.7.92: RESCATE. reanalyzeFolder guarda TODO en el servidor
-            // (TXTs + _RECUENTO.txt en Drive, palabras/páginas/análisis en la
-            // hoja) ANTES de responder. Si la respuesta se pierde en la
-            // redirección de Apps Script (caso real: análisis completo en Drive
-            // y error en pantalla), el trabajo ya está hecho y pagado: en vez
-            // de dar error (o repetir el análisis con su coste en Claude), se
-            // recupera el resultado de la hoja con getBudget.
-            async function recoverAnalysisFromSheet() {
-                for (let intento = 1; intento <= 2; intento++) {
-                    // margen por si el backend aún está escribiendo la hoja
-                    await new Promise(r => setTimeout(r, intento === 1 ? 3000 : 8000));
-                    try {
-                        const resp = await apiPost({ action: 'getBudget', budgetId: budgetData.id }, { retry: false });
-                        const b = resp && resp.success && resp.budget;
-                        if (b && parseFloat(b.palabras) > 0 && Array.isArray(b.analisisDetalle) && b.analisisDetalle.length > 0) {
-                            return {
-                                analysis: b.analisisDetalle,
-                                totalWords: parseFloat(b.palabras) || 0,
-                                totalPages: parseFloat(b.paginas) || 0
-                            };
-                        }
-                    } catch (e) { /* siguiente intento */ }
-                }
-                return null;
-            }
-
-            try {
-                // Si hay archivos nuevos pendientes de subir, subirlos primero
-                prodLogStart('sync', 'Sincronizando archivos pendientes con Drive');
-                await syncPendingUploads();
-                prodLogDone('sync', 'OK');
-
-                prodLogStart('reanalyze', `Analizando documento con Claude (${numFiles} archivo(s))`);
-                let data;
-                try {
-                    data = await apiPost({
-                        action: 'reanalyzeFolder',
-                        folderId: budgetData.folderId,
-                        budgetId: budgetData.id,
-                        sourceLang: budgetData.sourceLang,
-                        internalComments: budgetData.internalComments || '',
-                        fileSettings: budgetData.fileSettings || {},  // v3.7.19
-                        countMethod: 'claude'                          // v3.10.32
-                    }, { retry: false });
-                } catch (fetchErr) {
-                    const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
-                    prodLogError('reanalyze', isTimeout ? 'timeout >6 min (Apps Script) o red' : (fetchErr.message || 'error'));
-                    // v3.7.92: antes de dar error, mirar si el análisis quedó
-                    // guardado en la hoja (respuesta perdida con trabajo hecho).
-                    prodLogStart('recover', 'Respuesta perdida: comprobando si el análisis quedó guardado');
-                    showStatus('La respuesta se perdió; comprobando si el análisis terminó igualmente...', 'loading');
-                    const rec = await recoverAnalysisFromSheet();
-                    if (rec) {
-                        prodLogDone('recover', `Recuperado de la hoja: ${rec.totalWords} palabras · ${rec.totalPages} pág.`);
-                        data = { success: true, analysis: rec.analysis, totalWords: rec.totalWords,
-                                 totalPages: rec.totalPages, failedPages: [], _recovered: true };
-                    } else {
-                        prodLogError('recover', 'sin datos guardados en la hoja');
-                        throw fetchErr;
-                    }
-                }
-                prodLogDone('reanalyze', data && data.success ? `${data.totalWords || 0} palabras · ${data.totalPages || 0} pág.` : ((data && data.error) || 'sin éxito'));
-                if (data._perf) logPerfToConsole(data._perf, 'Reanalizar');  // v3.7.27
-                // v3.7.32: log etapas (en reanalyzeFolder el backend hace TODO,
-                // no hay etapa de upload de archivos ni saveResults separada)
-                const t_end = performance.now();
-                const total_ms = Math.round(t_end - t_start);
-                const claudeMs = (data._perf && data._perf.totalMs) || 0;
-                // El resto = todo lo que NO es Claude (lectura archivos Drive, split,
-                // guardado TXTs/recuento, escribir hoja...)
-                const otherBackend_ms = Math.max(0, total_ms - claudeMs);
-                fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'logStageTimings',
-                        budgetId: budgetData.id,
-                        action_label: 'Reanalizar',
-                        stages: {
-                            uploadFiles_ms: 0,
-                            createFolder_ms: 0,
-                            claudeAnalysis_ms: claudeMs,
-                            saveResults_ms: otherBackend_ms,
-                            total_ms: total_ms
-                        },
-                        meta: { numFiles: numFiles, totalBytes: 0 }
-                    })
-                }).catch(e => console.warn('logStageTimings fallo:', e));
-                console.log(`%c[Tradutema STAGES] Reanalizar (${budgetData.id}) %ctotal=${(total_ms/1000).toFixed(1)}s · claude=${(claudeMs/1000).toFixed(1)}s · otroBackend=${(otherBackend_ms/1000).toFixed(1)}s`,
-                    'color:#7c3aed;font-weight:bold;', 'color:#475569;');
-
-                if (data.success) {
-                    budgetData.countMethodUsed = data.countMethodUsed || countMethod();   // v3.8.7
-                    budgetData.fileAnalysis = data.analysis || [];
-                    aplicarAjustesManuales();   // v3.10.34
-                    renderWordCountSummary();   // v3.10.33
-                    budgetData.wordCount = data.totalWords || 0;
-                    budgetData.pageCount = data.totalPages || budgetData.pageCount;
-                    budgetData.hasRecuento = true;  // v3.7.22: se acaba de crear _RECUENTO.txt
-                    completedSteps.add(4);
-                    updateProgressSteps();
-                    if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();  // v3.7.24
-                    hideStatus();
-                    // v3.7.23: si Claude falló en alguna página, avisar para reintentar
-                    const failedCount = Array.isArray(data.failedPages) ? data.failedPages.length : 0;
-                    const totalPages = data.totalPages || 0;
-                    // v3.8.8: el desglose de otros idiomas NO es un error.
-                    const _otros = formatOtrosIdiomas(data.otrosIdiomas);
-                    budgetData.otrosIdiomas = data.otrosIdiomas || null;
-                    if (failedCount > 0) {
-                        const okPages = totalPages - failedCount;
-                        budgetData.failedPages = data.failedPages;   // v3.10.34
-                        const msg = `⚠️ Análisis parcial · ${budgetData.id} · ${okPages}/${totalPages} páginas procesadas · ${data.totalWords} palabras. ` +
-                            `Falló: ${resumenFallos(data.failedPages)}. Si al reanalizar sigue igual, escribe el recuento a mano en ⚙ del archivo.`;
-                        showGlobalAnalysisBanner('warning', msg);
-                        showStatus(msg, 'warning');
-                        setTimeout(hideStatus, 12000);
-                    } else if (_otros) {
-                        const pg = data.paginasOtroIdioma
-                            ? ` (${data.paginasOtroIdioma} de ${totalPages} páginas no aportan palabras al recuento)` : '';
-                        const msg = `✓ ${budgetData.id} · ${data.totalWords} palabras en ${budgetData.sourceLang} · ${totalPages} páginas. ` +
-                                    `Además hay aprox. ${_otros.texto}, que NO se contabilizan${pg}.`;
-                        showGlobalAnalysisBanner('info', msg);
-                        showSuccess(`Análisis completado · ${data.totalWords} palabras en ${budgetData.sourceLang}`, budgetData.id);
-                    } else if (data.totalWords === 0 && totalPages > 0) {
-                        // v3.7.24: 0 palabras con páginas procesadas = error de extracción
-                        const msg = `❌ ${budgetData.id} · 0 palabras en ${totalPages} página(s). Posibles causas: idioma origen incorrecto, escaneo borroso, sin texto legible. Verifica el idioma y reintenta.`;
-                        showGlobalAnalysisBanner('error', msg);
-                        showStatus(msg, 'error');
-                        setTimeout(hideStatus, 14000);
-                    } else {
-                        const msg = `✓ Análisis completado · ${budgetData.id} · ${data.totalWords} palabras · ${data.totalPages} páginas · ${countMethodLabel(budgetData.countMethodUsed || countMethod(), budgetData.sourceLang)}`;
-                        showGlobalAnalysisBanner('success', msg);
-                        showSuccess(`Análisis completado · ${data.totalWords} palabras · ${data.totalPages} páginas`, budgetData.id);
-                        // v3.7.44: actualizar el presupuesto (páginas/importe/mensaje)
-                        // con los nuevos datos antes de mostrar el paso 4.
-                        refreshQuoteAfterFileChange();
-                        setTimeout(() => { hideSuccess(); showCard(4); }, 1800);
-                    }
-                } else {
-                    showStatus('Error: ' + data.error, 'error');
-                    showGlobalAnalysisBanner('error', `❌ ${budgetData.id} · Error: ${data.error}`);
-                }
-            } catch(e) {
-                showStatus('Error: ' + e.message, 'error');
-            } finally {
-                // Liberar el flag y dejar que updateStep2Buttons restaure el botón
-                if (btn) btn.dataset.busy = 'false';
-                updateStep2Buttons();
-            }
-        }
-
         // ====== FOLDER CREATION ======
         function updateFolderPreview() {
             const today = new Date();
@@ -9073,7 +8181,10 @@
         }
         function prodLogClear() {
             prodLog.entries = [];
-            prodLogRender();
+            // v3.10.54: los trabajos terminados también se limpian; los que
+            // están en marcha, no
+            for (let i = trabajos.length - 1; i >= 0; i--) if (!enMarcha(trabajos[i])) trabajos.splice(i, 1);
+            renderTrabajos();
         }
         function prodLogStart(id, text) {
             prodLogShow();
@@ -9137,7 +8248,7 @@
             const body = document.getElementById('prodLogBody');
             if (!body) return;
             const now = performance.now();
-            body.innerHTML = prodLog.entries.map(e => {
+            body.innerHTML = (typeof htmlTrabajos === 'function' ? htmlTrabajos() : '') + prodLog.entries.map(e => {
                 const elapsed = (e.t1 ? e.t1 : now) - e.t0;
                 let icon, color;
                 if (e.status === 'running') { icon = '⏳'; color = '#fbbf24'; }
@@ -9152,8 +8263,7 @@
                     <span>${e.text}</span>
                     <span${warn}> · ${prodLogFmtElapsed(elapsed)}${e.status === 'running' ? '…' : ''}</span>${detail}
                 </div>`;
-            }).join('') || '<span style="color:#64748b;">Sin actividad.</span>';
-            body.scrollTop = body.scrollHeight;
+            }).join('') || (trabajos.length ? '' : '<span style="color:#64748b;">Sin actividad.</span>');
         }
 
         function showBgBanner(state, text, retry) {
@@ -9192,58 +8302,6 @@
         // Evita carpetas duplicadas cuando un reintento (o un error que NO sea
         // "Failed to fetch") sigue a una creación que SÍ tuvo éxito en el
         // servidor pero cuya respuesta se perdió. Devuelve true si adoptó.
-        async function adoptBudgetByFingerprint(files, minutesBack) {
-            try {
-                const fpData = await apiPost({
-                        action: 'findBudgetByFingerprint',
-                        origen: budgetData.sourceLang,
-                        destino: budgetData.targetLang,
-                        canal: budgetData.channel || '',
-                        // v3.7.46: enviar nombres para que el backend pueda
-                        // desambiguar si los usa; inofensivo si los ignora.
-                        fileNames: (files || []).map(f => f.name),
-                        minutesBack: minutesBack || 10
-                    });
-                if (fpData.success && fpData.found && fpData.budget) {
-                    budgetData.id = fpData.budget.id;
-                    budgetData.folderId = fpData.budget.folderId;
-                    budgetData.folderUrl = fpData.budget.folderUrl;
-                    bgState.folderCreated = true;
-                    bgState.folderError = null;
-                    bgState.pendingFiles = null;
-                    uploadedFiles = [];
-                    const idDisplay = document.getElementById('budgetIdDisplay');
-                    if (idDisplay) { idDisplay.textContent = budgetData.id; idDisplay.classList.add('active'); }
-                    const delBtn = document.getElementById('deleteBudgetBtn');
-                    if (delBtn) delBtn.style.display = 'inline-block';
-                    const folderLink = document.getElementById('folderLink');
-                    if (folderLink && budgetData.folderUrl) { folderLink.href = budgetData.folderUrl; folderLink.classList.remove('hidden'); }
-                    if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
-                    if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
-                    return true;
-                }
-            } catch (e) {
-                console.log('adoptBudgetByFingerprint falló:', e);
-            }
-            return false;
-        }
-
-        async function retryBackgroundCreate() {
-            if (!bgState.pendingFiles) return;
-            showBgBanner('loading', '🔄 Comprobando si la carpeta ya existe...', false);
-            // v3.7.46: antes de reintentar, comprobar si la carpeta YA se creó
-            // en el intento anterior (respuesta perdida) para NO duplicarla.
-            const adopted = await adoptBudgetByFingerprint(bgState.pendingFiles, 15);
-            if (adopted) {
-                const recMsg = `⚠️ Carpeta recuperada · ${budgetData.id} — ya existía del intento anterior, no se ha duplicado. Pulsa "Reanalizar" en el paso 2 si necesitas terminar el análisis.`;
-                showBgBanner('warning', recMsg, false);
-                showGlobalAnalysisBanner('warning', recMsg);
-                return;
-            }
-            showBgBanner('loading', '🔄 Reintentando creación de carpeta...', false);
-            await runBackgroundCreate(bgState.pendingFiles, bgState.pendingWithAnalysis, bgState.pendingInternalComments);
-        }
-
         // Ejecuta la creación de carpeta (y opcionalmente análisis) en background
         // ============ v3.7.73: LLAMADAS AL BACKEND A PRUEBA DE HTML ============
         // Apps Script a veces responde con una PÁGINA HTML en lugar de JSON
@@ -9345,7 +8403,11 @@
         function saveBudgetCache(b) {
             try {
                 const lite = JSON.parse(JSON.stringify(b));
-                delete lite.analisisDetalle;   // el texto extraído pesa demasiado
+                // v3.10.54: se conserva el análisis por archivo (palabras/páginas)
+                // sin el texto extraído, que es lo que pesa. Antes se borraba
+                // entero y, al abrir desde la copia, la tabla del paso 3 salía
+                // "sin analizar" aunque el recuento existiera.
+                lite.analisisDetalle = analisisLite(lite.analisisDetalle);
                 lite._cachedAt = Date.now();
                 localStorage.setItem(BUDGET_CACHE_PREFIX + b.id, JSON.stringify(lite));
                 // Índice + poda de los más antiguos
@@ -9860,585 +8922,6 @@
             return { subidos, fallidos };
         }
 
-        async function runBackgroundCreate(files, withAnalysis, internalComments) {
-            // v3.7.32: instrumentación global de etapas
-            const stageTimings = {
-                t_start: performance.now(),
-                t_promiseAllEnd: 0,
-                t_saveResultsStart: 0,
-                t_saveResultsEnd: 0,
-                t_end: 0,
-                backendCreateFolderMs: 0,
-                backendClaudeMs: 0,
-                backendSaveResultsMs: 0
-            };
-            // Tamaño aproximado del payload de archivos (base64)
-            let approxBytes = 0;
-            try {
-                files.forEach(f => { approxBytes += (f.content || '').length; });
-                // base64 es 33% más grande que los bytes reales
-                approxBytes = Math.round(approxBytes * 0.75);
-            } catch(e) {}
-
-            try {
-                const totalPages = files.reduce((sum, f) => sum + (f.pages || 1), 0);
-
-                // v3.7.49: log de proceso en pantalla
-                // v3.10.38: el registro dice el modo de verdad. Antes ponía
-                // "subiendo a Drive" en los dos, y era imposible saber cuál
-                // se había usado mirando el proceso.
-                prodLogClear();
-                const _localHandle = (bgState && bgState.localHandle) ? bgState.localHandle : await localModeReady(false);
-                if (bgState && bgState.localConfigurada && !_localHandle) {
-                    showStatus('⚠️ La carpeta local está configurada pero sin permiso: este presupuesto se crea en Drive por Apps Script. ' +
-                               'Para el próximo, pulsa "Reactivar carpeta local" en el paso 2.', 'warning');
-                    setTimeout(hideStatus, 9000);
-                }
-                prodLogStart('folder', _localHandle
-                    ? `Registrando presupuesto (modo LOCAL: carpeta y ${files.length} archivo(s) en disco)`
-                    : `Creando carpeta en Drive + subiendo ${files.length} archivo(s) por Apps Script`);
-
-                // v3.7.50 FIX: SECUENCIAL, no en paralelo. Apps Script serializa
-                // las peticiones simultáneas del mismo usuario; al lanzar carpeta
-                // y análisis a la vez, el análisis (pesado) acaparaba el turno ~6
-                // min y la respuesta de "crear carpeta" quedaba esperando en cola
-                // hasta los 6 min, aunque la carpeta se creara en segundos. Ahora
-                // creamos la carpeta SOLA primero (vuelve en ~5s → ID inmediato) y
-                // solo después lanzamos el análisis como llamada independiente.
-                let folderResult = null;
-                // v3.7.72: si Drive está conectado, la carpeta se crea VACÍA
-                // (petición ligera, sin base64) y los archivos se suben después
-                // directos desde el navegador. Si no, se mantiene el método
-                // anterior (archivos dentro del POST a Apps Script).
-                // v3.7.78: usar subida directa si ya hay token válido O si el
-                // usuario conectó Drive alguna vez (en ese caso se pedirá el
-                // token justo antes de subir, no al cargar la página).
-                // v3.8.0 MODO LOCAL: si está configurado y con permiso, la
-                // carpeta y los archivos se escriben en el disco (instantáneo)
-                // y al backend solo se le pide el código y la fila.
-                // (v3.10.38: _localHandle ya viene resuelto desde el clic)
-
-                // v3.7.93: requestId único por creación. Se guarda en bgState
-                // para que el botón "Reintentar" reutilice EL MISMO id: si la
-                // primera ejecución llegó al servidor y solo se perdió la
-                // respuesta, el backend (v3.7.57) devuelve la carpeta ya creada
-                // en vez de duplicarla. Reintentar es ahora 100% seguro.
-                if (!bgState.requestId) {
-                    bgState.requestId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-                }
-                try {
-                    // v3.7.81 CAMBIO ESTRUCTURAL: la carpeta se crea SIEMPRE
-                    // vacía. Antes los archivos viajaban en base64 dentro de
-                    // ESTA petición (14 MB → ~19 MB de POST); Apps Script
-                    // tardaba >1 min y su respuesta —que llevaba el código de
-                    // presupuesto— se perdía en la redirección ("respuesta sin
-                    // código de presupuesto"). Ahora esta petición pesa unos KB,
-                    // vuelve en segundos, con reintento, y el código queda
-                    // asegurado ANTES de tocar los archivos.
-                    folderResult = await apiPost({
-                        action: 'createBudgetFolder',
-                        channel: budgetData.channel,
-                        sourceLang: budgetData.sourceLang,
-                        targetLang: budgetData.targetLang,
-                        clientEmail: budgetData.clientEmail,
-                        clientWhatsApp: budgetData.clientWhatsApp,
-                        internalComments: internalComments,
-                        totalPages: totalPages,
-                        files: [],
-                        numArchivosPrevisto: files.length,
-                        tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
-                        paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
-                        apostilla: !!document.getElementById('docApostille')?.checked,
-                        enHistorico: document.getElementById('docInHistory')?.checked !== false,
-                        requestId: bgState.requestId,   // v3.7.93: idempotencia
-                        localMode: !!_localHandle       // v3.8.0: solo registrar fila, sin carpeta Drive
-                    }, { retry: true, attempts: 4, timeoutMs: 30000 });   // v3.10.39: 30 s por intento, 4 intentos
-                    // v3.7.84: el servidor puede contestar "ocupado" si otra
-                    // creación tiene el bloqueo; entonces lo que buscamos ya
-                    // existe o está a punto: recuperar por requestId.
-                    if (folderResult && !folderResult.success && folderResult.busy) {
-                        prodLogError('folder', 'servidor ocupado; recuperando por requestId');
-                        const rec = await recuperarPorRequestId(bgState.requestId, 4);
-                        if (rec) folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
-                    }
-                } catch (folderErr) {
-                    // v3.10.39: antes de rendirse, preguntar al servidor si llegó
-                    // a crearlo (respuesta perdida = caso más frecuente).
-                    prodLogError('folder', ((folderErr && folderErr.message) || 'sin respuesta') + ' · buscando por requestId…');
-                    const rec = await recuperarPorRequestId(bgState.requestId, 3);
-                    if (rec) {
-                        folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
-                        prodLogDone('folder', rec.budgetId + ' (recuperado por requestId tras respuesta perdida)');
-                    } else {
-                        throw folderErr;
-                    }
-                }
-
-                // v3.7.82: ÚNICA ruta de subida — Apps Script, archivo a
-                // archivo, con presupuesto de tiempo ajustable. (La subida
-                // directa con OAuth de navegador se retiró: exigía "Conectar
-                // Google Drive" cada día porque los tokens de página web
-                // caducan a la hora por diseño de Google.)
-                // v3.7.85: si el lote pesa más del límite de Ajustes, NI SE
-                // INTENTA subir: se crea la carpeta y se pide subida manual
-                // directamente (más rápido que esperar a que agote el tiempo).
-                let directUploadResults = null;
-                let _volverAPaso2 = false;   // v3.7.87: hay archivos sin subir → paso 2
-
-                // v3.8.0 MODO LOCAL: escribir carpeta + archivos en disco.
-                // Drive Desktop los sube por detrás; el folderId se resuelve
-                // en segundo plano sin bloquear a nadie.
-                if (_localHandle && folderResult && folderResult.success && folderResult.budgetId && files.length > 0) {
-                    try {
-                        const t0 = performance.now();
-                        bgState.localFolderHandle = await createLocalBudgetFolder(_localHandle, folderResult.budgetId, files);
-                        prodLogDone('folder-local', files.length + ' archivo(s) escritos en local · ' + Math.round(performance.now() - t0) + 'ms');
-                        directUploadResults = { subidos: files.length, fallidos: [] };
-                        // Resolver el folderId cuando Drive Desktop sincronice (sin bloquear)
-                        resolveLocalFolderId(folderResult.budgetId, 5).then(r => {
-                            if (r && r.folderId) {
-                                budgetData.folderId = r.folderId;
-                                budgetData.folderUrl = r.folderUrl || '';
-                                if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
-                            }
-                        });
-                    } catch (eLocal) {
-                        prodLogError('folder-local', eLocal.message || String(eLocal));
-                        showStatus('⚠️ No se pudo escribir en la carpeta local (' + (eLocal.message || eLocal) + '). Súbelos a Drive a mano y pulsa "Actualizar desde Drive".', 'error');
-                        setTimeout(hideStatus, 9000);
-                        directUploadResults = { subidos: 0, fallidos: files.map(f => ({ name: f.name, error: 'local' })) };
-                        _volverAPaso2 = true;
-                    }
-                } else if (folderResult && folderResult.success && folderResult.folderId && files.length > 0) {
-                    let _pesoLote = 0;
-                    try {
-                        files.forEach(f => {
-                            _pesoLote += f.size || Math.round((f.content || '').length * 0.75);
-                        });
-                    } catch (e) {}
-                    const _limiteBytes = getUploadMaxAutoBytes();
-                    if (_pesoLote > _limiteBytes) {
-                        const mbLote = (_pesoLote / 1048576).toFixed(1);
-                        const mbLim = Math.round(_limiteBytes / 1048576);
-                        directUploadResults = { subidos: 0, fallidos: files.map(f => ({ name: f.name, error: 'lote > ' + mbLim + ' MB' })) };
-                        prodLogDone('folder', (folderResult.budgetId || '') + ' · lote ' + mbLote + ' MB > ' + mbLim + ' MB: subida manual');
-                        // v3.7.94: defensa — si folderUrl no es una URL completa
-                        // (p. ej. viniera solo el ID), construirla desde el ID
-                        // para que el enlace nunca apunte a la propia web (404).
-                        let _urlCarpeta = folderResult.folderUrl || '';
-                        if (_urlCarpeta.indexOf('http') !== 0) {
-                            _urlCarpeta = 'https://drive.google.com/drive/folders/' + (folderResult.folderId || _urlCarpeta);
-                        }
-                        showStatus(`⚠️ Los archivos pesan ${mbLote} MB (más de ${mbLim} MB): súbelos directamente a ` +
-                            `<a href="${_urlCarpeta}" target="_blank" style="font-weight:600;">📂 la carpeta de Drive</a>` +
-                            ` y pulsa "🔄 Actualizar desde Drive".`, 'warning');
-                        // sin auto-cierre: se queda hasta que el usuario actúe
-                        // v3.7.87: marcar vuelta al paso 2 (Archivos); se hace
-                        // más abajo, cuando folderId/folderFiles ya están asignados.
-                        _volverAPaso2 = true;
-                    } else {
-                        const res = await uploadFilesViaAppsScript(files, folderResult.folderId, folderResult.budgetId);
-                        directUploadResults = res;
-                        if (res.fallidos.length) {
-                            showStatus(`⚠️ No se pudieron cargar: ` +
-                                res.fallidos.map(f => f.name).join(', ') +
-                                `. Súbelos a mano en Drive (botón 📂) y pulsa "🔄 Actualizar desde Drive".`, 'error');
-                            setTimeout(hideStatus, 12000);
-                            _volverAPaso2 = true;   // v3.7.87
-                        }
-                    }
-                }
-                stageTimings.t_promiseAllEnd = performance.now();  // v3.7.32
-                stageTimings.backendCreateFolderMs = (folderResult && folderResult._timings && folderResult._timings.totalMs) || 0;
-
-                if (!folderResult || !folderResult.success) {
-                    prodLogError('folder', folderResult ? (folderResult.error || 'error') : 'sin respuesta');
-                    throw new Error((folderResult && folderResult.error) || 'Error creando carpeta');
-                }
-
-                // v3.7.49: carpeta OK
-                prodLogDone('folder', folderResult.budgetId || '');
-                
-                // v3.7.75: si el backend no devolvió el código (respuesta
-                // incompleta), no seguir con "undefined": intentar recuperarlo.
-                if (!folderResult.budgetId) {
-                    // v3.10.38: la respuesta cruda, para saber por dónde vino
-                    // (¿dedup por requestId con fila sin ID? ¿otra cosa?)
-                    let _cruda = '';
-                    try { _cruda = JSON.stringify(folderResult).slice(0, 300); } catch (e) {}
-                    prodLogError('folder', 'respuesta sin código de presupuesto · servidor contestó: ' + _cruda);
-                    console.warn('createBudgetFolder sin budgetId:', folderResult);
-                    // v3.10.39: primero por requestId (exacto), luego por huella
-                    const rec = await recuperarPorRequestId(bgState.requestId, 3);
-                    if (rec) {
-                        folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
-                        prodLogDone('folder', rec.budgetId + ' (recuperado por requestId)');
-                    } else {
-                        const adoptado = await adoptBudgetByFingerprint(files, 10).catch(() => false);
-                        if (!adoptado) {
-                            throw new Error('La carpeta se creó pero no se recibió su código. Pulsa "Reintentar" o recarga para recuperarla.');
-                        }
-                        return;
-                    }
-                }
-                
-                // Guardar datos de carpeta
-                budgetData.id = folderResult.budgetId;
-                budgetData.folderId = folderResult.folderId;
-                budgetData.folderUrl = folderResult.folderUrl;
-                budgetData.numArchivos = files.length;
-                // v3.7.55: estado inicial visible en la barra
-                if (!budgetData.estado) budgetData.estado = '0-Pendiente';
-                bgState.folderCreated = true;
-                bgState.folderError = null;
-                bgState.pendingFiles = null;
-
-                // v3.7.21 FIX bug #1: vaciar uploadedFiles ahora que los
-                // archivos están en Drive. Sin esto, al retomar el presupuesto
-                // los mismos archivos aparecerían como "Pendientes de subir".
-                // También listar archivos subidos en folderFiles para reflejar
-                // el estado actual de Drive en la UI.
-                uploadedFiles = [];
-                if (folderResult.uploadedFiles) {
-                    budgetData.folderFiles = folderResult.uploadedFiles;
-                } else if (directUploadResults) {
-                    // v3.7.75: con subida directa el backend no devuelve la lista
-                    // (los archivos no pasaron por él). Reconstruirla aquí para
-                    // que los archivos NO desaparezcan de la pantalla.
-                    const fallidos = new Set((directUploadResults.fallidos || []).map(f => f.name));
-                    budgetData.folderFiles = files
-                        .filter(f => !fallidos.has(f.name))
-                        .map(f => ({
-                            id: f.driveId || '',
-                            name: f.name,
-                            mimeType: f.type,
-                            size: f.size,
-                            pages: f.pages || 0,
-                            url: f.driveUrl || ''   // v3.7.81: la ruta Apps Script sí devuelve URL
-                        }));
-                    budgetData.numArchivos = budgetData.folderFiles.length;
-                    // releer la carpeta en segundo plano para obtener ids/urls reales
-                    setTimeout(() => {
-                        if (typeof refreshFolderFilesFromDrive === 'function') {
-                            refreshFolderFilesFromDrive().catch(() => {});
-                        }
-                    }, 800);
-                }
-                
-                // Actualizar UI con ID de presupuesto
-                const idDisplay = document.getElementById('budgetIdDisplay');
-                if (idDisplay) {
-                    idDisplay.textContent = budgetData.id;
-                    idDisplay.classList.add('active');
-                }
-                const delBtn = document.getElementById('deleteBudgetBtn');
-                if (delBtn) delBtn.style.display = 'inline-block';
-                const folderLink = document.getElementById('folderLink');
-                if (folderLink) {
-                    folderLink.href = budgetData.folderUrl;
-                    folderLink.classList.remove('hidden');
-                }
-                // v3.7.20: refrescar botones del header (Drive / Local)
-                if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
-                // v3.7.24: refrescar banner de resumen
-                if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
-
-                // v3.7.87: si quedaron archivos sin subir, volver al paso 2
-                // (Archivos): ahí se ve el estado real y está el botón
-                // "🔄 Actualizar desde Drive". Se hace AQUÍ, con folderId y
-                // folderFiles ya asignados, para que la pantalla pinte bien.
-                if (_volverAPaso2) showCard(2);
-
-                // v3.7.69: regenerar el mensaje al cliente ahora que ya existe
-                // la referencia (budgetData.id). Sin esto, el mensaje se quedaba
-                // con el marcador "REFERENCIA" y la validación bloqueaba la copia.
-                if (!clientMessageEdited && typeof updateClientMessage === 'function') {
-                    updateClientMessage();
-                }
-                
-                // Activar botón Extraer ahora que existe carpeta
-                const extractBtn = document.getElementById('step2BtnExtract');
-                if (extractBtn) extractBtn.disabled = false;
-
-                // v3.7.50: análisis AHORA, como llamada independiente (secuencial)
-                let claudeResult = null;
-                let claudeFailedHard = false;
-                let claudeHardError = '';
-                if (withAnalysis) {
-                    // v3.8.3: DOBLE CARRIL. Los PDF con texto embebido se
-                    // cuentan aquí mismo (pdf.js, milisegundos); solo el resto
-                    // viaja al backend (OCR de Google y/o Claude).
-                    // v3.10.32: sin carril rápido. Todo va a Claude.
-                    const _filesParaBackend = files;
-                    {
-                    prodLogStart('analyze', `Analizando ${_filesParaBackend.length} archivo(s) en el servidor (Claude)`);
-                    try {
-                        const claudeResp = await fetch(apiUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'countWordsParallel',
-                                files: _filesParaBackend,
-                                sourceLang: budgetData.sourceLang,
-                                internalComments: internalComments,
-                                countMethod: 'claude'                      // v3.10.32
-                            })
-                        });
-                        claudeResult = await claudeResp.json();
-                        if (claudeResult && claudeResult.success) {
-                            budgetData.countMethodUsed = claudeResult.countMethodUsed || 'claude';
-                        }
-                    } catch (cErr) {
-                        claudeFailedHard = true;
-                        claudeHardError = (cErr && cErr.message) ? cErr.message : 'Failed to fetch';
-                    }
-                    }
-                    stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
-
-                    // v3.7.97: un "éxito" con análisis vacío (caso real 0806-08-W:
-                    // recuento 0 en silencio) es ilegal y se degrada a FALLO DURO,
-                    // que es la rama que relanza automáticamente por la vía
-                    // robusta (reanalyzeFolder, con rescate desde la hoja).
-                    if (claudeResult && claudeResult.success &&
-                        (!Array.isArray(claudeResult.analysis) || claudeResult.analysis.length === 0) &&
-                        files.length > 0) {
-                        // v3.7.99 TRAZADOR: dejar la respuesta cruda en el log de
-                        // proceso (botón copiar) para diagnóstico del caso 0806-08-W.
-                        try {
-                            prodLogError('analyze', 'RESPUESTA ANÓMALA (éxito sin análisis): ' +
-                                JSON.stringify(claudeResult).substring(0, 600));
-                        } catch (e) {}
-                        claudeFailedHard = true;
-                        claudeHardError = 'análisis vacío con ' + files.length + ' archivo(s)';
-                        claudeResult = null;
-                    }
-                }
-
-                // Procesar resultado del análisis si lo hubo
-                if (withAnalysis && claudeFailedHard) {
-                    // v3.7.49: la carpeta se creó pero el análisis reventó (timeout
-                    // de Apps Script >6 min, o red). NO perdemos la carpeta.
-                    prodLogError('analyze', claudeHardError);
-                    bgState.analysisError = claudeHardError;
-                    // v3.7.93: los archivos YA están en Drive (desde v3.7.81 se
-                    // suben antes del análisis), así que en vez de pedirle al
-                    // usuario que pulse "Analizar", se relanza AUTOMÁTICAMENTE
-                    // por esa misma vía (reanalyzeFolder), que además tiene el
-                    // rescate desde la hoja (v3.7.92) si se pierde la respuesta.
-                    const msgAuto = `✓ Carpeta creada · ${budgetData.id} · ⚠️ el primer análisis falló; reintentando automáticamente...`;
-                    showBgBanner('warning', msgAuto, false);
-                    showGlobalAnalysisBanner('loading', '⏳ ' + msgAuto);
-                    try {
-                        await reanalyzeFromFolder();
-                        bgState.analysisError = null;
-                        bgState.analysisDone = true;
-                    } catch (e2) {
-                        const isTimeout = /failed to fetch|networkerror|load failed/i.test(claudeHardError);
-                        const msg = isTimeout
-                            ? `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis superó el límite de 6 min de Apps Script (documento largo). Pulsa "Analizar" en el paso 2 para reintentarlo.`
-                            : `✓ Carpeta creada · ${budgetData.id} · ⚠️ el análisis falló: ${claudeHardError}. Pulsa "Analizar" en el paso 2.`;
-                        showBgBanner('warning', msg, false);
-                        showGlobalAnalysisBanner('warning', msg);
-                    }
-                } else if (withAnalysis && claudeResult) {
-                    prodLogDone('analyze', claudeResult.success ? `${claudeResult.totalWords || 0} palabras` : (claudeResult.error || 'sin éxito'));
-                    if (claudeResult._debug) console.log('[Tradutema DEBUG]', claudeResult._debug);
-                    if (claudeResult._perf) logPerfToConsole(claudeResult._perf, 'Crear y Analizar');
-                    // v3.7.31: registrar en hoja Performance con budgetId real
-                    // (countWordsParallel no lo tenía porque iba en paralelo)
-                    if (claudeResult._perf && budgetData.id) {
-                        fetch(apiUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                action: 'logPerformance',
-                                budgetId: budgetData.id,
-                                action_label: 'Crear y Analizar',
-                                perf: claudeResult._perf
-                            })
-                        }).catch(e => console.warn('logPerformance fallo:', e));
-                    }
-                    if (claudeResult.success) {
-                        budgetData.fileAnalysis = claudeResult.analysis || [];
-                        budgetData.wordCount = claudeResult.totalWords || 0;
-                        budgetData.pageCount = claudeResult.totalPages || budgetData.pageCount;  // v3.7.25
-                        bgState.analysisDone = true;
-                        if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
-                        aplicarAjustesManuales();   // v3.10.34: el manual gana sobre el análisis
-                        renderWordCountSummary();   // v3.10.33: la tabla del paso 3, aunque ya estés en él
-                        
-                        // v3.7.19: construir fileSettings desde los archivos subidos
-                        const initialFileSettings = {};
-                        files.forEach(f => {
-                            if (f.pagesFilter || f.instructions) {
-                                initialFileSettings[f.name] = {
-                                    pagesFilter: f.pagesFilter || '',
-                                    instructions: f.instructions || ''
-                                };
-                            }
-                        });
-                        // También dejarlo en budgetData para que el resto del flujo lo vea
-                        budgetData.fileSettings = Object.assign({}, budgetData.fileSettings || {}, initialFileSettings);
-
-                        // v3.7.30 FIX: Guardar resultado en hoja AWAIT (antes era fire-and-forget).
-                        // En presupuestos grandes (mucho extractedText), el navegador podía
-                        // abortar el fetch antes de que llegara al backend, dejando los TXTs
-                        // sin generar en Drive. Ahora esperamos y damos feedback al usuario.
-                        showBgBanner('loading', '💾 Guardando análisis en Drive (TXTs + _RECUENTO.txt)...', false);
-                        showGlobalAnalysisBanner('loading', `⏳ ${budgetData.id} · Guardando análisis en Drive...`);
-                        prodLogStart('save', 'Guardando recuento + TXTs en Drive');
-                        stageTimings.t_saveResultsStart = performance.now();  // v3.7.32
-                        try {
-                            // v3.8.0 MODO LOCAL: los TXTs se escriben en la carpeta
-                            // local (Drive Desktop los sube); al backend solo la fila.
-                            const _fhLocal = await handleLocalDelPresupuesto(false);   // v3.9.8
-                            if (_fhLocal) {
-                                try {
-                                    const fh = _fhLocal;
-                                    for (const item of (claudeResult.analysis || [])) {
-                                        if (item.extractedText) {
-                                            await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText);
-                                        }
-                                    }
-                                    // v3.8.7: el método de recuento va SIEMPRE en la cabecera:
-                                    // cada carril cuenta con un criterio distinto y sin esto el
-                                    // número no es interpretable meses después.
-                                    const _mUsed = budgetData.countMethodUsed || countMethod();
-                                    let tsv = 'Presupuesto\t' + budgetData.id + '\nIdioma origen\t' + budgetData.sourceLang +
-                                        '\nMetodo de recuento\t' + countMethodLabel(_mUsed, budgetData.sourceLang) +
-                                        '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
-                                    (claudeResult.analysis || []).forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
-                                    tsv += 'TOTAL\t' + claudeResult.totalWords + '\n';
-                                    await writeLocalTextFile(fh, '_RECUENTO.txt', tsv);
-                                } catch (eTxt) {
-                                    console.warn('TXTs locales:', eTxt);
-                                }
-                                // v3.9.1: y la ficha Excel, junto a los TXT
-                                await escribirRecuentoExcelLocal('análisis');
-                            }
-                            const saveData = await apiPost({
-                                    action: 'saveWordCountResults',
-                                    budgetId: budgetData.id,
-                                    folderId: budgetData.folderId,
-                                    skipDrive: !!_fhLocal,   // v3.8.0 · v3.9.8: handle validado
-                                    analysis: claudeResult.analysis,
-                                    totalWords: claudeResult.totalWords,
-                                    totalPages: claudeResult.totalPages,
-                                    sourceLang: budgetData.sourceLang,
-                                    fileSettings: initialFileSettings  // v3.7.19
-                                });
-                            if (!saveData.success) {
-                                console.warn('saveWordCountResults: el backend reportó fallo', saveData);
-                                prodLogError('save', saveData.error || 'el backend reportó fallo');
-                            } else {
-                                prodLogDone('save', 'OK');
-                            }
-                            // v3.7.32: capturar timing backend de saveResults
-                            if (saveData._timings && saveData._timings.totalMs) {
-                                stageTimings.backendSaveResultsMs = saveData._timings.totalMs;
-                            }
-                        } catch(saveErr) {
-                            console.error('saveWordCountResults: fallo en la llamada', saveErr);
-                            prodLogError('save', (saveErr && saveErr.message) || 'fallo en la llamada');
-                            // No es bloqueante: la hoja Presupuestos quizá tampoco se actualizó,
-                            // pero el usuario verá el resultado en pantalla y podrá reanalizar
-                            // desde el paso 2 si los TXTs no están en Drive.
-                        }
-                        stageTimings.t_saveResultsEnd = performance.now();  // v3.7.32
-
-                        // Actualizar resumen de palabras si está visible
-                        refreshWordCountSummary();
-
-                        // v3.7.23: detectar páginas fallidas y avisar
-                        const failedCount = Array.isArray(claudeResult.failedPages) ? claudeResult.failedPages.length : 0;
-                        const totalPages = claudeResult.totalPages || 0;
-                        // v3.8.8: contenido en otro idioma ≠ fallo. Se informa en azul.
-                        const _otros = formatOtrosIdiomas(claudeResult.otrosIdiomas);
-                        budgetData.otrosIdiomas = claudeResult.otrosIdiomas || null;
-                        if (failedCount > 0) {
-                            const okPages = totalPages - failedCount;
-                            budgetData.failedPages = claudeResult.failedPages;   // v3.10.34
-                            const msg = `⚠️ ${budgetData.id} · Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron). ` +
-                                `Falló: ${resumenFallos(claudeResult.failedPages)}. Reanaliza desde paso 2; si sigue igual, escribe el recuento a mano en ⚙ del archivo.`;
-                            showBgBanner('warning', msg, false);
-                            showGlobalAnalysisBanner('warning', msg);
-                        } else if (_otros) {
-                            const pg = claudeResult.paginasOtroIdioma
-                                ? ` (${claudeResult.paginasOtroIdioma} de ${totalPages} páginas no aportan palabras al recuento)` : '';
-                            const msg = `✓ ${budgetData.id} · ${budgetData.wordCount} palabras en ${budgetData.sourceLang} · ${totalPages} páginas. ` +
-                                        `Además hay aprox. ${_otros.texto}, que NO se contabilizan${pg}.`;
-                            showBgBanner('info', msg, false);
-                            showGlobalAnalysisBanner('info', msg);
-                        } else if (budgetData.wordCount === 0 && totalPages > 0) {
-                            // v3.7.24: 0 palabras con páginas procesadas = error
-                            const msg = `❌ ${budgetData.id} · 0 palabras en ${totalPages} página(s). Verifica el idioma origen (¿es correcto?) y reanaliza.`;
-                            showBgBanner('error', msg, false);
-                            showGlobalAnalysisBanner('error', msg);
-                        } else {
-                            const msg = `✓ Carpeta creada · ${budgetData.id} · ${budgetData.wordCount} palabras · ${totalPages} páginas`;
-                            showBgBanner('success', msg, false);
-                            showGlobalAnalysisBanner('success', msg);
-                        }
-                    } else {
-                        bgState.analysisError = claudeResult.error;
-                        const msg = `✓ Carpeta creada · ${budgetData.id} · ⚠️ recuento falló: ${claudeResult.error || ''}`;
-                        showBgBanner('warning', msg, false);
-                        showGlobalAnalysisBanner('warning', msg);
-                    }
-                } else {
-                    const msg = `✓ Carpeta creada · ${budgetData.id}`;
-                    showBgBanner('success', msg, false);
-                    showGlobalAnalysisBanner('success', msg);
-                }
-                // v3.10.36: la carpeta ya existe y el id está puesto: repintar
-                // cabecera, tabla del paso 3 y lista del paso 2 con este
-                // presupuesto, estés en la pantalla que estés.
-                if (typeof aplicarAjustesManuales === 'function') { try { aplicarAjustesManuales(); } catch (e) {} }
-                
-                // Auto-ocultar el banner del paso 2 tras 4s en éxito
-                // (el banner global persiste hasta que el usuario lo cierre)
-                setTimeout(hideBgBanner, 4000);
-
-                // v3.7.32: registrar resumen de etapas en Performance
-                stageTimings.t_end = performance.now();
-                logStageTimingsToSheet(stageTimings, withAnalysis ? 'Crear y Analizar' : 'Crear Carpeta', files.length, approxBytes);
-                
-            } catch(error) {
-                bgState.folderError = error.message;
-                bgState.pendingFiles = files;
-                bgState.pendingWithAnalysis = withAnalysis;
-                bgState.pendingInternalComments = internalComments;
-
-                // v3.7.46: el rescate por huella ahora se intenta ante CUALQUIER
-                // error (antes solo con "Failed to fetch", línea ~6489). La
-                // carpeta puede haberse creado en el backend aunque la respuesta
-                // fallara o el backend devolviera success:false en un paso
-                // posterior; en ese caso la adoptamos en lugar de permitir que
-                // un "Reintentar" la duplique (causa de 0602-02-W / 0602-03-W).
-                const isFailedToFetch = /failed to fetch|networkerror|load failed/i.test(error.message || '');
-                const diagnostic = isFailedToFetch
-                    ? 'Sin respuesta del servidor (posible timeout de Apps Script >6 min o red caída). Comprobando si la carpeta se creó igualmente...'
-                    : 'Error al crear la carpeta. Comprobando si la carpeta se creó igualmente...';
-                showBgBanner('loading', diagnostic, false);
-                showGlobalAnalysisBanner('loading', '⏳ ' + diagnostic);
-
-                // Dar margen a que el backend termine de escribir la fila en
-                // Presupuestos antes de buscar por huella, y luego adoptar.
-                await new Promise(r => setTimeout(r, 4000));
-                const recovered = await adoptBudgetByFingerprint(files, 10);
-
-                if (recovered) {
-                    const recMsg = `⚠️ Carpeta rescatada · ${budgetData.id} — el servidor falló al responder pero la carpeta SÍ se creó (no se ha duplicado). ${withAnalysis ? 'Pulsa "Reanalizar" en el paso 2 si necesitas terminar el análisis.' : ''}`;
-                    showBgBanner('warning', recMsg, false);
-                    showGlobalAnalysisBanner('warning', recMsg);
-                } else {
-                    const msg = isFailedToFetch
-                        ? `⚠️ No se obtuvo respuesta del servidor y no se encontró carpeta creada. Probable timeout (>6 min) o red caída. Pulsa "Reintentar". Detalle: ${error.message}`
-                        : `⚠️ No se pudo crear la carpeta: ${error.message}. Pulsa "Reintentar".`;
-                    showBgBanner('error', msg, true);
-                    showGlobalAnalysisBanner('error', '❌ ' + (budgetData.id || '') + ' · ' + msg);
-                }
-            }
-        }
-        
         // Refrescar el resumen de palabras en paso 4 si está visible
         function refreshWordCountSummary() {
             // v3.7.51: re-renderizar el paso actual si es el de tasación (card 4)
@@ -10450,97 +8933,888 @@
             if (currentStep === 4 || currentStep === 5) showCard(currentStep);
         }
 
-        async function createFolderAndContinue(withAnalysis = true, foreground = false) {
-            // v3.7.66: se permite crear la carpeta VACÍA (sin adjuntos). Solo el
-            // análisis exige documentos, porque no hay nada que analizar.
+        // ============================================================
+        // ====== v3.10.54: TRABAJOS EN SEGUNDO PLANO ======
+        // ============================================================
+        // Hasta ahora "Crear y analizar" corría dentro del presupuesto abierto:
+        // el flujo escribía en budgetData, bgState y la pantalla, así que había
+        // que esperar el recuento (1-3 min por presupuesto) sin poder hacer
+        // nada más. Ahora cada creación/recuento es un TRABAJO con su propia
+        // copia de datos (job.ctx) y su propio estado (job.bg):
+        //   · si el presupuesto sigue abierto, actualiza la pantalla como antes;
+        //   · si no (te fuiste a Inicio a crear otro), guarda igualmente en la
+        //     hoja, en los TXT locales y en la copia local del navegador, y lo
+        //     anota en el panel "Proceso" con un enlace para abrirlo.
+        // El código del presupuesto lo asigna el servidor bajo bloqueo, así que
+        // encadenar varios no puede duplicar numeración. Lo único que exige
+        // esperar es la fase "creando carpeta" (unos segundos): se ve en la
+        // cabecera y "Nueva tasación" lo avisa.
+        const trabajos = [];          // el más reciente primero
+        let _jidSeq = 0;
+        const FASES_TRABAJO = {
+            preparando: 'preparando',
+            creando:    'creando carpeta',
+            escribiendo:'escribiendo archivos en local',
+            subiendo:   'subiendo archivos a Drive',
+            contando:   'contando palabras',
+            guardando:  'guardando recuento',
+            hecho:      'terminado',
+            error:      'error'
+        };
+        function nuevoTrabajo(tipo, ctx) {
+            const job = {
+                jid: 'j' + (++_jidSeq) + '-' + Date.now().toString(36),
+                tipo: tipo,                       // 'crear' | 'crear+contar' | 'contar'
+                budgetId: (ctx && ctx.budgetId) || null,
+                fase: 'preparando', faseDesde: Date.now(),
+                inicio: Date.now(), fin: 0,
+                detalle: '', resultado: null, error: null,
+                ctx: ctx || {},
+                bg: { folderCreated: false, folderError: null, analysisDone: false, analysisError: null,
+                      pendingFiles: null, pendingWithAnalysis: false, pendingInternalComments: '' }
+            };
+            job.k = s => job.jid + ':' + s;      // clave única de línea en el log
+            trabajos.unshift(job);
+            if (trabajos.length > 40) trabajos.length = 40;
+            renderTrabajos();
+            return job;
+        }
+        function enMarcha(job) { return job && job.fase !== 'hecho' && job.fase !== 'error'; }
+        function faseTrabajo(job, fase, detalle) {
+            job.fase = fase; job.faseDesde = Date.now();
+            if (detalle !== undefined) job.detalle = detalle || '';
+            if (!enMarcha(job)) job.fin = Date.now();
+            renderTrabajos();
+            if (esAbierto(job)) {
+                // el presupuesto abierto refleja la fase: botones del paso 2 y
+                // la tabla del paso 3 ("⏳ contando…" / "sin analizar")
+                try { if (typeof updateStep2Buttons === 'function') updateStep2Buttons(); } catch (e) {}
+                try { if (typeof renderWordCountSummary === 'function') renderWordCountSummary(); } catch (e) {}
+            }
+        }
+        function trabajoDe(budgetId) {
+            if (!budgetId) return null;
+            return trabajos.find(t => t.budgetId === budgetId && enMarcha(t)) || null;
+        }
+        function trabajoPorJid(jid) { return trabajos.find(t => t.jid === jid) || null; }
+        // Trabajo en marcha del presupuesto abierto (con código o aún sin él)
+        function trabajoDelAbierto() {
+            if (!budgetData) return null;
+            const t = trabajoDe(budgetData.id) || (budgetData._jid ? trabajoPorJid(budgetData._jid) : null);
+            return (t && enMarcha(t)) ? t : null;
+        }
+        function hayTrabajoCreando() { return trabajos.find(t => t.fase === 'creando' || t.fase === 'preparando') || null; }
+        function trabajosEnMarcha() { return trabajos.filter(enMarcha); }
+        // ¿El presupuesto de este trabajo es el que está abierto en pantalla?
+        function esAbierto(job) {
+            if (!job || !budgetData) return false;
+            // el presupuesto que se está creando en pantalla lleva el jid del trabajo
+            // hasta que recibe código (y también justo después, en el mismo flujo)
+            if (job.jid && budgetData._jid === job.jid &&
+                (!budgetData.id || !job.budgetId || budgetData.id === job.budgetId)) return true;
+            if (job.budgetId) return budgetData.id === job.budgetId;
+            return false;
+        }
+        function etiquetaTrabajo(job) { return job.budgetId || 'nuevo'; }
+        function textoFase(job) { return FASES_TRABAJO[job.fase] || job.fase; }
+        function fmtMmSs(ms) {
+            const s = Math.max(0, Math.round(ms / 1000));
+            return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        }
+
+        // ---------- cabecera: "⏳ 0928-02-M · contando palabras · 0:35" ----------
+        let _trabajosTimer = null;
+        function renderTrabajos() {
+            const badge = document.getElementById('jobsBadge');
+            const activos = trabajosEnMarcha();
+            if (badge) {
+                if (!activos.length) {
+                    badge.style.display = 'none';
+                } else {
+                    // el que está creando carpeta manda (es el que obliga a esperar)
+                    const principal = activos.find(t => t.fase === 'creando' || t.fase === 'preparando') || activos[0];
+                    const resto = activos.length - 1;
+                    // compacto: la cabecera va justa de sitio. El cronómetro está en el panel.
+                    const corta = { preparando: 'creando carpeta', creando: 'creando carpeta', escribiendo: 'escribiendo archivos', subiendo: 'subiendo archivos', contando: 'contando palabras', guardando: 'guardando' };
+                    badge.innerHTML = '⏳ ' + (principal.budgetId ? '<b>' + escapeHtml(principal.budgetId) + '</b> · ' : '') +
+                        (corta[principal.fase] || textoFase(principal)) + (resto ? ' <span style="opacity:.85">+' + resto + '</span>' : '');
+                    badge.style.background = (principal.fase === 'creando' || principal.fase === 'preparando') ? '#dc2626' : '#f59e0b';
+                    badge.title = (principal.fase === 'creando' || principal.fase === 'preparando')
+                        ? 'Espera a que termine de crearse la carpeta antes de empezar otro presupuesto'
+                        : 'Puedes crear otro presupuesto mientras tanto · clic para ver el registro';
+                    badge.style.display = '';
+                }
+            }
+            if (activos.length && !_trabajosTimer) _trabajosTimer = setInterval(renderTrabajos, 1000);
+            if (!activos.length && _trabajosTimer) { clearInterval(_trabajosTimer); _trabajosTimer = null; }
+            prodLogRender();
+        }
+        // Bloque de trabajos en el panel "Proceso"
+        function htmlTrabajos() {
+            if (!trabajos.length) return '';
+            const filas = trabajos.map(t => {
+                let icon, color;
+                if (enMarcha(t)) { icon = '⏳'; color = '#fbbf24'; }
+                else if (t.fase === 'hecho') { icon = '✓'; color = '#4ade80'; }
+                else { icon = '⚠️'; color = '#f87171'; }
+                const hora = _hhmmss(new Date(t.inicio));
+                const dur = fmtMmSs((t.fin || Date.now()) - t.inicio);
+                let cuerpo;
+                if (enMarcha(t)) {
+                    cuerpo = textoFase(t) + (t.detalle ? ' · ' + escapeHtml(t.detalle) : '') + ' · ' + dur;
+                } else if (t.fase === 'hecho') {
+                    cuerpo = (t.resultado ? escapeHtml(t.resultado.texto) : 'terminado') + ' · ' + dur;
+                } else {
+                    cuerpo = 'falló: ' + escapeHtml(t.error || 'error') + ' · ' + dur;
+                }
+                const links = [];
+                if (t.budgetId && !esAbierto(t)) links.push(`<a href="#" onclick="abrirDesdeTrabajo('${t.budgetId}'); return false;" style="color:#93c5fd;">abrir</a>`);
+                if (t.budgetId && esAbierto(t)) links.push('<span style="color:#64748b;">(abierto)</span>');
+                if (t.fase === 'error' && t.reintentar) links.push(`<a href="#" onclick="reintentarTrabajo('${t.jid}'); return false;" style="color:#93c5fd;">reintentar</a>`);
+                return `<div style="padding:4px 0;border-bottom:1px dashed #1e293b;">
+                    <span style="color:${color};">${icon}</span> <span style="color:#64748b;">${hora}</span>
+                    <b>${escapeHtml(etiquetaTrabajo(t))}</b> · ${cuerpo}${links.length ? ' · ' + links.join(' · ') : ''}
+                </div>`;
+            }).join('');
+            return `<div style="margin-bottom:6px;color:#cbd5e1;font-weight:700;">Trabajos</div>${filas}
+                    <div style="margin:8px 0 4px;color:#cbd5e1;font-weight:700;">Detalle</div>`;
+        }
+        async function abrirDesdeTrabajo(budgetId) {
+            if (!budgetId) return;
+            if (budgetData && budgetData.id === budgetId) return;
+            try { await loadBudget(budgetId); } catch (e) { showStatus('No se pudo abrir ' + budgetId + ': ' + e.message, 'error'); setTimeout(hideStatus, 5000); }
+        }
+        // ¿Puedo dejar este presupuesto y empezar otro? Solo bloquea la fase
+        // "creando carpeta" (unos segundos): el resto sigue en segundo plano.
+        function avisarSiCreando() {
+            const j = hayTrabajoCreando();
+            if (!j) return false;
+            showStatus('⏳ Espera unos segundos: todavía se está creando la carpeta de ' +
+                       (j.budgetId || 'otro presupuesto') + '. Cuando pase a "contando palabras" ya puedes empezar otro.', 'warning');
+            setTimeout(hideStatus, 6000);
+            prodLogShow();
+            return true;
+        }
+        window.addEventListener('beforeunload', e => {
+            if (trabajosEnMarcha().length) { e.preventDefault(); e.returnValue = ''; }
+        });
+
+        // ---------- carpeta local del trabajo (sin pasar por budgetData) ----------
+        async function handleLocalDeTrabajo(job) {
+            if (!job || !job.budgetId) return null;
+            const fh = job.bg && job.bg.localFolderHandle;
+            if (fh && fh.name === job.budgetId) return fh;
+            try {
+                const raiz = job.ctx.localHandle || await localModeReady(false);
+                if (!raiz) return null;
+                const folder = await raiz.getDirectoryHandle(job.budgetId, { create: false });
+                if (folder && folder.name === job.budgetId) { job.bg.localFolderHandle = folder; return folder; }
+            } catch (e) { /* sin carpeta local: se guarda en Drive por el servidor */ }
+            return null;
+        }
+
+        // ---------- resultado de un recuento: pantalla si está abierto, copias si no ----------
+        function analisisLite(arr) {
+            return (Array.isArray(arr) ? arr : []).map(f => {
+                const c = Object.assign({}, f);
+                delete c.extractedText; delete c.text;
+                return c;
+            });
+        }
+        function actualizarCopiasTrasRecuento(budgetId, res) {
+            // copia local del presupuesto (la que abre "Retomar" al instante)
+            try {
+                const c = getBudgetCache(budgetId);
+                if (c) {
+                    c.palabras = res.totalWords || 0;
+                    c.paginas = res.totalPages || c.paginas;
+                    c.analisisDetalle = analisisLite(res.analysis);
+                    if (res.fileSettings && Object.keys(res.fileSettings).length) c.fileSettings = Object.assign({}, c.fileSettings || {}, res.fileSettings);
+                    saveBudgetCache(c);
+                }
+            } catch (e) {}
+            // listado (memoria + IndexedDB)
+            try {
+                const b = (allBudgets || []).find(x => x.id === budgetId);
+                if (b) {
+                    b.palabras = res.totalWords || 0;
+                    b.paginas = res.totalPages || b.paginas;
+                    if (typeof guardarCacheLocalPresupuestos === 'function') guardarCacheLocalPresupuestos(allBudgets, budgetsTotal, budgetsShowingAll);
+                    if (document.getElementById('budgetListScreen') && !document.getElementById('budgetListScreen').classList.contains('hidden')) {
+                        try { filterBudgets(); } catch (e) {}
+                    }
+                }
+            } catch (e) {}
+        }
+        // Aplica el resultado (análisis) del trabajo. `res` = respuesta normalizada:
+        // { analysis, totalWords, totalPages, failedPages, otrosIdiomas, paginasOtroIdioma, countMethodUsed, fileSettings }
+        function aplicarResultadoRecuento(job, res, opts) {
+            opts = opts || {};
+            const totalPages = res.totalPages || 0;
+            const failedCount = Array.isArray(res.failedPages) ? res.failedPages.length : 0;
+            const _otros = formatOtrosIdiomas(res.otrosIdiomas);
+            let texto = (res.totalWords || 0).toLocaleString('es-ES') + ' palabras · ' + totalPages + ' págs';
+            if (failedCount > 0) texto += ' · ⚠️ ' + failedCount + ' pág. fallaron';
+            else if ((res.totalWords || 0) === 0 && totalPages > 0) texto += ' · ⚠️ 0 palabras';
+            job.resultado = { palabras: res.totalWords || 0, paginas: totalPages, texto: texto };
+
+            if (!esAbierto(job)) {
+                actualizarCopiasTrasRecuento(job.budgetId, res);
+                return;
+            }
+            // ----- presupuesto abierto: como siempre -----
+            budgetData.countMethodUsed = res.countMethodUsed || countMethod();
+            budgetData.fileAnalysis = res.analysis || [];
+            budgetData.wordCount = res.totalWords || 0;
+            budgetData.pageCount = res.totalPages || budgetData.pageCount;
+            budgetData.hasRecuento = true;
+            budgetData.otrosIdiomas = res.otrosIdiomas || null;
+            budgetData.failedPages = failedCount > 0 ? res.failedPages : null;
+            if (res.fileSettings && Object.keys(res.fileSettings).length) {
+                budgetData.fileSettings = Object.assign({}, budgetData.fileSettings || {}, res.fileSettings);
+            }
+            if (job.bg) job.bg.analysisDone = true;
+            completedSteps.add(4);
+            updateProgressSteps();
+            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+            aplicarAjustesManuales();   // v3.10.34: el manual gana sobre el análisis
+            renderWordCountSummary();   // v3.10.33
+            refreshWordCountSummary();
+            hideStatus();
+            const id = budgetData.id;
+            if (failedCount > 0) {
+                const okPages = totalPages - failedCount;
+                const msg = `⚠️ ${id} · Análisis parcial: ${okPages}/${totalPages} páginas procesadas (${failedCount} fallaron) · ${res.totalWords} palabras. ` +
+                    `Falló: ${resumenFallos(res.failedPages)}. Reanaliza desde el paso 2; si sigue igual, escribe el recuento a mano en ⚙ del archivo.`;
+                showBgBanner('warning', msg, false);
+                showGlobalAnalysisBanner('warning', msg);
+            } else if (_otros) {
+                const pg = res.paginasOtroIdioma ? ` (${res.paginasOtroIdioma} de ${totalPages} páginas no aportan palabras al recuento)` : '';
+                const msg = `✓ ${id} · ${budgetData.wordCount} palabras en ${budgetData.sourceLang} · ${totalPages} páginas. ` +
+                            `Además hay aprox. ${_otros.texto}, que NO se contabilizan${pg}.`;
+                showBgBanner('info', msg, false);
+                showGlobalAnalysisBanner('info', msg);
+            } else if (budgetData.wordCount === 0 && totalPages > 0) {
+                const msg = `❌ ${id} · 0 palabras en ${totalPages} página(s). Verifica el idioma origen (¿es correcto?) y reanaliza.`;
+                showBgBanner('error', msg, false);
+                showGlobalAnalysisBanner('error', msg);
+            } else {
+                const msg = (opts.prefijo || '✓ ') + `${id} · ${budgetData.wordCount} palabras · ${totalPages} páginas` +
+                    (opts.metodo ? ` · ${countMethodLabel(budgetData.countMethodUsed || countMethod(), budgetData.sourceLang)}` : '');
+                showBgBanner('success', msg, false);
+                showGlobalAnalysisBanner('success', msg);
+                if (opts.refrescarPresupuesto) { try { refreshQuoteAfterFileChange(); } catch (e) {} }
+            }
+            if (typeof aplicarAjustesManuales === 'function') { try { aplicarAjustesManuales(); } catch (e) {} }
+            setTimeout(hideBgBanner, 4000);
+        }
+
+        // Objeto "presupuesto" para la ficha Excel cuando el trabajo termina con
+        // el presupuesto cerrado (construirRecuentoWorkbook lee de él).
+        function presupuestoDelTrabajo(job, res) {
+            const c = job.ctx || {};
+            return {
+                id: job.budgetId, sourceLang: c.sourceLang || '', targetLang: c.targetLang || '',
+                clientEmail: c.clientEmail || '', clientWhatsApp: c.clientWhatsApp || '',
+                internalComments: c.internalComments || '', estado: '0-Pendiente',
+                fileAnalysis: res.analysis || [], fileSettings: res.fileSettings || c.fileSettings || {},
+                countMethodUsed: res.countMethodUsed || countMethod(), wordCount: res.totalWords || 0, pageCount: res.totalPages || 0,
+                numeroPedido: '', quoteConfig: null
+            };
+        }
+
+        // ---------- rescate por huella (trabajo) ----------
+        async function adoptarPorHuella(job, minutesBack) {
+            try {
+                const fpData = await apiPost({
+                    action: 'findBudgetByFingerprint',
+                    origen: job.ctx.sourceLang, destino: job.ctx.targetLang, canal: job.ctx.channel || '',
+                    fileNames: (job.ctx.files || []).map(f => f.name),
+                    minutesBack: minutesBack || 10
+                });
+                if (fpData.success && fpData.found && fpData.budget) {
+                    asignarCodigoAlTrabajo(job, { budgetId: fpData.budget.id, folderId: fpData.budget.folderId, folderUrl: fpData.budget.folderUrl });
+                    return true;
+                }
+            } catch (e) { console.log('adoptarPorHuella falló:', e); }
+            return false;
+        }
+        // El trabajo ya tiene código: anotarlo y, si es el abierto, pintarlo.
+        function asignarCodigoAlTrabajo(job, r) {
+            job.budgetId = r.budgetId;
+            job.folderId = r.folderId || '';
+            job.folderUrl = r.folderUrl || '';
+            job.bg.folderCreated = true; job.bg.folderError = null; job.bg.pendingFiles = null;
+            renderTrabajos();
+            if (!esAbierto(job)) return;
+            budgetData.id = r.budgetId;
+            budgetData.folderId = r.folderId || '';
+            budgetData.folderUrl = r.folderUrl || '';
+            if (!budgetData.estado) budgetData.estado = '0-Pendiente';
+            uploadedFiles = [];
+            const idDisplay = document.getElementById('budgetIdDisplay');
+            if (idDisplay) { idDisplay.textContent = budgetData.id; idDisplay.classList.add('active'); }
+            const delBtn = document.getElementById('deleteBudgetBtn');
+            if (delBtn) delBtn.style.display = 'inline-block';
+            const folderLink = document.getElementById('folderLink');
+            if (folderLink && budgetData.folderUrl) { folderLink.href = budgetData.folderUrl; folderLink.classList.remove('hidden'); }
+            if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+            if (typeof updateStep2Buttons === 'function') { try { updateStep2Buttons(); } catch (e) {} }
+            // v3.7.69: regenerar el mensaje al cliente ahora que ya existe la referencia
+            if (!clientMessageEdited && typeof updateClientMessage === 'function') updateClientMessage();
+            // el aviso de arriba deja de decir "en cuanto tenga código"
+            if (job.ctx && job.ctx.withAnalysis) {
+                showGlobalAnalysisBanner('loading', `⏳ ${r.budgetId} · contando palabras de ${(job.ctx.files || []).length} archivo(s)… Puedes ir a Inicio y empezar otro presupuesto; se avisa al terminar.`);
+            }
+        }
+        function reintentarTrabajo(jid) {
+            const job = trabajoPorJid(jid);
+            if (!job || !job.reintentar) return;
+            const fn = job.reintentar;
+            job.reintentar = null;
+            fn();
+        }
+        // Botón "Reintentar" del banner del paso 2 (compatibilidad)
+        async function retryBackgroundCreate() {
+            const job = trabajos.find(t => t.fase === 'error' && t.reintentar && (esAbierto(t) || !t.budgetId));
+            if (job) reintentarTrabajo(job.jid);
+        }
+
+        // ============ CREAR CARPETA (+ CONTAR) COMO TRABAJO ============
+        async function createFolderAndContinue(withAnalysis = true) {
             if (withAnalysis && uploadedFiles.length === 0) {
-                showStatus('Adjunta al menos un archivo para analizar (o usa "Crear Carpeta")', 'warning');
+                showStatus('Adjunta al menos un archivo para contar palabras (o usa "Crear carpeta")', 'warning');
                 setTimeout(hideStatus, 4000);
                 return;
             }
-            
-            const btn = document.getElementById('step2Btn');
-            const btnOnly = document.getElementById('step2BtnOnly');
-            const btnExtract = document.getElementById('step2BtnExtract');
-            
+            if (avisarSiCreando()) return;
+            if (budgetData.id || budgetData._jid) {
+                showStatus('Este presupuesto ya tiene carpeta (' + (budgetData.id || 'en creación') + ').', 'warning');
+                setTimeout(hideStatus, 4000);
+                return;
+            }
             const internalComments = document.getElementById('internalComments').value.trim();
             budgetData.internalComments = internalComments;
             const totalPages = uploadedFiles.reduce((sum, f) => sum + (f.pages || 1), 0);
             budgetData.pageCount = totalPages;
-            
-            // Reset estado background
-            bgState = {
-                folderCreated: false,
-                folderError: null,
-                analysisDone: false,
-                analysisError: null,
-                pendingFiles: null,
-                pendingWithAnalysis: withAnalysis,
-                pendingInternalComments: internalComments
-            };
 
-            // v3.10.38: el permiso de la carpeta local se resuelve AQUÍ, en el
-            // clic, y se guarda en bgState. Chrome solo muestra el aviso de
-            // permiso dentro de un gesto del usuario; pedirlo más tarde, en
-            // segundo plano, podía fallar en silencio y mandar todo a Drive.
-            bgState.localHandle = await localModeReady(true);
-            bgState.localConfigurada = !!(await getLocalDirHandle());
-            
-            // Modo BACKGROUND: lanzar y avanzar inmediatamente al paso 3
-            const filesSnapshot = uploadedFiles.slice();
-            
-            // Deshabilitar botones durante el proceso
-            btn.disabled = true;
-            btnOnly.disabled = true;
-            
-            // Mostrar banner de estado
-            showBgBanner('loading', withAnalysis
-                ? '⏳ Creando carpeta y analizando documentos en background...'
-                : '⏳ Creando carpeta en background...', false);
-            // v3.7.24: banner global persistente
-            showGlobalAnalysisBanner('loading',
-                withAnalysis
-                    ? `⏳ Creando carpeta y analizando ${filesSnapshot.length} archivo(s)... Puedes navegar; este aviso se mantendrá visible.`
-                    : (filesSnapshot.length === 0
-                        ? '⏳ Creando presupuesto y carpeta vacía en Drive...'
-                        : `⏳ Creando carpeta con ${filesSnapshot.length} archivo(s)...`)
-            );
-            
-            // Marcar paso 2 como completado y avanzar
+            // v3.10.38: el permiso de la carpeta local se resuelve AQUÍ, en el clic
+            const localHandle = await localModeReady(true);
+            const localConfigurada = !!(await getLocalDirHandle());
+
+            const ctx = {
+                withAnalysis: withAnalysis,
+                files: uploadedFiles.slice(),
+                internalComments: internalComments,
+                totalPages: totalPages,
+                sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang, channel: budgetData.channel,
+                clientEmail: budgetData.clientEmail, clientWhatsApp: budgetData.clientWhatsApp,
+                tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
+                paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
+                apostilla: !!document.getElementById('docApostille')?.checked,
+                enHistorico: document.getElementById('docInHistory')?.checked !== false,
+                localHandle: localHandle, localConfigurada: localConfigurada
+            };
+            const job = nuevoTrabajo(withAnalysis ? 'crear+contar' : 'crear', ctx);
+            job.bg.pendingWithAnalysis = withAnalysis;
+            job.bg.pendingInternalComments = internalComments;
+            budgetData._jid = job.jid;    // el presupuesto abierto "es" este trabajo hasta tener código
+            bgState = job.bg;             // compatibilidad con handleLocalDelPresupuesto / extractTexts
+
+            updateStep2Buttons();
+            showBgBanner('loading', withAnalysis ? '⏳ Creando carpeta y contando palabras en segundo plano...' : '⏳ Creando carpeta...', false);
+            showGlobalAnalysisBanner('loading', withAnalysis
+                ? `⏳ Creando carpeta y contando ${ctx.files.length} archivo(s)... En cuanto tenga código podrás ir a Inicio y empezar otro presupuesto.`
+                : (ctx.files.length === 0 ? '⏳ Creando presupuesto y carpeta vacía...' : `⏳ Creando carpeta con ${ctx.files.length} archivo(s)...`));
             completedSteps.add(2);
             completedSteps.add(4);
             updateProgressSteps();
-            
-            // Lanzar tarea de fondo (sin await)
-            runBackgroundCreate(filesSnapshot, withAnalysis, internalComments);
-            
-            // Avanzar inmediatamente al paso 4 (Solic. Tasación)
-            setTimeout(() => showCard(4), 300);
+
+            ejecutarTrabajoCrear(job);   // sin await
+            setTimeout(() => { if (esAbierto(job)) showCard(4); }, 300);
+        }
+        // Alias de compatibilidad
+        async function createFolder() { return createFolderAndContinue(true); }
+
+        async function ejecutarTrabajoCrear(job) {
+            const ctx = job.ctx;
+            const files = ctx.files || [];
+            const withAnalysis = !!ctx.withAnalysis;
+            const internalComments = ctx.internalComments || '';
+            const stageTimings = { t_start: performance.now(), t_promiseAllEnd: 0, t_saveResultsStart: 0, t_saveResultsEnd: 0, t_end: 0,
+                                   backendCreateFolderMs: 0, backendClaudeMs: 0, backendSaveResultsMs: 0 };
+            let approxBytes = 0;
+            try { files.forEach(f => { approxBytes += (f.content || '').length; }); approxBytes = Math.round(approxBytes * 0.75); } catch (e) {}
+            job.error = null; job.reintentar = null;
+
+            try {
+                const totalPages = ctx.totalPages || files.reduce((sum, f) => sum + (f.pages || 1), 0);
+                const _localHandle = ctx.localHandle || null;
+                if (ctx.localConfigurada && !_localHandle && esAbierto(job)) {
+                    showStatus('⚠️ La carpeta local está configurada pero sin permiso: este presupuesto se crea en Drive por Apps Script. ' +
+                               'Para el próximo, pulsa "Reactivar carpeta local" en el paso 2.', 'warning');
+                    setTimeout(hideStatus, 9000);
+                }
+                faseTrabajo(job, 'creando', files.length ? files.length + ' archivo(s)' : 'carpeta vacía');
+                prodLogStart(job.k('folder'), _localHandle
+                    ? `Registrando presupuesto (modo LOCAL: carpeta y ${files.length} archivo(s) en disco)`
+                    : `Creando carpeta en Drive + subiendo ${files.length} archivo(s) por Apps Script`);
+
+                // v3.7.93: requestId único por creación (idempotencia en reintentos)
+                if (!job.bg.requestId) job.bg.requestId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                let folderResult = null;
+                try {
+                    // v3.7.81: la carpeta se crea SIEMPRE vacía (petición ligera con reintento)
+                    folderResult = await apiPost({
+                        action: 'createBudgetFolder',
+                        channel: ctx.channel, sourceLang: ctx.sourceLang, targetLang: ctx.targetLang,
+                        clientEmail: ctx.clientEmail, clientWhatsApp: ctx.clientWhatsApp,
+                        internalComments: internalComments, totalPages: totalPages,
+                        files: [], numArchivosPrevisto: files.length,
+                        tipoDocumento: ctx.tipoDocumento, paisOrigen: ctx.paisOrigen, apostilla: ctx.apostilla, enHistorico: ctx.enHistorico,
+                        requestId: job.bg.requestId,
+                        localMode: !!_localHandle
+                    }, { retry: true, attempts: 4, timeoutMs: 30000 });
+                    if (folderResult && !folderResult.success && folderResult.busy) {
+                        prodLogError(job.k('folder'), 'servidor ocupado; recuperando por requestId');
+                        const rec = await recuperarPorRequestId(job.bg.requestId, 4);
+                        if (rec) folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
+                    }
+                } catch (folderErr) {
+                    prodLogError(job.k('folder'), ((folderErr && folderErr.message) || 'sin respuesta') + ' · buscando por requestId…');
+                    const rec = await recuperarPorRequestId(job.bg.requestId, 3);
+                    if (rec) {
+                        folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
+                        prodLogDone(job.k('folder'), rec.budgetId + ' (recuperado por requestId tras respuesta perdida)');
+                    } else {
+                        throw folderErr;
+                    }
+                }
+                if (!folderResult || !folderResult.success) {
+                    prodLogError(job.k('folder'), folderResult ? (folderResult.error || 'error') : 'sin respuesta');
+                    throw new Error((folderResult && folderResult.error) || 'Error creando carpeta');
+                }
+                if (!folderResult.budgetId) {
+                    let _cruda = '';
+                    try { _cruda = JSON.stringify(folderResult).slice(0, 300); } catch (e) {}
+                    prodLogError(job.k('folder'), 'respuesta sin código de presupuesto · servidor contestó: ' + _cruda);
+                    const rec = await recuperarPorRequestId(job.bg.requestId, 3);
+                    if (rec) {
+                        folderResult = { success: true, budgetId: rec.budgetId, folderId: rec.folderId || '', folderUrl: rec.folderUrl || '', _recuperado: true };
+                        prodLogDone(job.k('folder'), rec.budgetId + ' (recuperado por requestId)');
+                    } else {
+                        const adoptado = await adoptarPorHuella(job, 10);
+                        if (!adoptado) throw new Error('La carpeta se creó pero no se recibió su código. Pulsa "Reintentar" o recarga para recuperarla.');
+                        folderResult = { success: true, budgetId: job.budgetId, folderId: job.folderId, folderUrl: job.folderUrl };
+                    }
+                }
+                prodLogDone(job.k('folder'), folderResult.budgetId || '');
+                // ¡Código asignado! Desde aquí se puede empezar otro presupuesto.
+                asignarCodigoAlTrabajo(job, folderResult);
+                stageTimings.backendCreateFolderMs = (folderResult && folderResult._timings && folderResult._timings.totalMs) || 0;
+
+                // ----- archivos: disco local (Drive Desktop los sube) o Apps Script -----
+                let directUploadResults = null;
+                let _volverAPaso2 = false;
+                if (_localHandle && files.length > 0) {
+                    faseTrabajo(job, 'escribiendo', files.length + ' archivo(s)');
+                    try {
+                        const t0 = performance.now();
+                        job.bg.localFolderHandle = await createLocalBudgetFolder(_localHandle, job.budgetId, files);
+                        prodLogDone(job.k('folder-local'), files.length + ' archivo(s) escritos en local · ' + Math.round(performance.now() - t0) + 'ms');
+                        directUploadResults = { subidos: files.length, fallidos: [] };
+                        resolveLocalFolderId(job.budgetId, 5).then(r => {
+                            if (r && r.folderId) {
+                                job.folderId = r.folderId; job.folderUrl = r.folderUrl || '';
+                                if (esAbierto(job)) {
+                                    budgetData.folderId = r.folderId; budgetData.folderUrl = r.folderUrl || '';
+                                    if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+                                }
+                            }
+                        });
+                    } catch (eLocal) {
+                        prodLogError(job.k('folder-local'), eLocal.message || String(eLocal));
+                        if (esAbierto(job)) {
+                            showStatus('⚠️ No se pudo escribir en la carpeta local (' + (eLocal.message || eLocal) + '). Súbelos a Drive a mano y pulsa "Actualizar desde Drive".', 'error');
+                            setTimeout(hideStatus, 9000);
+                        }
+                        directUploadResults = { subidos: 0, fallidos: files.map(f => ({ name: f.name, error: 'local' })) };
+                        _volverAPaso2 = true;
+                    }
+                } else if (folderResult.folderId && files.length > 0) {
+                    faseTrabajo(job, 'subiendo', files.length + ' archivo(s)');
+                    let _pesoLote = 0;
+                    try { files.forEach(f => { _pesoLote += f.size || Math.round((f.content || '').length * 0.75); }); } catch (e) {}
+                    const _limiteBytes = getUploadMaxAutoBytes();
+                    if (_pesoLote > _limiteBytes) {
+                        const mbLote = (_pesoLote / 1048576).toFixed(1);
+                        const mbLim = Math.round(_limiteBytes / 1048576);
+                        directUploadResults = { subidos: 0, fallidos: files.map(f => ({ name: f.name, error: 'lote > ' + mbLim + ' MB' })) };
+                        prodLogDone(job.k('folder'), (folderResult.budgetId || '') + ' · lote ' + mbLote + ' MB > ' + mbLim + ' MB: subida manual');
+                        let _urlCarpeta = folderResult.folderUrl || '';
+                        if (_urlCarpeta.indexOf('http') !== 0) _urlCarpeta = 'https://drive.google.com/drive/folders/' + (folderResult.folderId || _urlCarpeta);
+                        if (esAbierto(job)) {
+                            showStatus(`⚠️ Los archivos pesan ${mbLote} MB (más de ${mbLim} MB): súbelos directamente a ` +
+                                `<a href="${_urlCarpeta}" target="_blank" style="font-weight:600;">📂 la carpeta de Drive</a>` +
+                                ` y pulsa "🔄 Actualizar desde Drive".`, 'warning');
+                        }
+                        _volverAPaso2 = true;
+                    } else {
+                        const res = await uploadFilesViaAppsScript(files, folderResult.folderId, job.budgetId);
+                        directUploadResults = res;
+                        if (res.fallidos.length) {
+                            if (esAbierto(job)) {
+                                showStatus(`⚠️ No se pudieron cargar: ` + res.fallidos.map(f => f.name).join(', ') +
+                                    `. Súbelos a mano en Drive (botón 📂) y pulsa "🔄 Actualizar desde Drive".`, 'error');
+                                setTimeout(hideStatus, 12000);
+                            }
+                            _volverAPaso2 = true;
+                        }
+                    }
+                }
+                stageTimings.t_promiseAllEnd = performance.now();
+
+                // lista de archivos de la carpeta (reconstruida en local; la real llega después)
+                if (folderResult.uploadedFiles) {
+                    job.folderFiles = folderResult.uploadedFiles;
+                } else if (directUploadResults) {
+                    const fallidos = new Set((directUploadResults.fallidos || []).map(f => f.name));
+                    job.folderFiles = files.filter(f => !fallidos.has(f.name)).map(f => ({
+                        id: f.driveId || '', name: f.name, mimeType: f.type, size: f.size, pages: f.pages || 0, url: f.driveUrl || ''
+                    }));
+                }
+                if (esAbierto(job)) {
+                    uploadedFiles = [];
+                    if (job.folderFiles) { budgetData.folderFiles = job.folderFiles; budgetData.numArchivos = job.folderFiles.length; }
+                    else budgetData.numArchivos = files.length;
+                    setTimeout(() => { if (esAbierto(job) && typeof refreshFolderFilesFromDrive === 'function') refreshFolderFilesFromDrive().catch(() => {}); }, 800);
+                    if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
+                    if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+                    if (_volverAPaso2) showCard(2);
+                    const extractBtn = document.getElementById('step2BtnExtract');
+                    if (extractBtn) extractBtn.disabled = false;
+                }
+
+                // ----- recuento de palabras (Claude) -----
+                let claudeResult = null;
+                let claudeFailedHard = false;
+                let claudeHardError = '';
+                if (withAnalysis) {
+                    faseTrabajo(job, 'contando', files.length + ' archivo(s)');
+                    prodLogStart(job.k('analyze'), `${job.budgetId} · Analizando ${files.length} archivo(s) en el servidor (Claude)`);
+                    try {
+                        claudeResult = await apiPost({
+                            action: 'countWordsParallel', files: files, sourceLang: ctx.sourceLang,
+                            internalComments: internalComments, countMethod: 'claude'
+                        }, { retry: false });
+                    } catch (cErr) {
+                        claudeFailedHard = true;
+                        claudeHardError = (cErr && cErr.message) ? cErr.message : 'Failed to fetch';
+                    }
+                    stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
+                    // v3.7.97: "éxito" con análisis vacío = fallo duro
+                    if (claudeResult && claudeResult.success &&
+                        (!Array.isArray(claudeResult.analysis) || claudeResult.analysis.length === 0) && files.length > 0) {
+                        try { prodLogError(job.k('analyze'), 'RESPUESTA ANÓMALA (éxito sin análisis): ' + JSON.stringify(claudeResult).substring(0, 600)); } catch (e) {}
+                        claudeFailedHard = true;
+                        claudeHardError = 'análisis vacío con ' + files.length + ' archivo(s)';
+                        claudeResult = null;
+                    }
+                }
+
+                if (withAnalysis && claudeFailedHard) {
+                    // Los archivos YA están en la carpeta: relanzar por la vía del
+                    // servidor (reanalyzeFolder), que además rescata desde la hoja.
+                    prodLogError(job.k('analyze'), claudeHardError);
+                    job.bg.analysisError = claudeHardError;
+                    if (esAbierto(job)) {
+                        const msgAuto = `✓ Carpeta creada · ${job.budgetId} · ⚠️ el primer análisis falló; reintentando automáticamente...`;
+                        showBgBanner('warning', msgAuto, false);
+                        showGlobalAnalysisBanner('loading', '⏳ ' + msgAuto);
+                    }
+                    const ok2 = await ejecutarTrabajoContar(job, { desdeCreacion: true });
+                    if (!ok2) {
+                        const isTimeout = /failed to fetch|networkerror|load failed/i.test(claudeHardError);
+                        const msg = isTimeout
+                            ? `✓ Carpeta creada · ${job.budgetId} · ⚠️ el análisis superó el límite de 6 min de Apps Script (documento largo). Pulsa "Recontar palabras" en el paso 2 para reintentarlo.`
+                            : `✓ Carpeta creada · ${job.budgetId} · ⚠️ el análisis falló: ${claudeHardError}. Pulsa "Recontar palabras" en el paso 2.`;
+                        if (esAbierto(job)) { showBgBanner('warning', msg, false); showGlobalAnalysisBanner('warning', msg); }
+                        job.error = 'el recuento falló (' + claudeHardError + ')';
+                        job.reintentar = () => { const j2 = nuevoTrabajo('contar', contextoContarDe(job)); ejecutarTrabajoContar(j2); };
+                        faseTrabajo(job, 'error');
+                        return;
+                    }
+                } else if (withAnalysis && claudeResult) {
+                    prodLogDone(job.k('analyze'), claudeResult.success ? `${claudeResult.totalWords || 0} palabras` : (claudeResult.error || 'sin éxito'));
+                    if (claudeResult._debug) console.log('[Tradutema DEBUG]', claudeResult._debug);
+                    if (claudeResult._perf) logPerfToConsole(claudeResult._perf, 'Crear y Analizar');
+                    if (claudeResult._perf && job.budgetId) {
+                        fetch(apiUrl, { method: 'POST', body: JSON.stringify({ action: 'logPerformance', budgetId: job.budgetId, action_label: 'Crear y Analizar', perf: claudeResult._perf }) })
+                            .catch(e => console.warn('logPerformance fallo:', e));
+                    }
+                    if (claudeResult.success) {
+                        // v3.7.19: fileSettings iniciales desde los archivos subidos
+                        const initialFileSettings = {};
+                        files.forEach(f => {
+                            if (f.pagesFilter || f.instructions) initialFileSettings[f.name] = { pagesFilter: f.pagesFilter || '', instructions: f.instructions || '' };
+                        });
+                        const res = {
+                            analysis: claudeResult.analysis || [], totalWords: claudeResult.totalWords || 0,
+                            totalPages: claudeResult.totalPages || totalPages, failedPages: claudeResult.failedPages || [],
+                            otrosIdiomas: claudeResult.otrosIdiomas || null, paginasOtroIdioma: claudeResult.paginasOtroIdioma,
+                            countMethodUsed: claudeResult.countMethodUsed || 'claude', fileSettings: initialFileSettings
+                        };
+                        // ----- guardar: TXT + ficha Excel en local (si hay carpeta) y fila en la hoja -----
+                        faseTrabajo(job, 'guardando');
+                        if (esAbierto(job)) {
+                            showBgBanner('loading', '💾 Guardando análisis (TXTs + _RECUENTO)...', false);
+                            showGlobalAnalysisBanner('loading', `⏳ ${job.budgetId} · Guardando análisis...`);
+                        }
+                        prodLogStart(job.k('save'), `${job.budgetId} · Guardando recuento + TXTs`);
+                        stageTimings.t_saveResultsStart = performance.now();
+                        try {
+                            const _fhLocal = await handleLocalDeTrabajo(job);
+                            if (_fhLocal) {
+                                try {
+                                    for (const item of res.analysis) {
+                                        if (item.extractedText) await writeLocalTextFile(_fhLocal, item.fileName + '.txt', item.extractedText);
+                                    }
+                                    const _mUsed = res.countMethodUsed || countMethod();
+                                    let tsv = 'Presupuesto\t' + job.budgetId + '\nIdioma origen\t' + ctx.sourceLang +
+                                        '\nMetodo de recuento\t' + countMethodLabel(_mUsed, ctx.sourceLang) +
+                                        '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
+                                    res.analysis.forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
+                                    tsv += 'TOTAL\t' + res.totalWords + '\n';
+                                    await writeLocalTextFile(_fhLocal, '_RECUENTO.txt', tsv);
+                                } catch (eTxt) { console.warn('TXTs locales:', eTxt); }
+                                // v3.9.1: ficha Excel junto a los TXT (con los datos del trabajo)
+                                try {
+                                    const bExcel = esAbierto(job)
+                                        ? Object.assign({}, budgetData, { fileAnalysis: res.analysis, fileSettings: Object.assign({}, budgetData.fileSettings || {}, initialFileSettings), wordCount: res.totalWords, pageCount: res.totalPages, countMethodUsed: res.countMethodUsed })
+                                        : presupuestoDelTrabajo(job, res);
+                                    const wb = await construirRecuentoWorkbook({ budget: bExcel });
+                                    const buffer = await wb.xlsx.writeBuffer();
+                                    await writeLocalBinaryFile(_fhLocal, nombreRecuentoExcel(null, job.budgetId),
+                                        new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+                                } catch (eX) { console.warn('Ficha Excel local:', eX); }
+                            }
+                            const saveData = await apiPost({
+                                action: 'saveWordCountResults', budgetId: job.budgetId, folderId: job.folderId || '',
+                                skipDrive: !!_fhLocal, analysis: res.analysis, totalWords: res.totalWords, totalPages: res.totalPages,
+                                sourceLang: ctx.sourceLang, fileSettings: initialFileSettings
+                            });
+                            if (!saveData.success) { console.warn('saveWordCountResults: el backend reportó fallo', saveData); prodLogError(job.k('save'), saveData.error || 'el backend reportó fallo'); }
+                            else prodLogDone(job.k('save'), 'OK');
+                            if (saveData._timings && saveData._timings.totalMs) stageTimings.backendSaveResultsMs = saveData._timings.totalMs;
+                        } catch (saveErr) {
+                            console.error('saveWordCountResults: fallo en la llamada', saveErr);
+                            prodLogError(job.k('save'), (saveErr && saveErr.message) || 'fallo en la llamada');
+                        }
+                        stageTimings.t_saveResultsEnd = performance.now();
+                        aplicarResultadoRecuento(job, res, { prefijo: '✓ Carpeta creada · ' });
+                    } else {
+                        job.bg.analysisError = claudeResult.error;
+                        const msg = `✓ Carpeta creada · ${job.budgetId} · ⚠️ recuento falló: ${claudeResult.error || ''}`;
+                        if (esAbierto(job)) { showBgBanner('warning', msg, false); showGlobalAnalysisBanner('warning', msg); }
+                        job.error = 'el recuento falló: ' + (claudeResult.error || '');
+                        job.reintentar = () => { const j2 = nuevoTrabajo('contar', contextoContarDe(job)); ejecutarTrabajoContar(j2); };
+                        faseTrabajo(job, 'error');
+                        return;
+                    }
+                } else {
+                    const msg = `✓ Carpeta creada · ${job.budgetId}`;
+                    if (esAbierto(job)) { showBgBanner('success', msg, false); showGlobalAnalysisBanner('success', msg); setTimeout(hideBgBanner, 4000); }
+                    job.resultado = { texto: 'carpeta creada' + (files.length ? ' · ' + files.length + ' archivo(s)' : '') };
+                }
+                if (enMarcha(job)) faseTrabajo(job, 'hecho');
+                stageTimings.t_end = performance.now();
+                logStageTimingsToSheet(stageTimings, withAnalysis ? 'Crear y Analizar' : 'Crear Carpeta', files.length, approxBytes, job.budgetId);
+            } catch (error) {
+                job.bg.folderError = error.message;
+                job.bg.pendingFiles = files;
+                const isFailedToFetch = /failed to fetch|networkerror|load failed/i.test(error.message || '');
+                const diagnostic = isFailedToFetch
+                    ? 'Sin respuesta del servidor (posible timeout de Apps Script >6 min o red caída). Comprobando si la carpeta se creó igualmente...'
+                    : 'Error al crear la carpeta. Comprobando si la carpeta se creó igualmente...';
+                if (esAbierto(job)) { showBgBanner('loading', diagnostic, false); showGlobalAnalysisBanner('loading', '⏳ ' + diagnostic); }
+                await new Promise(r => setTimeout(r, 4000));
+                const recovered = job.budgetId ? true : await adoptarPorHuella(job, 10);
+                if (recovered) {
+                    const recMsg = `⚠️ Carpeta rescatada · ${job.budgetId} — el servidor falló al responder pero la carpeta SÍ se creó (no se ha duplicado). ${withAnalysis ? 'Pulsa "Recontar palabras" en el paso 2 si necesitas terminar el recuento.' : ''}`;
+                    if (esAbierto(job)) { showBgBanner('warning', recMsg, false); showGlobalAnalysisBanner('warning', recMsg); }
+                    job.error = 'carpeta creada, pero el proceso se cortó (' + (error.message || 'sin respuesta') + ')';
+                    if (withAnalysis) job.reintentar = () => { const j2 = nuevoTrabajo('contar', contextoContarDe(job)); ejecutarTrabajoContar(j2); };
+                } else {
+                    const msg = isFailedToFetch
+                        ? `⚠️ No se obtuvo respuesta del servidor y no se encontró carpeta creada. Probable timeout (>6 min) o red caída. Pulsa "Reintentar". Detalle: ${error.message}`
+                        : `⚠️ No se pudo crear la carpeta: ${error.message}. Pulsa "Reintentar".`;
+                    if (esAbierto(job)) { showBgBanner('error', msg, true); showGlobalAnalysisBanner('error', '❌ ' + msg); }
+                    job.error = error.message || 'error';
+                    // mismo requestId → el servidor no duplica
+                    job.reintentar = () => { job.fase = 'preparando'; job.fin = 0; ejecutarTrabajoCrear(job); };
+                }
+                faseTrabajo(job, 'error');
+            }
         }
 
-        // v3.10.50: botón "Continuar →" del paso 2. Un solo botón por etapa:
-        //   - sin carpeta y con adjuntos → crear + analizar + extraer (como
-        //     hacía "Crear, Analizar y Extraer →")
-        //   - sin carpeta y sin adjuntos → crear la carpeta vacía
-        //   - con carpeta → subir pendientes si los hay y pasar a Solic. Tasación
-        async function continuarPaso2() {
+        // ============ CONTAR PALABRAS (carpeta ya creada) COMO TRABAJO ============
+        function contextoContarDe(job) {
+            return {
+                budgetId: job.budgetId, folderId: job.folderId || '', sourceLang: job.ctx.sourceLang,
+                internalComments: job.ctx.internalComments || '', fileSettings: job.ctx.fileSettings || {},
+                numFiles: (job.ctx.files || []).length, localHandle: job.ctx.localHandle || null
+            };
+        }
+        // Botón del paso 2 ("Contar / Recontar palabras →", "Subir y contar →").
+        // Prepara con el presupuesto abierto (sube pendientes, resuelve la
+        // carpeta) y lanza el recuento como trabajo: se puede salir.
+        async function reanalyzeFromFolder() {
+            if (!budgetData.id) { showStatus('Primero crea la carpeta', 'warning'); setTimeout(hideStatus, 3000); return; }
+            if (trabajoDe(budgetData.id)) { showStatus('Este presupuesto ya tiene un recuento en curso', 'warning'); setTimeout(hideStatus, 3000); prodLogShow(); return; }
             if (!budgetData.folderId) {
-                return createFolderAndContinue(uploadedFiles.length > 0, false);
+                showStatus('⏳ Esperando a que Google Drive Desktop sincronice la carpeta local...', 'loading');
+                const r = await resolveLocalFolderId(budgetData.id, 4);
+                if (r && r.folderId) { budgetData.folderId = r.folderId; budgetData.folderUrl = r.folderUrl || ''; }
+                else {
+                    showStatus('La carpeta aún no aparece en Drive. Comprueba que Google Drive Desktop esté sincronizando y reintenta en unos segundos.', 'warning');
+                    setTimeout(hideStatus, 6000);
+                    return;
+                }
             }
-            if (uploadedFiles && uploadedFiles.length > 0) {
-                const ok = await syncPendingUploads();
-                if (!ok && !confirm('No se han podido subir todos los archivos a Drive. ¿Avanzar de todos modos?')) return;
-                hideStatus();
+            const idFlujo = budgetData.id;
+            try {
+                if ((uploadedFiles || []).length) {
+                    showStatus('Subiendo archivos pendientes...', 'loading');
+                    prodLogStart(idFlujo + ':sync', idFlujo + ' · Sincronizando archivos pendientes con Drive');
+                    await syncPendingUploads();
+                    prodLogDone(idFlujo + ':sync', 'OK');
+                }
+            } catch (e) {
+                showStatus('No se pudieron subir los archivos pendientes: ' + e.message, 'error'); setTimeout(hideStatus, 6000);
+                return;
             }
-            completedSteps.add(2);
-            updateProgressSteps();
-            saveBudgetDataIfNeeded();
-            showCard(4);
+            if (!sigueSiendo(idFlujo)) return;
+            const numFiles = (budgetData.folderFiles || []).filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_').length;
+            const job = nuevoTrabajo('contar', {
+                budgetId: budgetData.id, folderId: budgetData.folderId, sourceLang: budgetData.sourceLang,
+                internalComments: budgetData.internalComments || '', fileSettings: budgetData.fileSettings || {},
+                numFiles: numFiles, localHandle: await localModeReady(false)
+            });
+            updateStep2Buttons();
+            showStatus('Contando palabras en segundo plano… puedes seguir trabajando.', 'loading');
+            setTimeout(hideStatus, 4000);
+            showGlobalAnalysisBanner('loading', `⏳ Contando palabras de ${numFiles} archivo(s) del presupuesto ${budgetData.id}... Puedes ir a Inicio y empezar otro; se avisa al terminar.`);
+            ejecutarTrabajoContar(job);   // sin await
         }
 
-        // Mantener createFolder como alias para compatibilidad
-        async function createFolder() {
-            return createFolderAndContinue(true);
+        // Devuelve true si terminó con recuento (aplicado), false si falló.
+        async function ejecutarTrabajoContar(job, opts) {
+            opts = opts || {};
+            const ctx = job.ctx;
+            if (!ctx.folderId) {
+                const r = await resolveLocalFolderId(ctx.budgetId, 4);
+                if (r && r.folderId) { ctx.folderId = r.folderId; job.folderId = r.folderId; if (esAbierto(job)) { budgetData.folderId = r.folderId; budgetData.folderUrl = r.folderUrl || ''; } }
+            }
+            if (!ctx.folderId) {
+                job.error = 'la carpeta aún no está en Drive (Google Drive Desktop no ha sincronizado)';
+                job.reintentar = () => { const j2 = nuevoTrabajo('contar', Object.assign({}, ctx)); ejecutarTrabajoContar(j2); };
+                faseTrabajo(job, 'error');
+                return false;
+            }
+            faseTrabajo(job, 'contando', ctx.numFiles ? ctx.numFiles + ' archivo(s)' : '');
+            const t_start = performance.now();
+            const numFiles = ctx.numFiles || 0;
+            async function recoverAnalysisFromSheet() {
+                for (let intento = 1; intento <= 2; intento++) {
+                    await new Promise(r => setTimeout(r, intento === 1 ? 3000 : 8000));
+                    try {
+                        const resp = await apiPost({ action: 'getBudget', budgetId: ctx.budgetId }, { retry: false });
+                        const b = resp && resp.success && resp.budget;
+                        if (b && parseFloat(b.palabras) > 0 && Array.isArray(b.analisisDetalle) && b.analisisDetalle.length > 0) {
+                            return { analysis: b.analisisDetalle, totalWords: parseFloat(b.palabras) || 0, totalPages: parseFloat(b.paginas) || 0 };
+                        }
+                    } catch (e) { /* siguiente intento */ }
+                }
+                return null;
+            }
+            try {
+                prodLogStart(job.k('reanalyze'), `${ctx.budgetId} · Analizando documento con Claude (${numFiles} archivo(s))`);
+                let data;
+                try {
+                    data = await apiPost({
+                        action: 'reanalyzeFolder', folderId: ctx.folderId, budgetId: ctx.budgetId, sourceLang: ctx.sourceLang,
+                        internalComments: ctx.internalComments || '', fileSettings: ctx.fileSettings || {}, countMethod: 'claude'
+                    }, { retry: false });
+                } catch (fetchErr) {
+                    const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
+                    prodLogError(job.k('reanalyze'), isTimeout ? 'timeout >6 min (Apps Script) o red' : (fetchErr.message || 'error'));
+                    prodLogStart(job.k('recover'), 'Respuesta perdida: comprobando si el análisis quedó guardado');
+                    const rec = await recoverAnalysisFromSheet();
+                    if (rec) {
+                        prodLogDone(job.k('recover'), `Recuperado de la hoja: ${rec.totalWords} palabras · ${rec.totalPages} pág.`);
+                        data = { success: true, analysis: rec.analysis, totalWords: rec.totalWords, totalPages: rec.totalPages, failedPages: [], _recovered: true };
+                    } else {
+                        prodLogError(job.k('recover'), 'sin datos guardados en la hoja');
+                        throw fetchErr;
+                    }
+                }
+                prodLogDone(job.k('reanalyze'), data && data.success ? `${data.totalWords || 0} palabras · ${data.totalPages || 0} pág.` : ((data && data.error) || 'sin éxito'));
+                if (data._perf) logPerfToConsole(data._perf, 'Reanalizar');
+                const total_ms = Math.round(performance.now() - t_start);
+                const claudeMs = (data._perf && data._perf.totalMs) || 0;
+                fetch(apiUrl, { method: 'POST', body: JSON.stringify({
+                    action: 'logStageTimings', budgetId: ctx.budgetId, action_label: 'Reanalizar',
+                    stages: { uploadFiles_ms: 0, createFolder_ms: 0, claudeAnalysis_ms: claudeMs, saveResults_ms: Math.max(0, total_ms - claudeMs), total_ms: total_ms },
+                    meta: { numFiles: numFiles, totalBytes: 0 }
+                }) }).catch(e => console.warn('logStageTimings fallo:', e));
+
+                if (data.success) {
+                    faseTrabajo(job, 'guardando');
+                    const res = {
+                        analysis: data.analysis || [], totalWords: data.totalWords || 0, totalPages: data.totalPages || 0,
+                        failedPages: data.failedPages || [], otrosIdiomas: data.otrosIdiomas || null, paginasOtroIdioma: data.paginasOtroIdioma,
+                        countMethodUsed: data.countMethodUsed || countMethod(), fileSettings: null
+                    };
+                    // TXT + _RECUENTO + Excel en local, si este presupuesto tiene carpeta local
+                    try {
+                        const fh = await handleLocalDeTrabajo(job);
+                        if (fh) {
+                            for (const item of res.analysis) { if (item.extractedText) await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText); }
+                            let tsv = 'Presupuesto\t' + ctx.budgetId + '\nIdioma origen\t' + ctx.sourceLang +
+                                '\nMetodo de recuento\t' + countMethodLabel(res.countMethodUsed, ctx.sourceLang) +
+                                '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
+                            res.analysis.forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
+                            tsv += 'TOTAL\t' + res.totalWords + '\n';
+                            await writeLocalTextFile(fh, '_RECUENTO.txt', tsv);
+                            try {
+                                const bExcel = esAbierto(job)
+                                    ? Object.assign({}, budgetData, { fileAnalysis: res.analysis, wordCount: res.totalWords, pageCount: res.totalPages, countMethodUsed: res.countMethodUsed })
+                                    : presupuestoDelTrabajo(job, res);
+                                const wb = await construirRecuentoWorkbook({ budget: bExcel });
+                                const buffer = await wb.xlsx.writeBuffer();
+                                await writeLocalBinaryFile(fh, nombreRecuentoExcel(null, ctx.budgetId),
+                                    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+                            } catch (eX) { console.warn('Ficha Excel local:', eX); }
+                        }
+                    } catch (eLoc) { console.warn('Copia local del recuento:', eLoc); }
+                    aplicarResultadoRecuento(job, res, { prefijo: '✓ Análisis completado · ', metodo: true, refrescarPresupuesto: true });
+                    if (esAbierto(job) && !opts.desdeCreacion && (res.failedPages || []).length === 0 && res.totalWords > 0 && !formatOtrosIdiomas(res.otrosIdiomas)) {
+                        showSuccess(`Análisis completado · ${res.totalWords} palabras · ${res.totalPages} páginas`, ctx.budgetId);
+                        setTimeout(() => { hideSuccess(); if (esAbierto(job)) showCard(4); }, 1800);
+                    }
+                    faseTrabajo(job, 'hecho');
+                    return true;
+                }
+                job.error = data.error || 'sin éxito';
+                if (esAbierto(job)) { showStatus('Error: ' + data.error, 'error'); showGlobalAnalysisBanner('error', `❌ ${ctx.budgetId} · Error: ${data.error}`); }
+            } catch (e) {
+                job.error = e.message || String(e);
+                if (esAbierto(job)) showStatus('Error: ' + e.message, 'error');
+            }
+            job.reintentar = () => { const j2 = nuevoTrabajo('contar', Object.assign({}, ctx)); ejecutarTrabajoContar(j2); };
+            faseTrabajo(job, 'error');
+            return false;
         }
 
         // ====== EXTRAER TEXTOS (botón Extraer) ======
@@ -10777,12 +10051,6 @@
         // ====== MODAL VER TXT EXTRAÍDO ======
         let currentTxtFilename = '';
         
-        function openTxtPreviewFromIndex(idx, source) {
-            const store = source === 'quick' ? window.quickExtractedTexts : window.wordCountExtractedTexts;
-            if (!store || !store[idx]) return;
-            openTxtPreviewModal(store[idx].name, store[idx].text);
-        }
-
         function openTxtPreviewModal(filename, text) {
             currentTxtFilename = filename;
             document.getElementById('txtPreviewTitle').textContent = '📄 ' + filename + '.txt';
@@ -12100,13 +11368,16 @@
         // al presupuestar (ej. "de este PDF de 4 páginas solo se traduce la 1").
         async function construirRecuentoWorkbook(opts) {
             opts = opts || {};
+            // v3.10.54: puede construirse para un presupuesto que NO está abierto
+            // (trabajo terminado en segundo plano): opts.budget en lugar del global
+            const _b = opts.budget || budgetData;
             const ExcelJS = await loadExcelJs();
             const wb = new ExcelJS.Workbook();
             wb.creator = 'Tradutema QUOTES';
             wb.created = new Date();
 
-            const settings = budgetData.fileSettings || {};
-            const archivos = (budgetData.fileAnalysis || []).map(f => {
+            const settings = _b.fileSettings || {};
+            const archivos = (_b.fileAnalysis || []).map(f => {
                 const nombre = f.fileName || f.name || '';
                 const st = settings[nombre] || {};
                 return {
@@ -12137,7 +11408,7 @@
                 pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
             });
             wc.columns = [{ width: 30 }, { width: 78 }];
-            _xlTituloFila(wc, 1, 'COTIZACIÓN ' + (budgetData.id || '') +
+            _xlTituloFila(wc, 1, 'COTIZACIÓN ' + (_b.id || '') +
                 (opts.esEnvio ? '  ·  VERSIÓN v' + opts.version + ' (ENVIADA AL CLIENTE)' : '  ·  estado actual'), 2);
 
             let fc = 3;
@@ -12162,37 +11433,37 @@
                 fc++;
             };
 
-            _dato('Presupuesto', budgetData.id || '');
+            _dato('Presupuesto', _b.id || '');
             if (opts.esEnvio) {
                 _dato('Versión', 'v' + opts.version + ' — enviada por ' + (opts.canal || 'cliente'), true);
                 _dato('Enviada el', new Date().toLocaleString('es-ES'), true);
             } else {
                 _dato('Versión', 'Estado actual (no es una copia enviada)');
             }
-            _dato('Estado', budgetData.estado || '');
-            _dato('Idiomas', (budgetData.sourceLang || '') + ' → ' + (budgetData.targetLang || ''), true);
-            _dato('Contacto', budgetData.clientEmail || budgetData.clientWhatsApp || '');
-            _dato('Nº de pedido', budgetData.numeroPedido || '(sin pedido asociado)');
+            _dato('Estado', _b.estado || '');
+            _dato('Idiomas', (_b.sourceLang || '') + ' → ' + (_b.targetLang || ''), true);
+            _dato('Contacto', _b.clientEmail || _b.clientWhatsApp || '');
+            _dato('Nº de pedido', _b.numeroPedido || '(sin pedido asociado)');
             _dato('Generado el', new Date().toLocaleString('es-ES'));
 
             _seccion('PRECIO');
-            const cfg = budgetData.quoteConfig || null;
+            const cfg = _b.quoteConfig || null;
             _dato('Método de cálculo', (cfg && CALC_METHOD_LABELS[cfg.method]) || CALC_METHOD_LABELS[currentCalcMethod] || '');
             _dato('Palabras contabilizadas', totalPal, true);
             _dato('Páginas contabilizadas', totalPag, true);
             const _v = id => { const e = document.getElementById(id); return e ? e.value : ''; };
             _dato('Páginas totales (al cliente)', _v('quoteTotalPages'));
             _dato('Páginas a traducir', _v('quotePagesToTranslate'));
-            _dato('Tarifa', budgetData.savedQuoteRate || budgetData.savedQuotePricePerWord || _v('directTariffPerWord') || '');
-            _dato('Importe', budgetData.savedQuoteTotal ? budgetData.savedQuoteTotal + ' €' : (_v('quoteAmountPages') || ''), true);
-            _dato('Plazo', (budgetData.savedQuoteDays || _v('quoteDays') || '') + ' días');
-            _dato('Recargo urgencia', _v('quoteUrgency') || budgetData.savedUrgency || '');
+            _dato('Tarifa', _b.savedQuoteRate || _b.savedQuotePricePerWord || _v('directTariffPerWord') || '');
+            _dato('Importe', _b.savedQuoteTotal ? _b.savedQuoteTotal + ' €' : (_v('quoteAmountPages') || ''), true);
+            _dato('Plazo', (_b.savedQuoteDays || _v('quoteDays') || '') + ' días');
+            _dato('Recargo urgencia', _v('quoteUrgency') || _b.savedUrgency || '');
             if (cfg && cfg.method === 'provider' && cfg.providerName) {
                 _dato('Proveedor cotizado', cfg.providerName + (cfg.providerQuote ? ' · ' + cfg.providerQuote : ''));
             }
 
             _seccion('CONDICIONES ACORDADAS  ⚠ leer antes de producir');
-            _dato('Notas e instrucciones', (document.getElementById('internalComments') || {}).value || budgetData.internalComments || '');
+            _dato('Notas e instrucciones', (document.getElementById('internalComments') || {}).value || _b.internalComments || '');
             _dato('Comentarios a proveedores', (document.getElementById('providerComments') || {}).value || '');
             if (hayFiltros) {
                 _dato('Restricciones por archivo', 'SÍ — ver la columna "Páginas a traducir" en la hoja Recuento');
@@ -12215,7 +11486,7 @@
             }
 
             _seccion('MENSAJE ENVIADO AL CLIENTE');
-            _dato('Texto', (document.getElementById('clientMessage') || {}).value || budgetData.savedClientMessage || '');
+            _dato('Texto', (document.getElementById('clientMessage') || {}).value || _b.savedClientMessage || '');
 
             // ══════════ Hoja 2: Recuento ══════════
             const ws = wb.addWorksheet('Recuento', {
@@ -12226,14 +11497,14 @@
                 { width: 46 }, { width: 10 }, { width: 12 }, { width: 15 }, { width: 28 }, { width: 34 }
             ];
 
-            _xlTituloFila(ws, 1, 'RECUENTO DE PALABRAS · ' + (budgetData.id || '') +
+            _xlTituloFila(ws, 1, 'RECUENTO DE PALABRAS · ' + (_b.id || '') +
                 (opts.esEnvio ? '  ·  v' + opts.version : ''), 6);
             const meta = [
-                ['Presupuesto', budgetData.id || ''],
-                ['Idiomas', (budgetData.sourceLang || '') + ' → ' + (budgetData.targetLang || '')],
-                ['Método de recuento', countMethodLabel(budgetData.countMethodUsed || countMethod(), budgetData.sourceLang)],
+                ['Presupuesto', _b.id || ''],
+                ['Idiomas', (_b.sourceLang || '') + ' → ' + (_b.targetLang || '')],
+                ['Método de recuento', countMethodLabel(_b.countMethodUsed || countMethod(), _b.sourceLang)],
                 ['Fecha', new Date().toLocaleString('es-ES')],
-                ['Contacto', budgetData.clientEmail || '']
+                ['Contacto', _b.clientEmail || '']
             ];
             meta.forEach((par, i) => {
                 const fila = 2 + i;
@@ -12294,7 +11565,7 @@
 
             if (totalOtros > 0) {
                 const ra = ws.getCell(fila, 1);
-                ra.value = 'El total de arriba cuenta SOLO las palabras en ' + (budgetData.sourceLang || 'el idioma origen') +
+                ra.value = 'El total de arriba cuenta SOLO las palabras en ' + (_b.sourceLang || 'el idioma origen') +
                            '. El documento contiene además unas ' + totalOtros.toLocaleString('es-ES') +
                            ' palabras en otros idiomas, que NO están incluidas en este recuento ni en el precio.';
                 ra.alignment = { wrapText: true, vertical: 'top' };
@@ -12324,8 +11595,8 @@
             return wb;
         }
 
-        function nombreRecuentoExcel(version) {
-            const base = '_RECUENTO_' + (budgetData.id || 'presupuesto');
+        function nombreRecuentoExcel(version, id) {
+            const base = '_RECUENTO_' + (id || budgetData.id || 'presupuesto');
             return version ? (base + '_v' + version + '.xlsx') : (base + '.xlsx');
         }
 
@@ -14238,7 +13509,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         //   createFolder_ms   = backendCreateFolderMs (lo que tardó el backend)
         //   claudeAnalysis_ms = backendClaudeMs       (lo que tardó el backend)
         //   saveResults_ms    = t_saveResultsEnd - t_saveResultsStart
-        function logStageTimingsToSheet(stageTimings, actionLabel, numFiles, totalBytes) {
+        function logStageTimingsToSheet(stageTimings, actionLabel, numFiles, totalBytes, budgetIdTrabajo) {
             try {
                 const t = stageTimings;
                 const total_ms = Math.round(t.t_end - t.t_start);
@@ -14255,7 +13526,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
 
                 const payload = {
                     action: 'logStageTimings',
-                    budgetId: budgetData.id || '',
+                    budgetId: budgetIdTrabajo || budgetData.id || '',
                     action_label: actionLabel,
                     stages: {
                         uploadFiles_ms: uploadFiles_ms,
