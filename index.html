@@ -725,6 +725,8 @@
 
         <!-- HOME SCREEN -->
         <div class="home-screen" id="homeScreen">
+            <!-- v3.10.56: el servidor ejecuta una versión anterior a la que necesita esta app -->
+            <div id="apiVersionWarning" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:0.9rem;line-height:1.45;"></div>
             <div class="home-buttons">
                 <button class="home-btn" onclick="startNewBudget()">
                     <span class="home-btn-icon">🆕</span>
@@ -1944,8 +1946,12 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.54';
-        const HTML_DATE = '28/09/2026';
+        const HTML_VERSION = '3.10.56';
+        const HTML_DATE = '30/09/2026';
+        // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
+        // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
+        // fallar con "Acción no reconocida" al usar una función nueva.
+        const API_MIN_VERSION = '3.7.88';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -6049,6 +6055,35 @@
             }
         }
         
+        // v3.10.56: comparación de versiones "3.7.88" (numérica por tramos)
+        function compararVersiones(a, b) {
+            const pa = String(a || '').split('.').map(x => parseInt(x, 10) || 0);
+            const pb = String(b || '').split('.').map(x => parseInt(x, 10) || 0);
+            for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                const d = (pa[i] || 0) - (pb[i] || 0);
+                if (d) return d < 0 ? -1 : 1;
+            }
+            return 0;
+        }
+        function apiVersionInsuficiente() {
+            return !!(apiVersion && apiVersion !== '?' && compararVersiones(apiVersion, API_MIN_VERSION) < 0);
+        }
+        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_89.gs o posterior), ' +
+            'luego <b>Implementar → Gestionar implementaciones → ✏️ (editar) → Versión: «Nueva versión» → Implementar</b>. ' +
+            'Pegar el código sin crear una versión nueva no cambia lo que se ejecuta.';
+        function refrescarAvisoVersionApi() {
+            const box = document.getElementById('apiVersionWarning');
+            if (!box) return;
+            if (apiVersionInsuficiente()) {
+                box.innerHTML = `⚠️ <b>El servidor ejecuta el Apps Script v${escapeHtml(apiVersion)}${apiDate ? ' (' + escapeHtml(apiDate) + ')' : ''}</b> ` +
+                    `y esta pantalla (v${HTML_VERSION}) necesita la <b>v${API_MIN_VERSION} o superior</b>. Las funciones nuevas fallarán con «Acción no reconocida». ` +
+                    TEXTO_IMPLEMENTAR_API;
+                box.style.display = '';
+            } else {
+                box.style.display = 'none';
+            }
+        }
+
         function updateVersionIndicator(error = false) {
             const htmlDisplay = document.getElementById('htmlVersionDisplay');
             const apiDisplay = document.getElementById('apiVersionDisplay');
@@ -6059,16 +6094,23 @@
             }
             
             if (apiDisplay) {
+                apiDisplay.classList.remove('ok', 'error');
                 if (error) {
                     apiDisplay.textContent = 'Error de conexión';
                     apiDisplay.classList.add('error');
                 } else if (apiVersion && apiVersion !== '?') {
-                    apiDisplay.textContent = `v${apiVersion}${apiDate ? ' (' + apiDate + ')' : ''}`;
-                    apiDisplay.classList.add('ok');
+                    if (apiVersionInsuficiente()) {
+                        apiDisplay.textContent = `v${apiVersion}${apiDate ? ' (' + apiDate + ')' : ''} — ⚠️ hace falta la v${API_MIN_VERSION} o superior`;
+                        apiDisplay.classList.add('error');
+                    } else {
+                        apiDisplay.textContent = `v${apiVersion}${apiDate ? ' (' + apiDate + ')' : ''}`;
+                        apiDisplay.classList.add('ok');
+                    }
                 } else {
                     apiDisplay.textContent = 'Cargando...';
                 }
             }
+            refrescarAvisoVersionApi();
         }
 
         // v3.7.4 (v3.7.5: selects clásicos): poblar selectores de tipo/país.
@@ -8317,9 +8359,74 @@
             listFolderFiles: 'leer la carpeta de Drive'
         };
 
+        // v3.10.55: las operaciones "de negocio" que van al servidor se anotan
+        // en el panel Proceso (⏳ → ✓/✗). Las lecturas y los guardados
+        // automáticos (cotización tecleada, prefetch…) no, para no llenarlo.
+        // Las que ya son trabajos (crear, contar, enviar tasación) se anotan
+        // desde el propio trabajo, con más detalle.
+        const API_LOG = {
+            saveClientData:          'Guardando datos del cliente (tarifa, plazo, mensaje)',
+            saveClientSendHistory:   'Anotando envío al cliente',
+            updateStatus:            'Cambiando estado',
+            sendClientEmail:         'Enviando presupuesto al cliente por email',
+            addContactedProviders:   'Apuntando traductores contactados (sin envío)',
+            updateBudgetBasicData:   'Guardando datos del presupuesto',
+            deleteBudget:            'Eliminando presupuesto',
+            saveOrderNumber:         'Guardando nº de pedido',
+            syncWooOrders:           'Vinculando pedidos de WooCommerce',
+            saveProviderFull:        'Guardando traductor',
+            setProvidersActiveBulk:  'Activando/desactivando traductores',
+            setProviderActive:       'Cambiando estado de traductor',
+            promoteFromDirectorioBulk: 'Añadiendo traductores del directorio',
+            promoteFromDirectorio:   'Añadiendo traductor del directorio',
+            addProvider:             'Añadiendo traductor',
+            deleteProvider:          'Eliminando traductor',
+            removeFileFromFolder:    'Quitando archivo de la carpeta',
+            countPagesOnly:          'Contando páginas',
+            extractTextParallel:     'Extrayendo texto'
+        };
+        let _apiLogSeq = 0;
+        function _apiLogDetalle(payload, data) {
+            try {
+                switch (payload.action) {
+                    case 'sendClientEmail': return 'enviado a ' + (payload.clientEmail || '');
+                    case 'updateStatus': return String(payload.status || '');
+                    case 'addContactedProviders': return (payload.providers || []).map(p => p.nombre).join(', ');
+                    case 'saveClientSendHistory': return (payload.tipo || '') + (payload.destinatario ? ' → ' + payload.destinatario : '');
+                    case 'syncWooOrders': return (data && data.linked != null) ? data.linked + ' vinculado(s)' : 'OK';
+                    case 'saveOrderNumber': return '#' + (payload.orderNumber || '');
+                    case 'saveClientData': return (payload.amount ? payload.amount + ' € · ' : '') + (payload.quoteDays ? payload.quoteDays + ' días' : '');
+                    case 'setProvidersActiveBulk': return (payload.activo === false ? 'desactivar ' : 'activar ') + ((payload.emails || payload.claves || []).length || '') ;
+                }
+            } catch (e) {}
+            return 'OK';
+        }
+
         async function apiPost(payload, opts) {
             const options = opts || {};
             const accion = API_ACTION_LABELS[payload && payload.action] || (payload && payload.action) || 'la operación';
+            const _logKey = (payload && API_LOG[payload.action]) ? ('api' + (++_apiLogSeq)) : null;
+            if (_logKey) prodLogStart(_logKey, (payload.budgetId ? payload.budgetId + ' · ' : '') + API_LOG[payload.action]);
+            try {
+                const r = await _apiPostCore(payload, options, accion);
+                // v3.10.56: el servidor no conoce la acción = Apps Script antiguo
+                if (r && r.success === false && /Acci[oó]n no reconocida/i.test(String(r.error || ''))) {
+                    r.error = 'El Apps Script del servidor (v' + apiVersion + ') es anterior al que necesita esta pantalla (v' + API_MIN_VERSION +
+                        ' o superior): no conoce «' + (payload && payload.action) + '». ' +
+                        TEXTO_IMPLEMENTAR_API.replace(/<\/?b>/g, '');
+                    refrescarAvisoVersionApi();
+                }
+                if (_logKey) {
+                    if (r && r.success === false) prodLogError(_logKey, r.error || 'el servidor devolvió error');
+                    else prodLogDone(_logKey, _apiLogDetalle(payload, r));
+                }
+                return r;
+            } catch (e) {
+                if (_logKey) prodLogError(_logKey, (e && e.message) || String(e));
+                throw e;
+            }
+        }
+        async function _apiPostCore(payload, options, accion) {
             // v3.7.93: intentos configurables (options.attempts) con espera
             // creciente. Para llamadas críticas y baratas (crear carpeta) se
             // puede subir a 4; el resto sigue en 2 como hasta ahora.
@@ -8958,6 +9065,7 @@
             subiendo:   'subiendo archivos a Drive',
             contando:   'contando palabras',
             guardando:  'guardando recuento',
+            enviando:   'enviando solicitud de tasación',
             hecho:      'terminado',
             error:      'error'
         };
@@ -8990,7 +9098,11 @@
                 // la tabla del paso 3 ("⏳ contando…" / "sin analizar")
                 try { if (typeof updateStep2Buttons === 'function') updateStep2Buttons(); } catch (e) {}
                 try { if (typeof renderWordCountSummary === 'function') renderWordCountSummary(); } catch (e) {}
+                try { if (typeof updateSelectedCount === 'function') updateSelectedCount(); } catch (e) {}
             }
+        }
+        function trabajoEnvioDe(budgetId) {
+            return trabajos.find(t => t.tipo === 'enviar' && t.budgetId === budgetId && enMarcha(t)) || null;
         }
         function trabajoDe(budgetId) {
             if (!budgetId) return null;
@@ -9035,7 +9147,7 @@
                     const principal = activos.find(t => t.fase === 'creando' || t.fase === 'preparando') || activos[0];
                     const resto = activos.length - 1;
                     // compacto: la cabecera va justa de sitio. El cronómetro está en el panel.
-                    const corta = { preparando: 'creando carpeta', creando: 'creando carpeta', escribiendo: 'escribiendo archivos', subiendo: 'subiendo archivos', contando: 'contando palabras', guardando: 'guardando' };
+                    const corta = { preparando: 'creando carpeta', creando: 'creando carpeta', escribiendo: 'escribiendo archivos', subiendo: 'subiendo archivos', contando: 'contando palabras', guardando: 'guardando', enviando: 'enviando tasación' };
                     badge.innerHTML = '⏳ ' + (principal.budgetId ? '<b>' + escapeHtml(principal.budgetId) + '</b> · ' : '') +
                         (corta[principal.fase] || textoFase(principal)) + (resto ? ' <span style="opacity:.85">+' + resto + '</span>' : '');
                     badge.style.background = (principal.fase === 'creando' || principal.fase === 'preparando') ? '#dc2626' : '#f59e0b';
@@ -10325,7 +10437,10 @@
 
         function updateSelectedCount() {
             document.getElementById('selectedCount').textContent = proveedoresSeleccionados().length + ' seleccionados';
-            document.getElementById('sendQuoteBtn').disabled = selectedProviders.size === 0;
+            const _env = (typeof trabajoEnvioDe === 'function') ? trabajoEnvioDe(budgetData.id) : null;   // v3.10.55
+            const _sq = document.getElementById('sendQuoteBtn');
+            _sq.disabled = selectedProviders.size === 0 || !!_env;
+            _sq.innerHTML = _env ? '<span class="spinner"></span> Enviando solicitud de tasación… (puedes seguir trabajando)' : '✉️ Previsualizar y Enviar Tasación';
             refreshStep4ContinueHint();   // v3.10.50
         }
 
@@ -10873,9 +10988,16 @@
 
         let _sendingProviders = false;   // v3.7.96: guard anti doble clic
 
+        // v3.10.55: el envío de la solicitud de tasación es un TRABAJO: la
+        // preparación (carpeta en Drive, destinatarios, texto) se hace con el
+        // presupuesto abierto; los lotes se mandan en segundo plano y quedan
+        // en el panel Proceso. Antes, si cambiabas de presupuesto a mitad,
+        // los lotes restantes ni se enviaban (v3.10.44). Ahora se envían y
+        // solo se deja de tocar la pantalla.
         async function sendProviderEmails() {
-            // v3.7.96: si ya hay un envío en curso, ignorar el clic
-            if (_sendingProviders) return;
+            if (trabajoEnvioDe(budgetData.id)) {
+                showStatus('Ya hay un envío en curso para este presupuesto', 'warning'); setTimeout(hideStatus, 3000); prodLogShow(); return;
+            }
             // v3.8.0: en modo local, resolver la carpeta antes de enviar (los
             // adjuntos del email salen de Drive)
             if (!budgetData.folderId && budgetData.id) {
@@ -10890,44 +11012,70 @@
                     return;
                 }
             }
-            _sendingProviders = true;
-
-            // Feedback INMEDIATO en el propio botón antes de cerrar el modal
             const sendBtn = document.getElementById('providerSendBtn');
-            if (sendBtn) {
-                sendBtn.disabled = true;
-                sendBtn.innerHTML = '<span class="spinner"></span> Enviando...';
-            }
-
+            if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<span class="spinner"></span> Enviando...'; }
             closeProviderModal();
-            
             // v3.10.42: exactamente los que se enseñaron en "Destinatarios (N)"
             const providers = (window._providersToSend || proveedoresSeleccionados()).filter(p => p && p.email);
-            const idFlujoTas = budgetData.id;   // v3.10.44
             if (!providers.length) {
                 showStatus('No hay destinatarios: vuelve a seleccionar los traductores', 'error'); setTimeout(hideStatus, 4000);
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = 'Enviar'; }
                 return;
             }
-            const customMessage = document.getElementById('providerMessageEdit').value;
-            const additionalComments = document.getElementById('providerComments').value.trim();
-            
+            const job = nuevoTrabajo('enviar', {
+                budgetId: budgetData.id, folderId: budgetData.folderId,
+                sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang,
+                customMessage: document.getElementById('providerMessageEdit').value,
+                additionalComments: document.getElementById('providerComments').value.trim(),
+                providers: providers.map(p => ({ nombre: p.nombre, email: p.email }))
+            });
+            if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
+            updateSelectedCount();
+            if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = 'Enviar'; }
+            ejecutarTrabajoEnviar(job);   // sin await
+        }
+
+        function actualizarCopiasTrasEnvio(budgetId, lote, fechaEnvio) {
+            try {
+                const c = getBudgetCache(budgetId);
+                if (c) {
+                    const nombres = String(c.traductoresContactados || '').split(' | ').map(s => s.trim()).filter(Boolean);
+                    lote.forEach(p => { if (!nombres.includes(p.nombre)) nombres.push(p.nombre); });
+                    c.traductoresContactados = nombres.join(' | ');
+                    const h = (c.historialTraductores && typeof c.historialTraductores === 'object') ? c.historialTraductores : {};
+                    lote.forEach(p => { if (!h[p.nombre]) h[p.nombre] = []; h[p.nombre].push({ fecha: fechaEnvio, email: p.email }); });
+                    c.historialTraductores = h;
+                    if (!c.estado || String(c.estado).startsWith('0')) c.estado = '1-Tasación Solicitada';
+                    saveBudgetCache(c);
+                }
+            } catch (e) {}
+            try {
+                const b = (allBudgets || []).find(x => x.id === budgetId);
+                if (b && (!b.estado || String(b.estado).startsWith('0'))) {
+                    b.estado = '1-Tasación Solicitada';
+                    if (typeof guardarCacheLocalPresupuestos === 'function') guardarCacheLocalPresupuestos(allBudgets, budgetsTotal, budgetsShowingAll);
+                }
+            } catch (e) {}
+        }
+
+        async function ejecutarTrabajoEnviar(job) {
+            const ctx = job.ctx;
+            const providers = ctx.providers || [];
             // v3.10.43: ENVÍO POR LOTES de 4. Cada lote es una llamada corta al
-            // servidor que apunta a sus 4 en la hoja ANTES de mandar los
-            // correos. Con 13 traductores y adjuntos de 17 MB, una sola
-            // llamada podía morir por tiempo después de mandar y antes de
-            // apuntar (caso real: 0915-05-M, 15/09 18:54). Ahora, si algo
-            // falla a mitad, la hoja ya sabe a quién se pidió y en pantalla ves
-            // exactamente qué lote no salió.
+            // servidor que apunta a sus 4 en la hoja ANTES de mandar los correos.
             const LOTE = 4;
             const lotes = [];
             for (let k = 0; k < providers.length; k += LOTE) lotes.push(providers.slice(k, k + LOTE));
-            let ok = 0, fallidos = [], loteConError = null;
-            if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
-
+            let ok = 0, fallidos = [], loteConError = null, enviados = [];
+            faseTrabajo(job, 'enviando', providers.length + ' traductor(es)');
             try {
                 for (let li = 0; li < lotes.length; li++) {
                     const lote = lotes[li];
-                    showStatus(`Enviando a ${lote.map(p => p.nombre).join(', ')} (${li * LOTE + 1}–${Math.min((li + 1) * LOTE, providers.length)} de ${providers.length})… no repitas el envío`, 'loading');
+                    const etiqueta = lotes.length > 1 ? `lote ${li + 1}/${lotes.length}: ` : '';
+                    faseTrabajo(job, 'enviando', etiqueta + lote.map(p => p.nombre).join(', '));
+                    prodLogStart(job.k('lote' + li), `${ctx.budgetId} · Enviando solicitud de tasación a ${lote.map(p => p.nombre).join(', ')}` +
+                        (lotes.length > 1 ? ` (${li * LOTE + 1}–${Math.min((li + 1) * LOTE, providers.length)} de ${providers.length})` : ''));
+                    if (esAbierto(job)) showStatus(`Enviando a ${lote.map(p => p.nombre).join(', ')} (${li * LOTE + 1}–${Math.min((li + 1) * LOTE, providers.length)} de ${providers.length})… no repitas el envío`, 'loading');
                     // Sin reintento automático (v3.7.96): enviar correos no es
                     // idempotente. El candado de 2 min del backend protege si
                     // alguien reintenta a mano.
@@ -10936,45 +11084,43 @@
                         data = await apiPost({
                             action: 'sendProviderEmails',
                             providers: lote,
-                            budgetId: budgetData.id,
-                            folderId: budgetData.folderId,
-                            sourceLang: budgetData.sourceLang,
-                            targetLang: budgetData.targetLang,
-                            customMessage: customMessage,
-                            additionalComments: li === 0 ? additionalComments : ''   // los comentarios, una vez
+                            budgetId: ctx.budgetId,
+                            folderId: ctx.folderId,
+                            sourceLang: ctx.sourceLang,
+                            targetLang: ctx.targetLang,
+                            customMessage: ctx.customMessage,
+                            additionalComments: li === 0 ? ctx.additionalComments : ''   // los comentarios, una vez
                         }, { retry: false });
                     } catch (eLote) {
-                        // Respuesta perdida o red caída: el lote puede haber salido
-                        // (y estar ya apuntado en la hoja) o no. Se para aquí y se
-                        // dice exactamente en cuál, para que Recuperar desde Gmail
-                        // o un reenvío acotado lo resuelvan.
                         data = { success: false, error: (eLote && eLote.message) || 'sin respuesta' };
                     }
-                    if (!data || !data.success) { loteConError = { lote: lote, error: (data && data.error) || 'sin respuesta' }; break; }
-
-                    // El servidor ya los ha apuntado: reflejarlo en memoria
-                    if (!sigueSiendo(idFlujoTas)) { loteConError = null; break; }   // v3.10.44: otro presupuesto abierto, no tocar
-                    lote.forEach(p => {
-                        if (!budgetData.contactedProviders.some(c => c.nombre === p.nombre)) budgetData.contactedProviders.push({ nombre: p.nombre, email: p.email });
-                        if (!budgetData.historialTraductores) budgetData.historialTraductores = {};
-                        if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
-                        budgetData.historialTraductores[p.nombre].push({ fecha: data.fechaEnvio, email: p.email });
-                    });
+                    if (!data || !data.success) {
+                        prodLogError(job.k('lote' + li), (data && data.error) || 'sin respuesta');
+                        loteConError = { lote: lote, error: (data && data.error) || 'sin respuesta' };
+                        break;
+                    }
                     (data.results || []).forEach(r => { if (r.success) ok++; else fallidos.push(r.provider + (r.error ? ' (' + r.error + ')' : '')); });
-                    // v3.10.51 (caso 0925-02-W): el backend pone "1-Tasación
-                    // Solicitada" al registrar el lote, así que la pantalla lo
-                    // refleja YA, sin esperar a otra llamada que puede fallar
-                    // o llegar tarde. Y el aviso "marcados sin solicitud" se
-                    // recalcula, que se quedaba colgado hasta cambiar de paso.
-                    {
+                    prodLogDone(job.k('lote' + li), (data.results || []).filter(r => r.success).length + ' correo(s) · ' + (data.fechaEnvio || ''));
+                    enviados = enviados.concat(lote);
+                    // El servidor ya los ha apuntado: reflejarlo en memoria (si está abierto) o en las copias
+                    if (esAbierto(job)) {
+                        lote.forEach(p => {
+                            if (!budgetData.contactedProviders.some(c => c.nombre === p.nombre)) budgetData.contactedProviders.push({ nombre: p.nombre, email: p.email });
+                            if (!budgetData.historialTraductores) budgetData.historialTraductores = {};
+                            if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
+                            budgetData.historialTraductores[p.nombre].push({ fecha: data.fechaEnvio, email: p.email });
+                        });
+                        // v3.10.51: el backend pone "1-Tasación Solicitada" al registrar el lote
                         const est = budgetData.estado || '';
                         if (!est || est.startsWith('0')) {
                             budgetData.estado = '1-Tasación Solicitada';
                             if (typeof updateBudgetSummaryBar === 'function') { try { updateBudgetSummaryBar(); } catch (e) {} }
                         }
+                        try { renderContactedProviders(); } catch (e) {}
+                        try { refreshStep4ContinueHint(); } catch (e) {}
+                    } else {
+                        actualizarCopiasTrasEnvio(ctx.budgetId, lote, data.fechaEnvio || '');
                     }
-                    try { renderContactedProviders(); } catch (e) {}
-                    try { refreshStep4ContinueHint(); } catch (e) {}
                 }
 
                 if (loteConError) {
@@ -10984,46 +11130,42 @@
                         '. Vuelve a marcar solo a esos y envía otra vez (los ya enviados están protegidos contra duplicados 2 min).');
                 }
 
-                {
+                let texto = 'solicitud enviada a ' + ok + ' traductor(es): ' + enviados.map(p => p.nombre).join(', ');
+                if (fallidos.length) texto += ' · ⚠️ no salieron: ' + fallidos.join(' · ');
+                job.resultado = { texto: texto };
+                faseTrabajo(job, 'hecho');
+
+                if (esAbierto(job)) {
                     hideStatus();
                     if (fallidos.length) {
                         showStatus('⚠️ ' + fallidos.length + ' correo(s) no salieron: ' + fallidos.join(' · '), 'warning');
                         setTimeout(hideStatus, 9000);
                     }
                     showSuccess('Emails enviados', `${ok} proveedor${ok > 1 ? 'es' : ''} notificado${ok > 1 ? 's' : ''}`);
-                    
-                    // v3.7.55: marcar "1-Tasación Solicitada" salvo que ya esté
-                    // en un estado más avanzado (2-Enviado / 3-Pedido).
-                    // v3.10.51: normalmente ya está en "1-…" (ver lote); esto
-                    // solo actúa si algo quedó a medias, y sin esperar.
+                    // v3.7.55/v3.10.51: normalmente ya está en "1-…"; red por si quedó a medias
                     const est = budgetData.estado || '';
-                    if (sigueSiendo(idFlujoTas) && (!est || est.startsWith('0'))) {
-                        updateBudgetStatusFE('1-Tasación Solicitada', idFlujoTas).catch(e => console.warn('estado tasación:', e));
+                    if (!est || est.startsWith('0')) {
+                        updateBudgetStatusFE('1-Tasación Solicitada', ctx.budgetId).catch(e => console.warn('estado tasación:', e));
                     }
-                    
                     completedSteps.add(4);
                     updateProgressSteps();
-                    
-                    setTimeout(() => {
-                        hideSuccess();
-                        // Ir al paso 5 para introducir cotizaciones
-                        showCard(5);
-                    }, 2000);
+                    setTimeout(() => { hideSuccess(); if (esAbierto(job)) showCard(5); }, 2000);
                 }
             } catch (error) {
                 // v3.7.96: sin reintento automático, un fallo real llega aquí.
                 // OJO: la respuesta perdida NO implica que el envío no saliera;
                 // el candado del backend (v3.7.60) evita duplicados al reintentar.
-                showStatus('Error: ' + error.message + ' — Si vuelves a pulsar Enviar, el sistema evita duplicados automáticamente.', 'error');
-                setTimeout(hideStatus, 6000);
+                job.error = error.message || String(error);
+                faseTrabajo(job, 'error');
+                if (esAbierto(job)) {
+                    showStatus('Error: ' + error.message + ' — Si vuelves a pulsar Enviar, el sistema evita duplicados automáticamente.', 'error');
+                    setTimeout(hideStatus, 8000);
+                }
             } finally {
-                // v3.7.96: restaurar botón y guard pase lo que pase
-                _sendingProviders = false;
-                const sb = document.getElementById('providerSendBtn');
-                if (sb) { sb.disabled = false; sb.innerHTML = 'Enviar'; }
+                if (esAbierto(job)) { try { updateSelectedCount(); } catch (e) {} }
             }
         }
-        
+
         // Renderizar traductores contactados con radio buttons
         function renderContactedProviders() {
             const container = document.getElementById('contactedProvidersList');
@@ -13117,25 +13259,21 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             }
             if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
 
-            try {
-                await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'saveClientData',
-                        budgetId: budgetData.id,
-                        clientEmail: email,
-                        clientWhatsApp: whatsapp,
-                        amount: amount,
-                        clientMessage: clientMessage,
-                        quoteDays: quoteDaysValue,
-                        urgency: urgency,
-                        quoteConfig: JSON.stringify(collectQuoteConfig())   // v3.8.7
-                    })
-                });
-                console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue + ', urgencia: ' + urgency);
-            } catch (error) {
-                console.log('Error guardando datos cliente:', error);
-            }
+            // v3.10.55: por apiPost (queda en el panel Proceso) y el fallo se
+            // propaga: "Guardar" y el guardado tras copiar ya lo enseñan.
+            const r = await apiPost({
+                action: 'saveClientData',
+                budgetId: budgetData.id,
+                clientEmail: email,
+                clientWhatsApp: whatsapp,
+                amount: amount,
+                clientMessage: clientMessage,
+                quoteDays: quoteDaysValue,
+                urgency: urgency,
+                quoteConfig: JSON.stringify(collectQuoteConfig())   // v3.8.7
+            }, { retry: false });
+            if (!r || !r.success) throw new Error((r && r.error) || 'el servidor no confirmó el guardado');
+            console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue + ', urgencia: ' + urgency);
         }
 
         // v3.7.34: guardado manual desde el botón del header. Persiste los
