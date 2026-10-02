@@ -1280,33 +1280,8 @@
             <div class="file-list" id="fileList"></div>
             <div class="file-total" id="fileTotal" style="display:none;"></div>
 
-            <!-- v3.7.4 (UX fix v3.7.5): Metadatos opcionales del presupuesto -->
-            <div id="docMetaSection" style="margin-top:12px; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
-                <div style="font-size:0.8rem; color:#64748b; margin-bottom:8px; font-weight:500;">📋 Metadatos del documento (opcional, para histórico)</div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                    <div>
-                        <label style="font-size:0.8rem; color:#475569; display:block; margin-bottom:4px;">Tipo de documento</label>
-                        <select id="docType" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box; background:white;">
-                            <option value="Varios">Varios</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size:0.8rem; color:#475569; display:block; margin-bottom:4px;">País de origen</label>
-                        <select id="docCountry" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem; box-sizing:border-box; background:white;">
-                            <option value="">(ninguno)</option>
-                        </select>
-                    </div>
-                </div>
-                <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:0.9rem; color:#475569; cursor:pointer;">
-                    <input type="checkbox" id="docApostille" style="width:16px; height:16px; cursor:pointer;">
-                    Lleva apostilla
-                </label>
-                <!-- v3.7.15: marcar/desmarcar guardado en histórico (v3.7.33: desactivado por defecto) -->
-                <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:0.9rem; color:#475569; cursor:pointer;">
-                    <input type="checkbox" id="docInHistory" style="width:16px; height:16px; cursor:pointer;">
-                    Guardar en histórico para futuras consultas
-                </label>
-            </div>
+            <!-- (v3.10.62: el cuadro "Metadatos del documento" —tipo, país, apostilla,
+                 guardar en histórico— se ha retirado con el método "según tipo de documento") -->
 
             <!-- v3.10.38: dónde se va a crear la carpeta, comprobado de verdad -->
             <div id="localModeBanner" style="margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.85rem;display:none;align-items:center;gap:10px;"></div>
@@ -1577,11 +1552,9 @@
                         <input type="radio" name="calcMethod" value="provider" onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
                         <span class="calc-method-label">🤝 Por cotización proveedor + margen</span>
                     </label>
-                    <label class="calc-method-option">
-                        <input type="radio" name="calcMethod" value="historical" onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
-                        <span class="calc-method-label">📊 Según Tipo de Documento (histórico)</span>
-                    </label>
                 </div>
+                <!-- v3.10.61: método por defecto del par (columna "Método por defecto" de Tarifas) -->
+                <div id="metodoDefectoNota" style="display:none;margin-top:8px;font-size:0.8rem;color:#475569;"></div>
                 <!-- v3.8.7: ficha de la tarificación guardada (por qué se dio este precio) -->
                 <div id="quoteConfigStamp" class="hidden" style="margin-top:10px;padding:8px 10px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;font-size:0.8rem;color:#065f46;line-height:1.5;"></div>
             </div>
@@ -1774,57 +1747,21 @@
                 </div>
             </div>
 
-            <!-- OPCIÓN 5 (v3.7.4): Cálculo según Tipo de Documento (histórico) -->
-            <div class="margin-calc-box hidden" id="step5TariffCalcHistorical">
-                <div class="margin-calc-header">
-                    <span>📊 Histórico según Tipo de Documento</span>
-                </div>
-                <!-- v3.7.48: filtros independientes, todos activados por defecto -->
-                <div style="display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin-bottom:8px; font-size:0.85rem; color:#475569;">
-                    <span style="font-weight:500;">Filtrar por:</span>
-                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="checkbox" id="histFilterSource" checked onchange="loadHistoricalQuotes()"> Idioma origen
-                    </label>
-                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="checkbox" id="histFilterTarget" checked onchange="loadHistoricalQuotes()"> Idioma destino
-                    </label>
-                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="checkbox" id="histFilterTipo" checked onchange="loadHistoricalQuotes()"> Tipo
-                    </label>
-                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="checkbox" id="histFilterPais" checked onchange="loadHistoricalQuotes()"> País
-                    </label>
-                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="checkbox" id="histFilterApostilla" checked onchange="loadHistoricalQuotes()"> Apostilla
-                    </label>
-                </div>
-                <div id="historicalCriteria" style="font-size:0.85rem; color:#475569; margin-bottom:10px; padding:8px 10px; background:#f1f5f9; border-radius:6px;">
-                    <!-- Resumen de filtros aplicados -->
-                </div>
-                <div id="historicalLoading" style="display:none; text-align:center; padding:14px; color:#64748b; font-size:0.9rem;">
-                    <span class="spinner"></span> Buscando presupuestos pasados…
-                </div>
-                <div id="historicalResults" style="max-height:340px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; background:white;">
-                    <!-- Se rellena con JS -->
-                </div>
-                <div class="margin-divider" style="margin-top:14px;"></div>
-                <div class="margin-calc-row input-row">
-                    <span class="margin-label">Tu tarifa (IVA inc.):</span>
-                    <input type="number" id="quoteAmountHistorical" step="0.01" min="0" placeholder="Ej: 30.00" onchange="onHistoricalAmountChange()">
-                </div>
-            </div>
+            <!-- (v3.10.61: el método "Según tipo de documento (histórico)" se ha retirado) -->
 
             <!-- Plazo común para todos los métodos -->
             <div class="quote-row">
                 <div class="form-group">
                     <label>Plazo (días laborables)</label>
-                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="updateClientMessage()">
+                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="try { proponerPlazoWeb(); } catch (e) {} updateClientMessage()">
                 </div>
                 <div class="form-group">
                     <label>Recargo urgencia (€, opcional)</label>
                     <input type="number" id="quoteUrgency" step="0.01" min="0" placeholder="" onchange="updateClientMessage()">
                 </div>
             </div>
+            <!-- v3.10.61: plazo mínimo según la web (pestañas Plazos y Calendario) -->
+            <div id="entregaMinimaHint" style="display:none;margin:-6px 0 14px;font-size:0.8rem;color:#065f46;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:7px 10px;line-height:1.45;"></div>
             
             <div class="form-group">
                 <label>Email del cliente (opcional, para envío directo)</label>
@@ -1976,13 +1913,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.60';
+        const HTML_VERSION = '3.10.62';
         const HTML_DATE = '02/10/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.90';
+        const API_MIN_VERSION = '3.7.92';   // v3.10.62: fuera los metadatos del documento (3.10.61: tramos web, plazos, método por defecto)
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2056,29 +1993,7 @@
             }
             updateClientMessage();
 
-            // v3.7.4: listeners para metadatos. Si hay budgetId ya creado, persistir cambio.
-            const docTypeEl = document.getElementById('docType');
-            const docCountryEl = document.getElementById('docCountry');
-            const docApostilleEl = document.getElementById('docApostille');
-            const docInHistoryEl = document.getElementById('docInHistory');  // v3.7.15
-            const persistDocMeta = () => {
-                if (!budgetData.id) return;  // aún no se ha creado carpeta
-                fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'updateBudgetBasicData',
-                        budgetId: budgetData.id,
-                        tipoDocumento: (docTypeEl?.value || '').trim() || 'Varios',
-                        paisOrigen: (docCountryEl?.value || '').trim(),
-                        apostilla: !!docApostilleEl?.checked,
-                        enHistorico: docInHistoryEl?.checked !== false  // v3.7.15
-                    })
-                }).catch(e => console.warn('persistDocMeta:', e));
-            };
-            if (docTypeEl) docTypeEl.addEventListener('change', persistDocMeta);
-            if (docCountryEl) docCountryEl.addEventListener('change', persistDocMeta);
-            if (docApostilleEl) docApostilleEl.addEventListener('change', persistDocMeta);
-            if (docInHistoryEl) docInHistoryEl.addEventListener('change', persistDocMeta);  // v3.7.15
+            // (v3.10.62: fuera los listeners de los metadatos del documento)
 
             // Setup drag & drop for file upload
             const dropArea = document.getElementById('fileUploadArea');
@@ -2792,15 +2707,6 @@
             if (clientEmailStep1) clientEmailStep1.value = '';
             if (clientWhatsAppStep1) clientWhatsAppStep1.value = '';
 
-            // v3.7.4: limpiar metadatos del documento (v3.7.11: tipo doc por defecto "Varios")
-            const docTypeReset = document.getElementById('docType');
-            const docCountryReset = document.getElementById('docCountry');
-            const docApostilleReset = document.getElementById('docApostille');
-            const docInHistoryReset = document.getElementById('docInHistory');  // v3.7.15
-            if (docTypeReset) docTypeReset.value = 'Varios';
-            if (docCountryReset) docCountryReset.value = '';
-            if (docApostilleReset) docApostilleReset.checked = false;
-            if (docInHistoryReset) docInHistoryReset.checked = false;  // v3.7.33: default desactivado
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
             
             // Reset contacted providers section
@@ -2880,21 +2786,11 @@
             const providerMessageEdit = document.getElementById('providerMessageEdit');
             if (providerMessageEdit) providerMessageEdit.value = '';
 
-            // v3.7.10: reset paso 4 (importes adicionales y modo del histórico)
+            // v3.7.10: reset paso 4 (importes adicionales)
             const quoteAmountDirect = document.getElementById('quoteAmountDirect');
-            const quoteAmountHistorical = document.getElementById('quoteAmountHistorical');
             if (quoteAmountDirect) quoteAmountDirect.value = '';
-            if (quoteAmountHistorical) quoteAmountHistorical.value = '';
-            // v3.7.48: filtros del histórico vuelven a "todos activados"
-            ['histFilterSource', 'histFilterTarget', 'histFilterTipo', 'histFilterPais', 'histFilterApostilla'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.checked = true;
-            });
-            // Limpiar resultados del histórico si estaban renderizados
-            const historicalResults = document.getElementById('historicalResults');
-            const historicalCriteria = document.getElementById('historicalCriteria');
-            if (historicalResults) historicalResults.innerHTML = '';
-            if (historicalCriteria) historicalCriteria.innerHTML = '';
+            const _hintEntrega = document.getElementById('entregaMinimaHint');   // v3.10.61
+            if (_hintEntrega) _hintEntrega.style.display = 'none';
 
             // Reset buttons
             if (step1Btn) step1Btn.disabled = true;
@@ -5807,26 +5703,9 @@
                         internalCommentsField.value = budgetData.internalComments;
                     }
 
-                    // v3.7.4: restaurar metadatos del documento
-                    budgetData.tipoDocumento = b.tipoDocumento || 'Varios';
-                    budgetData.paisOrigen = b.paisOrigen || '';
-                    budgetData.apostilla = !!b.apostilla;
-                    budgetData.enHistorico = (b.enHistorico !== false);  // v3.7.15: default true
-                    const docTypeField = document.getElementById('docType');
-                    const docCountryField = document.getElementById('docCountry');
-                    const docApostilleField = document.getElementById('docApostille');
-                    const docInHistoryField = document.getElementById('docInHistory');  // v3.7.15
-                    // Asignar valor PRIMERO, luego repoblar (populateDocMetadata
-                    // conservará el valor actual al rellenar las opciones).
-                    if (docTypeField) docTypeField.value = budgetData.tipoDocumento;
-                    if (docCountryField) docCountryField.value = budgetData.paisOrigen;
-                    if (docApostilleField) docApostilleField.checked = budgetData.apostilla;
-                    if (docInHistoryField) docInHistoryField.checked = budgetData.enHistorico;
-                    populateDocMetadata();
-                    // Forzar la selección por si el valor era nuevo y no estaba en la lista
-                    if (docTypeField) docTypeField.value = budgetData.tipoDocumento;
-                    if (docCountryField) docCountryField.value = budgetData.paisOrigen;
-                    
+                    // (v3.10.62: los metadatos del documento —tipo, país, apostilla, histórico—
+                    // ya no existen; si el servidor los manda de un presupuesto antiguo, se ignoran)
+
                     // Restaurar análisis detallado (array de archivos con palabras/páginas)
                     budgetData.fileAnalysis = b.analisisDetalle || [];
                     // v3.10.34: los ajustes manuales se reaplican tras restaurar
@@ -6017,17 +5896,14 @@
             allProviders = data.providers || [];
             allTariffs = data.tariffs || [];
             if (data.marginParams) marginParams = data.marginParams;
-            // v3.7.4: catálogos
-            window.allDocumentTypes = data.documentTypes || ['Varios'];
-            window.allCountries = data.countries || [];
             apiVersion = data.version || '?';
             apiDate = data.versionDate || '';
+            aplicarTarifasWeb(data);   // v3.10.61: tramos, plazos y calendario de la hoja
             // v3.7.20: enlaces de configuración (Sheet, carpeta general Drive)
             window.configLinks = data.configLinks || {};
 
             updateVersionIndicator();
             populateLanguages();
-            populateDocMetadata();
 
             // Auto-sync silencioso WooCommerce (última semana, en background)
             // v3.8.6: MÁXIMO una vez cada 24 h (antes: en CADA apertura de la
@@ -6117,7 +5993,7 @@
         function apiVersionInsuficiente() {
             return !!(apiVersion && apiVersion !== '?' && compararVersiones(apiVersion, API_MIN_VERSION) < 0);
         }
-        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_90.gs o posterior), ' +
+        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_92.gs o posterior), ' +
             'luego <b>Implementar → Gestionar implementaciones → ✏️ (editar) → Versión: «Nueva versión» → Implementar</b>. ' +
             'Pegar el código sin crear una versión nueva no cambia lo que se ejecuta.';
         function refrescarAvisoVersionApi() {
@@ -6162,41 +6038,7 @@
             refrescarAvisoVersionApi();
         }
 
-        // v3.7.4 (v3.7.5: selects clásicos): poblar selectores de tipo/país.
-        // Conserva el valor actualmente seleccionado si existe, para no perderlo
-        // al repoblar tras retomar un presupuesto.
-        function populateDocMetadata() {
-            const types = window.allDocumentTypes && window.allDocumentTypes.length ? window.allDocumentTypes : ['Varios'];
-            const countries = window.allCountries || [];
-
-            const typeSelect = document.getElementById('docType');
-            const countrySelect = document.getElementById('docCountry');
-
-            if (typeSelect) {
-                const currentType = typeSelect.value || 'Varios';
-                // Asegurar que "Varios" esté siempre presente al principio
-                const typesWithVarios = types.includes('Varios') ? types : ['Varios'].concat(types);
-                typeSelect.innerHTML = typesWithVarios
-                    .map(t => `<option value="${t}"${t === currentType ? ' selected' : ''}>${t}</option>`)
-                    .join('');
-                // Si el currentType no existía en la lista, lo añadimos para no perderlo
-                if (!typesWithVarios.includes(currentType) && currentType) {
-                    typeSelect.insertAdjacentHTML('beforeend', `<option value="${currentType}" selected>${currentType}</option>`);
-                }
-            }
-
-            if (countrySelect) {
-                const currentCountry = countrySelect.value || '';
-                let html = `<option value=""${currentCountry === '' ? ' selected' : ''}>(ninguno)</option>`;
-                html += countries
-                    .map(c => `<option value="${c}"${c === currentCountry ? ' selected' : ''}>${c}</option>`)
-                    .join('');
-                countrySelect.innerHTML = html;
-                if (currentCountry && !countries.includes(currentCountry)) {
-                    countrySelect.insertAdjacentHTML('beforeend', `<option value="${currentCountry}" selected>${currentCountry}</option>`);
-                }
-            }
-        }
+        // (v3.10.62: populateDocMetadata retirada con el cuadro de metadatos)
 
         // ====== LANGUAGES ======
         // v3.7.12: orden con FIGS+ primero, luego alfabético respetando acentos
@@ -9558,10 +9400,6 @@
                 totalPages: totalPages,
                 sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang, channel: budgetData.channel,
                 clientEmail: budgetData.clientEmail, clientWhatsApp: budgetData.clientWhatsApp,
-                tipoDocumento: (document.getElementById('docType')?.value || '').trim() || 'Varios',
-                paisOrigen: (document.getElementById('docCountry')?.value || '').trim(),
-                apostilla: !!document.getElementById('docApostille')?.checked,
-                enHistorico: document.getElementById('docInHistory')?.checked !== false,
                 localHandle: localHandle, localConfigurada: localConfigurada
             };
             const job = nuevoTrabajo(withAnalysis ? 'crear+contar' : 'crear', ctx);
@@ -9620,7 +9458,6 @@
                         clientEmail: ctx.clientEmail, clientWhatsApp: ctx.clientWhatsApp,
                         internalComments: internalComments, totalPages: totalPages,
                         files: [], numArchivosPrevisto: files.length,
-                        tipoDocumento: ctx.tipoDocumento, paisOrigen: ctx.paisOrigen, apostilla: ctx.apostilla, enHistorico: ctx.enHistorico,
                         requestId: job.bg.requestId,
                         localMode: !!_localHandle
                     }, { retry: true, attempts: 4, timeoutMs: 30000 });
@@ -12151,13 +11988,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const directBox = document.getElementById('step5TariffCalcDirect');
             const wordsBox = document.getElementById('step5TariffCalcWords');
             const providerBox = document.getElementById('step5TariffCalcProvider');
-            const historicalBox = document.getElementById('step5TariffCalcHistorical');
 
             pagesBox.classList.add('hidden');
             directBox.classList.add('hidden');
             wordsBox.classList.add('hidden');
             providerBox.classList.add('hidden');
-            if (historicalBox) historicalBox.classList.add('hidden');
 
             if (method === 'pages') {
                 pagesBox.classList.remove('hidden');
@@ -12173,9 +12008,6 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             } else if (method === 'provider') {
                 providerBox.classList.remove('hidden');
                 recalculateFromProvider();
-            } else if (method === 'historical') {
-                historicalBox.classList.remove('hidden');
-                loadHistoricalQuotes();
             }
 
             updateClientMessage();
@@ -12315,7 +12147,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
 
             _seccion('PRECIO');
             const cfg = _b.quoteConfig || null;
-            _dato('Método de cálculo', (cfg && CALC_METHOD_LABELS[cfg.method]) || CALC_METHOD_LABELS[currentCalcMethod] || '');
+            _dato('Método de cálculo', (cfg && (CALC_METHOD_LABELS[cfg.method] || CALC_METHOD_LABELS_LEGACY[cfg.method])) || CALC_METHOD_LABELS[currentCalcMethod] || '');
             _dato('Palabras contabilizadas', totalPal, true);
             _dato('Páginas contabilizadas', totalPag, true);
             const _v = id => { const e = document.getElementById(id); return e ? e.value : ''; };
@@ -12665,7 +12497,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             'quoteTotalPages', 'quotePagesToTranslate', 'quotePagesCount', 'quoteAmountPages',
             'directTariffPerWord', 'directWordCount', 'quoteAmountDirect',
             'quoteWordCount', 'quoteAmountWords',
-            'quoteAmountProvider', 'quoteAmountHistorical',
+            'quoteAmountProvider',
             'quoteDays', 'quoteUrgency'
         ];
         const QUOTE_CONFIG_CHECKS = [
@@ -12677,9 +12509,10 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             pages: '📄 Por páginas (tarifa web)',
             direct: '🔤 Por tarifa por palabra (IVA inc.)',
             words: '💰 Por palabras + margen',
-            provider: '🤝 Por cotización proveedor + margen',
-            historical: '📊 Según Tipo de Documento (histórico)'
+            provider: '🤝 Por cotización proveedor + margen'
         };
+        // v3.10.61: solo para mostrar fichas antiguas guardadas con el método retirado
+        const CALC_METHOD_LABELS_LEGACY = { historical: '📊 Según tipo de documento (histórico, retirado)' };
 
         function collectQuoteConfig() {
             const fields = {};
@@ -12734,6 +12567,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 budgetData.tariffPerWordManual = (!isNaN(tm) && tm > 0) ? tm : null;
                 // 1) método: marcar el radio y desplegar su caja
                 const m = CALC_METHOD_LABELS[cfg.method] ? cfg.method : 'pages';
+                // v3.10.61: ficha guardada con el método "histórico" (retirado): se
+                // muestra como "por páginas" con el importe que se dio entonces
+                if (cfg.method === 'historical' && cfg.fields && cfg.fields.quoteAmountHistorical && !cfg.fields.quoteAmountPages) {
+                    cfg.fields.quoteAmountPages = cfg.fields.quoteAmountHistorical;
+                }
                 const radio = document.querySelector(`input[name="calcMethod"][value="${m}"]`);
                 if (radio) {
                     radio.checked = true;
@@ -12781,7 +12619,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 case 'words':
                     cant = num(f.quoteWordCount); tot = num(f.quoteAmountWords); u = 'pal'; break;
                 case 'provider':  tot = num(f.quoteAmountProvider); break;
-                case 'historical': tot = num(f.quoteAmountHistorical); break;
+                case 'historical': tot = num(f.quoteAmountHistorical); break;   // fichas antiguas
             }
             if (!cant) {
                 if (u === 'pág') { cant = num(cfg.pages); }
@@ -12803,7 +12641,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const eur = n => Number(n).toLocaleString('es-ES',
                 { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
             const partes = [];
-            const etiqueta = (CALC_METHOD_LABELS && CALC_METHOD_LABELS[t.m]) || t.m;
+            const etiqueta = (CALC_METHOD_LABELS && (CALC_METHOD_LABELS[t.m] || CALC_METHOD_LABELS_LEGACY[t.m])) || t.m;
             // sin el emoji, que en una línea de resumen sobra
             partes.push(String(etiqueta).replace(/^[^\wÁÉÍÓÚÑa-z]+/, '').trim());
             if (t.cant > 0 && t.u) {
@@ -12836,164 +12674,15 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (cfg.providerName && cfg.method === 'provider') {
                 partes.push(`proveedor: ${escapeHtml(cfg.providerName)}${cfg.providerQuote ? ' · ' + escapeHtml(cfg.providerQuote) : ''}`);
             }
-            box.innerHTML = `<b>🔒 Tarificación guardada</b> — método: <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || cfg.method)}</b>`
+            box.innerHTML = `<b>🔒 Tarificación guardada</b> — método: <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || CALC_METHOD_LABELS_LEGACY[cfg.method] || cfg.method)}</b>`
                 + (partes.length ? `<br>Datos usados: ${partes.join(' · ')}` : '')
                 + (fecha ? `<br><span style="color:#047857;font-size:0.75rem;">Guardado el ${escapeHtml(fecha)}</span>` : '');
             box.classList.remove('hidden');
         }
 
-        // v3.7.4 (extendido v3.7.8): cargar histórico con modo configurable
-        async function loadHistoricalQuotes() {
-            const sourceLang = budgetData.sourceLang || '';
-            const targetLang = budgetData.targetLang || '';
-            const tipoDoc = (document.getElementById('docType')?.value || '').trim() || 'Varios';
-            const pais = (document.getElementById('docCountry')?.value || '').trim();
-            const apostilla = !!document.getElementById('docApostille')?.checked;
+        // (v3.10.61: loadHistoricalQuotes / relaxHistoricalFilters / useHistoricalAmount /
+        // onHistoricalAmountChange retirados con el método "histórico")
 
-            // v3.7.48: filtros independientes (todos activados por defecto)
-            const fSource = document.getElementById('histFilterSource')?.checked !== false;
-            const fTarget = document.getElementById('histFilterTarget')?.checked !== false;
-            const fTipo = document.getElementById('histFilterTipo')?.checked !== false;
-            const fPais = document.getElementById('histFilterPais')?.checked !== false;
-            const fApostilla = document.getElementById('histFilterApostilla')?.checked !== false;
-
-            const criteria = document.getElementById('historicalCriteria');
-            const loading = document.getElementById('historicalLoading');
-            const results = document.getElementById('historicalResults');
-
-            if (criteria) {
-                const parts = [];
-                if (fSource) parts.push(`Origen: <strong>${sourceLang || '—'}</strong>`);
-                if (fTarget) parts.push(`Destino: <strong>${targetLang || '—'}</strong>`);
-                if (fTipo) parts.push(`Tipo: <strong>${tipoDoc}</strong>`);
-                if (fPais && pais) parts.push(`País: <strong>${pais}</strong>`);
-                if (fApostilla) parts.push(`Apostilla: <strong>${apostilla ? 'Sí' : 'No'}</strong>`);
-                criteria.innerHTML = parts.length
-                    ? 'Filtros activos: ' + parts.join(' · ')
-                    : '<em>Sin filtros: mostrando todo el histórico.</em>';
-            }
-            if (loading) loading.style.display = 'block';
-            if (results) results.innerHTML = '';
-
-            try {
-                const data = await apiPost({
-                        action: 'getHistoricalQuotes',
-                        sourceLang: sourceLang,
-                        targetLang: targetLang,
-                        tipoDocumento: tipoDoc,
-                        paisOrigen: pais,
-                        apostilla: apostilla,
-                        filterSource: fSource,
-                        filterTarget: fTarget,
-                        filterTipo: fTipo,
-                        filterPais: fPais,
-                        filterApostilla: fApostilla
-                    });
-                if (loading) loading.style.display = 'none';
-
-                if (!data.success) {
-                    if (results) results.innerHTML = `<div style="padding:14px; color:#dc2626; font-size:0.9rem;">Error: ${data.error || 'desconocido'}</div>`;
-                    return;
-                }
-
-                const quotes = data.quotes || [];
-                if (quotes.length === 0) {
-                    let empty = `<div style="padding:14px; color:#64748b; font-size:0.9rem; text-align:center;">No se encontraron presupuestos pasados con estos criterios.`;
-                    // Si hay filtros restrictivos activos, ofrecer aflojarlos
-                    if (fTipo || fPais || fApostilla) {
-                        empty += `<br><br><a href="javascript:void(0)" onclick="relaxHistoricalFilters()" style="color:#7c3aed; font-weight:500;">↗ Quitar filtros de tipo, país y apostilla</a>`;
-                    }
-                    empty += `</div>`;
-                    if (results) results.innerHTML = empty;
-                    return;
-                }
-
-                // Helper: formatear cotización con €/palabra calculado al vuelo
-                const fmtCotizacion = (cot, palabras) => {
-                    let s = `${cot.nombre}: ${cot.tarifa !== null ? cot.tarifa + '€' : '?€'}`;
-                    if (cot.plazo !== null && cot.plazo !== '') s += `/${cot.plazo}d`;
-                    // €/palabra calculado al vuelo si tenemos los dos datos
-                    if (cot.tarifa !== null && palabras && Number(palabras) > 0) {
-                        const ratio = cot.tarifa / Number(palabras);
-                        s += ` <span style="color:#7c3aed;">(${ratio.toFixed(3)} €/p)</span>`;
-                    }
-                    return s;
-                };
-
-                // Mostrar columna "Tipo" cuando el filtro de tipo está apagado
-                // (puede haber tipos mezclados que conviene distinguir).
-                const showTipoCol = !fTipo;
-                let html = `
-                    <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
-                        <thead>
-                            <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
-                                <th style="padding:8px; text-align:left;">Fecha</th>
-                                <th style="padding:8px; text-align:left;">Ref</th>
-                                ${showTipoCol ? '<th style="padding:8px; text-align:left;">Tipo</th>' : ''}
-                                <th style="padding:8px; text-align:right;">Págs</th>
-                                <th style="padding:8px; text-align:right;">Pal.</th>
-                                <th style="padding:8px; text-align:left;">Cotizaciones proveedores</th>
-                                <th style="padding:8px; text-align:right;">Importe cliente</th>
-                                <th style="padding:8px; text-align:right;">Plazo</th>
-                                <th style="padding:8px; text-align:left;">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                quotes.forEach((q, idx) => {
-                    const importeNum = parseFloat(String(q.importeCliente || '0').replace(',', '.')) || 0;
-                    const cotsArr = Array.isArray(q.cotizaciones) ? q.cotizaciones : [];
-                    const cotsHtml = cotsArr.length > 0
-                        ? cotsArr.map(c => fmtCotizacion(c, q.palabras)).join(' · ')
-                        : '-';
-                    html += `
-                        <tr style="border-bottom:1px solid #f1f5f9; ${idx === 0 ? 'background:#fefce8;' : ''}">
-                            <td style="padding:6px 8px; white-space:nowrap;">${q.fecha || ''}</td>
-                            <td style="padding:6px 8px; font-family:monospace;">${q.ref || ''}</td>
-                            ${showTipoCol ? '<td style="padding:6px 8px; color:#475569;">' + (q.tipoDocumento || '-') + '</td>' : ''}
-                            <td style="padding:6px 8px; text-align:right;">${q.paginas || ''}</td>
-                            <td style="padding:6px 8px; text-align:right;">${q.palabras || ''}</td>
-                            <td style="padding:6px 8px; color:#475569; font-size:0.8rem;">${cotsHtml}</td>
-                            <td style="padding:6px 8px; text-align:right; font-weight:600; cursor:pointer; color:#7c3aed;" title="Usar este importe" onclick="useHistoricalAmount(${importeNum})">${q.importeCliente || ''}</td>
-                            <td style="padding:6px 8px; text-align:right;">${q.plazoCliente || ''}</td>
-                            <td style="padding:6px 8px; font-size:0.8rem; color:#64748b;">${q.estado || ''}</td>
-                        </tr>
-                    `;
-                });
-                html += `</tbody></table>`;
-
-                if (results) results.innerHTML = html;
-            } catch(e) {
-                if (loading) loading.style.display = 'none';
-                if (results) results.innerHTML = `<div style="padding:14px; color:#dc2626; font-size:0.9rem;">Error: ${e.message}</div>`;
-            }
-        }
-
-        // v3.7.48: desactivar los filtros restrictivos (tipo/país/apostilla)
-        // y recargar, dejando solo los de idioma.
-        function relaxHistoricalFilters() {
-            ['histFilterTipo', 'histFilterPais', 'histFilterApostilla'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.checked = false;
-            });
-            loadHistoricalQuotes();
-        }
-        function useHistoricalAmount(amount) {
-            const inp = document.getElementById('quoteAmountHistorical');
-            if (inp) {
-                inp.value = amount.toFixed(2);
-                onHistoricalAmountChange();
-            }
-        }
-
-        function onHistoricalAmountChange() {
-            const amount = parseFloat(document.getElementById('quoteAmountHistorical').value) || 0;
-            budgetData.amount = amount;
-            updateClientMessage();
-        }
-        
-        
-        
         // Calcular margen sugerido según tramos de la hoja Excel
         function calculateSuggestedMargin(providerCost) {
             if (providerCost <= 0) return 0;
@@ -13286,8 +12975,6 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 return document.getElementById('quoteAmountWords').value || '';
             } else if (currentCalcMethod === 'provider') {
                 return document.getElementById('quoteAmountProvider').value || '';
-            } else if (currentCalcMethod === 'historical') {
-                return document.getElementById('quoteAmountHistorical').value || '';
             }
             return '';
         }
@@ -13376,6 +13063,153 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             return pluralize(count, singular, plural);
         }
         
+        // ============ v3.10.61: TARIFAS WEB POR TRAMOS, PLAZO MÍNIMO Y MÉTODO POR DEFECTO ============
+        // Petición de Javier (02/10/2026). Los datos vienen de la hoja (Apps
+        // Script 3.7.91): pestañas TarifasPaginas (tramos €/página por par de
+        // idiomas, como "Reglas de Precios" de tradutema.com), Plazos (días
+        // laborables por par e intervalo de páginas) y Calendario (días
+        // laborables, hora de corte, festivos), más la columna "Método por
+        // defecto" de Tarifas. La web suma los tramos uno a uno (comprobado el
+        // 02/10: Español→Inglés 1 pág. = 27 €, 2 = 47 €, 3 = 67 €, 10 = 203 €).
+        let pageTiers = [];
+        let deliveryRules = [];
+        let calendarioWeb = { diasLaborables: [1, 2, 3, 4, 5], horaCorte: '18:00', festivos: [] };
+        function aplicarTarifasWeb(data) {
+            pageTiers = Array.isArray(data.pageTiers) ? data.pageTiers : [];
+            deliveryRules = Array.isArray(data.deliveryRules) ? data.deliveryRules : [];
+            const c = data.calendar || {};
+            calendarioWeb = {
+                diasLaborables: (Array.isArray(c.diasLaborables) && c.diasLaborables.length) ? c.diasLaborables.map(Number) : [1, 2, 3, 4, 5],
+                horaCorte: /^\d{1,2}:\d{2}$/.test(String(c.horaCorte || '')) ? String(c.horaCorte) : '18:00',
+                festivos: Array.isArray(c.festivos) ? c.festivos.map(String) : []
+            };
+        }
+        function tarifaDelPar(src, tgt) {
+            return (allTariffs || []).find(t => t.idiomaOrigen === src && t.idiomaDestino === tgt) || null;
+        }
+        // Columna "Método por defecto" de Tarifas → método de la app
+        const METODOS_HOJA = { paginas: 'pages', pagina: 'pages', pages: 'pages',
+                               palabra: 'direct', directa: 'direct', direct: 'direct',
+                               palabras: 'words', margen: 'words', words: 'words',
+                               proveedor: 'provider', provider: 'provider' };
+        function metodoPorDefectoDeHoja(src, tgt) {
+            const t = tarifaDelPar(src, tgt);
+            const k = String((t && t.metodoPorDefecto) || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            return METODOS_HOJA[k] || null;
+        }
+        function tramosDelPar(src, tgt) {
+            return (pageTiers || [])
+                .filter(r => r.origen === src && r.destino === tgt && parseFloat(r.precio) > 0)
+                .map(r => ({ desde: Math.max(1, parseInt(r.desde) || 1), hasta: parseInt(r.hasta) || 1000, precio: parseFloat(r.precio) }))
+                .sort((a, b) => a.desde - b.desde);
+        }
+        // Precio por páginas sumando tramo a tramo. Sin tramos para el par, la
+        // fórmula de siempre (Tarifas C/D: 1ª página + resto).
+        function calcularPrecioPorPaginas(src, tgt, pages) {
+            pages = Math.max(0, parseInt(pages) || 0);
+            const tramos = tramosDelPar(src, tgt);
+            if (tramos.length) {
+                const partes = []; let total = 0, cubiertas = 0;
+                tramos.forEach(t => {
+                    const desde = cubiertas + 1;                 // sin huecos ni solapes
+                    const hasta = Math.min(t.hasta, pages);
+                    if (hasta < desde) return;
+                    const n = hasta - desde + 1;
+                    partes.push({ desde: t.desde, hasta: t.hasta, n: n, precio: t.precio, subtotal: n * t.precio });
+                    total += n * t.precio; cubiertas = hasta;
+                });
+                if (pages > cubiertas) {                          // por encima del último tramo: al último precio
+                    const u = tramos[tramos.length - 1]; const n = pages - cubiertas;
+                    partes.push({ desde: cubiertas + 1, hasta: pages, n: n, precio: u.precio, subtotal: n * u.precio, extra: true });
+                    total += n * u.precio;
+                }
+                return { total: total, partes: partes, tramos: tramos, conTramos: true, pages: pages };
+            }
+            const page1 = budgetData.tariffPage1 || 0, page2 = budgetData.tariffPage2 || 0;
+            return { total: pages > 0 ? page1 + Math.max(0, pages - 1) * page2 : 0, partes: null, conTramos: false, pages: pages, page1: page1, page2: page2 };
+        }
+        const _eur = v => (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+        function htmlDetallePaginas(c, src, tgt) {
+            if (!c.conTramos) {
+                return `Cálculo: ${_eur(c.page1)} (1ª pág) + ${_eur(c.page2)} × (${Math.max(0, c.pages - 1)} págs resto) = ` +
+                    `<span class="tariff-calc-result">${_eur(c.total)}</span>` +
+                    `<div style="color:#94a3b8;font-size:0.75rem;margin-top:3px;">Sin tramos en la pestaña TarifasPaginas para ${escapeHtml(src || '')} → ${escapeHtml(tgt || '')}: se usa Tarifas (1ª página / resto).</div>`;
+            }
+            const sumandos = c.partes.map(p => `${p.n} pág${p.n === 1 ? '.' : 's.'} × ${_eur(p.precio)}`).join(' &nbsp;+&nbsp; ');
+            const tramosTxt = c.tramos.map((t, i) => (i === c.tramos.length - 1 && t.hasta >= 1000) ? t.desde + '+' : (t.desde === t.hasta ? String(t.desde) : t.desde + '-' + t.hasta)).join(' · ');
+            return `<div style="line-height:1.6;">Cálculo (tramos de la web, ${escapeHtml(src || '')} → ${escapeHtml(tgt || '')}, ${c.pages} pág${c.pages === 1 ? '.' : 's.'} contabilizada${c.pages === 1 ? '' : 's'}):<br>` +
+                `<span style="display:inline-block;margin-left:10px;">${sumandos} = <span class="tariff-calc-result">${_eur(c.total)}</span></span><br>` +
+                `<span style="color:#94a3b8;font-size:0.75rem;">Tramos: ${tramosTxt} (pestaña TarifasPaginas)</span></div>`;
+        }
+
+        // ---------- plazo mínimo de la web ----------
+        function reglaPlazoWeb(src, tgt, pages) {
+            pages = Math.max(1, parseInt(pages) || 1);
+            const r = (deliveryRules || [])
+                .filter(x => x.origen === src && x.destino === tgt && pages >= (parseInt(x.desde) || 1) && pages <= (parseInt(x.hasta) || 1000) && parseFloat(x.dias) > 0)
+                .sort((a, b) => parseFloat(b.dias) - parseFloat(a.dias))[0];
+            return r ? { dias: Math.ceil(parseFloat(r.dias)), desde: parseInt(r.desde) || 1, hasta: parseInt(r.hasta) || 1000 } : null;
+        }
+        function fechaIsoLocal(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+        function esDiaLaborable(d) {
+            if (calendarioWeb.diasLaborables.indexOf(d.getDay()) === -1) return false;
+            return calendarioWeb.festivos.indexOf(fechaIsoLocal(d)) === -1;
+        }
+        // Entrega = `dias` laborables contados desde hoy si es antes de la hora
+        // de corte (18:00) y desde mañana si es después; se saltan fines de
+        // semana y festivos de la pestaña Calendario.
+        function fechaEntrega(dias, ahora) {
+            ahora = ahora || new Date();
+            const d = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+            const hm = String(calendarioWeb.horaCorte || '18:00').split(':');
+            const corte = (parseInt(hm[0]) || 18) * 60 + (parseInt(hm[1]) || 0);
+            if (ahora.getHours() * 60 + ahora.getMinutes() >= corte) d.setDate(d.getDate() + 1);
+            let n = 0; const total = Math.max(0, parseInt(dias) || 0);
+            let guarda = 0;
+            while (n < total && guarda++ < 400) { d.setDate(d.getDate() + 1); if (esDiaLaborable(d)) n++; }
+            return d;
+        }
+        function _fechaLarga(d, lang) {
+            return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+        // Rellena "Plazo (días laborables)" con el mínimo de la web si está vacío
+        // y pinta el aviso con la fecha. Devuelve la regla aplicada (o null).
+        function proponerPlazoWeb() {
+            const el = document.getElementById('quoteDays');
+            const hint = document.getElementById('entregaMinimaHint');
+            if (!el) return null;
+            const pages = parseInt((document.getElementById('quotePagesCount') || {}).value) ||
+                          parseInt((document.getElementById('quoteTotalPages') || {}).value) || budgetData.pageCount || 0;
+            const regla = reglaPlazoWeb(budgetData.sourceLang, budgetData.targetLang, pages);
+            if (!regla) { if (hint) hint.style.display = 'none'; return null; }
+            const vacio = !String(el.value || '').trim() || !(parseInt(el.value) > 0);
+            if (vacio) { el.value = regla.dias; el.title = 'Plazo mínimo según la web (' + regla.desde + '-' + regla.hasta + ' págs.)'; }
+            if (hint) {
+                const fecha = fechaEntrega(regla.dias);
+                const actual = parseInt(el.value) || 0;
+                const corto = actual > 0 && actual < regla.dias;
+                hint.style.display = '';
+                hint.style.background = corto ? '#fef3c7' : '#ecfdf5';
+                hint.style.borderColor = corto ? '#fcd34d' : '#a7f3d0';
+                hint.style.color = corto ? '#92400e' : '#065f46';
+                hint.innerHTML = `📅 <b>Entrega mínima según la web:</b> ${regla.dias} día${regla.dias === 1 ? '' : 's'} laborable${regla.dias === 1 ? '' : 's'} → <b>${_fechaLarga(fecha)}</b>` +
+                    `<br><span style="opacity:.85;">${escapeHtml(budgetData.sourceLang || '')} → ${escapeHtml(budgetData.targetLang || '')}, ${pages} págs. (regla ${regla.desde}-${regla.hasta}: ${regla.dias}) · pedido antes de las ${escapeHtml(calendarioWeb.horaCorte)} · ` +
+                    `${calendarioWeb.festivos.length ? calendarioWeb.festivos.length + ' festivo(s) en Calendario' : 'sin festivos'}.` +
+                    (corto ? ` <b>⚠️ El plazo indicado (${actual}) es menor que el mínimo de la web.</b>` : (vacio ? ' Propuesto en "Plazo"; puedes cambiarlo.' : '')) + `</span>`;
+            }
+            return regla;
+        }
+        // Nota bajo el selector: método por defecto de la hoja para este par
+        function pintarMetodoPorDefecto(metodo) {
+            const el = document.getElementById('metodoDefectoNota');
+            if (!el) return;
+            if (!metodo) { el.style.display = 'none'; return; }
+            el.style.display = '';
+            el.innerHTML = `Por defecto para <b>${escapeHtml(budgetData.sourceLang || '')} → ${escapeHtml(budgetData.targetLang || '')}</b>: <b>${escapeHtml((CALC_METHOD_LABELS[metodo] || metodo).replace(/^\S+\s/, ''))}</b> <span style="color:#94a3b8;">(columna "Método por defecto" de la pestaña Tarifas)</span>`;
+        }
+
         // ====== CÁLCULO DE TARIFA EN PASO 5 ======
         function initStep5TariffCalc() {
             const quotePagesCount = document.getElementById('quotePagesCount');
@@ -13442,32 +13276,33 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             // v3.10.59: sobre las PÁGINAS CONTABILIZADAS (el campo que acabamos de
             // rellenar), no sobre el total físico. Caso 1002-04-W: 76 páginas con
             // filtros ⚙ que dejaban 21 → el campo decía 21 y el precio cobraba 76.
+            // v3.10.61: por tramos de la web (TarifasPaginas), sumados tramo a tramo
             const pagesBase = (quotePagesCount && parseInt(quotePagesCount.value) > 0) ? parseInt(quotePagesCount.value) : pages;
-            const priceByPages = page1 + Math.max(0, pagesBase - 1) * page2;
+            const _calc = calcularPrecioPorPaginas(budgetData.sourceLang, budgetData.targetLang, pagesBase);
+            const priceByPages = _calc.total;
 
             // Mostrar detalle del cálculo por páginas
-            if (detailDiv) {
-                detailDiv.innerHTML = `
-                    Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pagesBase - 1)} págs resto) =
-                    <span class="tariff-calc-result">${priceByPages.toFixed(2).replace('.', ',')} €</span>
-                `;
-            }
+            if (detailDiv) detailDiv.innerHTML = htmlDetallePaginas(_calc, budgetData.sourceLang, budgetData.targetLang);
             
             // Pre-rellenar tarifa por páginas
             if (quoteAmountPages && !budgetData.savedAmount) {
                 quoteAmountPages.value = priceByPages.toFixed(2);
             }
             
-            // Determinar método de cálculo por defecto (v3.10.49):
+            // Determinar método de cálculo por defecto (v3.10.49, v3.10.61):
             //   - el usuario ya eligió uno a mano en este presupuesto → se respeta
             //   - traductor elegido CON cotización anotada → "provider"
+            //   - columna "Método por defecto" de Tarifas para este par → ese
             //   - hay traductores contactados → "words"
             //   - si no → "pages"
+            const _metodoHoja = metodoPorDefectoDeHoja(budgetData.sourceLang, budgetData.targetLang);
+            pintarMetodoPorDefecto(_metodoHoja);
             if (!calcMethodPickedByUser) {
                 const _q = budgetData.chosenProvider && (budgetData.providerQuotes || {})[budgetData.chosenProvider];
                 const _tarifa = _q ? parseFloat(String(_q.tarifa).replace(',', '.')) : 0;
                 let _def = 'pages';
                 if (_tarifa > 0) _def = 'provider';
+                else if (_metodoHoja) _def = _metodoHoja;
                 else if (budgetData.chosenProvider || (budgetData.contactedProviders && budgetData.contactedProviders.length > 0)) _def = 'words';
                 document.querySelector('input[name="calcMethod"][value="' + _def + '"]').checked = true;
                 currentCalcMethod = _def;
@@ -13491,8 +13326,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (budgetData.quoteConfig) {
                 applyQuoteConfig(budgetData.quoteConfig);
             }
+            // v3.10.61: plazo mínimo de la web (rellena "Plazo" si está vacío y pinta la fecha)
+            try { proponerPlazoWeb(); } catch (e) { console.warn('proponerPlazoWeb:', e); }
+            if (!clientMessageEdited && typeof updateClientMessage === 'function') { try { updateClientMessage(); } catch (e) {} }
         }
-        
+
         // Recalcular desde tarifa directa por palabra (col E, IVA inc.)
         function recalculateFromDirect() {
             const rate = parseFloat(document.getElementById('directTariffPerWord').value) || 0;
@@ -13511,19 +13349,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const detailDiv = document.getElementById('step5TariffDetail');
             
             const pages = parseInt(quotePagesCount.value) || 1;
-            const page1 = budgetData.tariffPage1 || 0;
-            const page2 = budgetData.tariffPage2 || 0;
-            
-            // Calcular nuevo precio por páginas
-            const priceByPages = page1 + Math.max(0, pages - 1) * page2;
-            
-            // Actualizar detalle del cálculo
-            if (detailDiv) {
-                detailDiv.innerHTML = `
-                    Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pages - 1)} págs resto) = 
-                    <span class="tariff-calc-result">${Math.round(priceByPages)} €</span>
-                `;
-            }
+
+            // v3.10.61: por tramos de la web (TarifasPaginas)
+            const _calc = calcularPrecioPorPaginas(budgetData.sourceLang, budgetData.targetLang, pages);
+            const priceByPages = _calc.total;
+            if (detailDiv) detailDiv.innerHTML = htmlDetallePaginas(_calc, budgetData.sourceLang, budgetData.targetLang);
             
             // Actualizar campo de tarifa por páginas
             if (quoteAmountPages) {
@@ -13532,7 +13362,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             
             // Guardar páginas contabilizadas (base del precio)
             budgetData.quotePagesCount = pages;
-            
+            try { proponerPlazoWeb(); } catch (e) {}   // v3.10.61: el plazo mínimo depende de las páginas
+
             // Actualizar mensaje
             updateClientMessage();
         }
@@ -13608,12 +13439,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             let deliveryDateEs = '';
             let deliveryDateEn = '';
             if (days && days !== 'X' && !isNaN(parseInt(days))) {
-                const d = new Date();
-                let added = 0;
-                while (added < parseInt(days)) {
-                    d.setDate(d.getDate() + 1);
-                    if (d.getDay() !== 0 && d.getDay() !== 6) added++;
-                }
+                // v3.10.61: mismo calendario que la web (hora de corte, festivos)
+                const d = fechaEntrega(parseInt(days));
                 deliveryDateEs = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
                 deliveryDateEn = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
             } else {
