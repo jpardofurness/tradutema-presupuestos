@@ -588,6 +588,18 @@
         .folder-link-icon { font-size: 1.2rem; }
 
         /* Responsive */
+        /* v3.10.60: fila de archivo del paso 2 (maqueta A). En pantallas
+           estrechas el nombre ocupa la primera línea y los datos la segunda. */
+        .fa-lbl { display: none; font-size: 0.7rem; color: #94a3b8; }
+        .fa-row .btn-preview, .fa-row .btn-preview-local { font-size: 0.85rem; padding: 0 3px; margin-right: 0; flex-shrink: 0; }
+        .fa-head > div:nth-child(3) { line-height: 1.15; }
+        @media (max-width: 560px) {
+            .fa-head { display: none !important; }
+            .fa-row { grid-template-columns: minmax(0,1fr) auto auto auto !important; row-gap: 6px; }
+            .fa-row .fa-info { grid-column: 1 / -1; }
+            .fa-row .fa-pags { text-align: left !important; }
+            .fa-lbl { display: inline; }
+        }
         @media (max-width: 500px) {
             .progress-step { min-width: 60px; font-size: 0.65rem; }
             .step-num { font-size: 0.9rem; }
@@ -1964,8 +1976,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.58';
-        const HTML_DATE = '01/10/2026';
+        const HTML_VERSION = '3.10.60';
+        const HTML_DATE = '02/10/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
@@ -6540,7 +6552,8 @@
                         : (_contando
                             ? `<td style="text-align:right;font-weight:600;color:#b45309;">⏳ contando…</td>`
                             : `<td style="text-align:right;font-weight:600;color:#b45309;">sin analizar</td>`);
-                    rows += `<tr><td style="padding:2px 8px 2px 0;${f ? '' : 'color:#b45309;'}">${escapeHtml(fname)}</td>` +
+                    // v3.10.60: nombre recortado por el medio (entero en el title)
+                    rows += `<tr><td style="padding:2px 8px 2px 0;width:100%;max-width:0;${f ? '' : 'color:#b45309;'}"><span class="nombre-recortable" data-full="${escapeHtml(fname)}" title="${escapeHtml(fname)}" style="display:block;overflow:hidden;white-space:nowrap;">${escapeHtml(fname)}</span></td>` +
                             `<td style="text-align:right;padding-right:10px;color:#64748b;">${pag || '—'}</td>` +
                             celdaTrad + celdaPal + '</tr>';
                 });
@@ -6554,6 +6567,7 @@
                 }
 
                 summaryTable.innerHTML = rows;
+                try { recortarNombres(summaryTable); } catch (e) {}   // v3.10.60
                 summaryTotal.textContent = (budgetData.wordCount || 0).toLocaleString('es-ES');
                 summaryBox.classList.remove('hidden');
 
@@ -7348,7 +7362,7 @@
                 const num = v === '' ? '' : parseInt(v, 10);
                 if (v !== '' && (isNaN(num) || num < 0)) return;   // no es un número: se ignora
                 getFileSettings(name)[field] = num;
-                updateSettingsBadge(name, pendingIdx);
+                actualizarFilaArchivo(name, pendingIdx);   // v3.10.60
                 aplicarAjustesManuales();
                 clearTimeout(window._filtroTimer);
                 window._filtroTimer = setTimeout(() => {
@@ -7367,8 +7381,8 @@
             } else {
                 getFileSettings(name)[field] = value;
             }
-            // Actualizar indicador en línea sin re-renderizar todo
-            updateSettingsBadge(name, pendingIdx);
+            // v3.10.60: "→ a contar" de la fila y total del pie, sin repintar la lista
+            actualizarFilaArchivo(name, pendingIdx);
             // v3.9.3: el filtro cambia las páginas a traducir y, con ellas, el
             // precio y los comentarios. Se recalcula al vuelo.
             if (field === 'pagesFilter' || field === 'instructions') {
@@ -7480,124 +7494,140 @@
             }
         }
 
-        // Construye el indicador "⚙ págs 1-5 · con instrucciones" en línea
-        function buildSettingsBadge(pagesFilter, instructions, manualWords, manualPages) {
-            const parts = [];
-            if (pagesFilter && pagesFilter.trim()) parts.push('SOLO págs ' + pagesFilter.trim());
-            if (instructions && instructions.trim()) parts.push('con instrucciones');
-            // v3.10.34
-            const mw = (manualWords !== '' && manualWords !== undefined && manualWords !== null) ? parseInt(manualWords, 10) : NaN;
-            const mp = (manualPages !== '' && manualPages !== undefined && manualPages !== null) ? parseInt(manualPages, 10) : NaN;
-            if (!isNaN(mw)) parts.push('✎ ' + mw.toLocaleString('es-ES') + ' pal. a mano');
-            if (!isNaN(mp)) parts.push('✎ ' + mp + ' pág. a mano');
-            if (!parts.length) return '';
-            return `<span class="settings-badge" style="display:inline-block;margin-left:6px;padding:3px 9px;background:#fb923c;color:white;border-radius:10px;font-size:0.72rem;font-weight:700;letter-spacing:0.3px;">⚙ ${parts.join(' · ')}</span>`;
-        }
-
-        function updateSettingsBadge(name, pendingIdx) {
+        // ============ v3.10.60: FILA DE ARCHIVO DEL PASO 2 (maqueta A, 02/10) ============
+        // Antes: botón ⚙ y panel desplegable con "Páginas a procesar",
+        // "Instrucciones para este archivo" y recuento manual. Ahora todo va a
+        // la vista, a la derecha del nombre, como en la tabla del paso 3:
+        //   Págs. (físicas) · Traducir págs. [rango] → a contar · Palabras [manual]
+        // Las instrucciones por archivo desaparecen (las notas generales del
+        // paso 2 ya llegan a Claude y a los traductores); las "páginas a mano"
+        // también (si un PDF no se deja contar, el rango completo en "Traducir
+        // págs." da las páginas a contar). Los nombres largos se recortan por
+        // el MEDIO —se conserva el final, que es lo que distingue
+        // "…01_Contrato_Marco.pdf" de "…03_EXTENSION.pdf"— y el nombre entero
+        // sale al pasar el ratón.
+        const FA_COLS = 'minmax(0,1fr) 40px 128px 76px 26px';
+        function _claveFila(name, pendingIdx) {
             pendingIdx = normPendingIdx(pendingIdx);
-            const key = pendingIdx !== null ? 'p' + pendingIdx : 'd' + name;
-            const badge = document.getElementById('settingsBadge_' + cssId(key));
-            if (!badge) return;
-            const s = readSettingsForFile(name, pendingIdx);
-            badge.innerHTML = buildSettingsBadge(s.pagesFilter, s.instructions, s.manualWords, s.manualPages);
-            // También actualizar color del botón ⚙
-            const toggle = document.getElementById('settingsToggle_' + cssId(key));
-            if (toggle) {
-                const hasAny = !!(s.pagesFilter || s.instructions);
-                toggle.style.color = hasAny ? '#d97706' : '#6b7280';
-                toggle.title = hasAny ? 'Ajustes configurados — pulsa para editar' : 'Configurar páginas e instrucciones para este archivo';
-            }
+            return pendingIdx !== null ? 'p' + pendingIdx : 'd' + name;
         }
-
+        function _htmlACotar(inv, pages) {
+            if (inv && inv.filtro) return `<span style="font-weight:700;color:#b45309;white-space:nowrap;">→ ${inv.aTraducir}</span>`;
+            return `<span style="color:#94a3b8;white-space:nowrap;">→ ${pages || (inv ? inv.aTraducir : 0) || '—'}</span>`;
+        }
+        function _inventarioPorNombre() {
+            const m = {};
+            try { (inventarioArchivos() || []).forEach(f => { m[f.nombre] = f; }); } catch (e) {}
+            return m;
+        }
         // CSS-safe id (sanitiza nombres de archivo con espacios, puntos, etc.)
         function cssId(s) {
             return String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
         }
-
-        function toggleSettingsPanel(key) {
-            const safeKey = cssId(key);
-            const panel = document.getElementById('settingsPanel_' + safeKey);
-            if (!panel) return;
-            // v3.7.21 FIX: el panel cuando está abierto tiene style.display=''
-            // (no 'none'). La lógica anterior consideraba '' como oculto y nunca
-            // cerraba el panel. Comprobar contra 'none' explícitamente.
-            const isCurrentlyVisible = panel.style.display !== 'none';
-            panel.style.display = isCurrentlyVisible ? 'none' : '';
-            if (isCurrentlyVisible) window.openSettingsPanels.delete(key);
-            else window.openSettingsPanels.add(key);
+        function htmlCabeceraArchivos() {
+            return `<div class="fa-head" style="display:grid;grid-template-columns:${FA_COLS};gap:8px;align-items:end;padding:0 12px 4px;font-size:0.72rem;color:#64748b;font-weight:600;">
+                <div>Documento</div><div style="text-align:right;">Págs.</div><div>Traducir págs. <span style="font-weight:400;">→ a contar</span></div><div>Palabras</div><div></div>
+            </div>`;
         }
-
-        // Renderiza el bloque "file-item + panel ⚙" para un archivo (pendiente
-        // o de Drive). pendingIdx es null para archivos de Drive.
-        function renderFileItemWithSettings({ name, sizeBytes, pagesStr, wordsStr, previewBtn, removeBtnHtml, pendingIdx, isPdfOrImg }) {
+        // Una fila. pendingIdx es null para los archivos de Drive.
+        // pages: páginas físicas conocidas (0 si no se saben); wordsAuto: palabras
+        // del análisis (null si no hay análisis).
+        function renderFileItemWithSettings({ name, sizeBytes, pages, wordsAuto, previewBtn, removeBtnHtml, pendingIdx, inventario }) {
             const s = readSettingsForFile(name, pendingIdx);
-            const hasAny = !!(s.pagesFilter || s.instructions);
-            const key = pendingIdx !== null && pendingIdx !== undefined ? 'p' + pendingIdx : 'd' + name;
+            const key = _claveFila(name, pendingIdx);
             const safeKey = cssId(key);
-            const isOpen = window.openSettingsPanels.has(key);
-            const sizeClass = sizeBytes > 2 * 1024 * 1024 ? 'file-size-large' : '';
-            // v3.10.28: para los archivos de Drive va null, no "". La cadena
-            // vacía pasaba las guardas de tipo y luego rompía la clave del
-            // indicador: updateSettingsBadge calculaba 'p' + "" = 'p', mientras
-            // que el elemento se había pintado con id 'd' + nombre. Buscaba un
-            // id inexistente y salía sin hacer nada, así que tecleabas el rango
-            // y en pantalla no cambiaba absolutamente nada.
-            const pendingAttr = pendingIdx !== null && pendingIdx !== undefined ? String(pendingIdx) : 'null';
+            const pendingAttr = normPendingIdx(pendingIdx) !== null ? String(pendingIdx) : 'null';
             const nameEsc = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            // v3.7.24: combinar size/pages/words en una sola línea de detalle
-            const parts = [formatFileSize(sizeBytes)];
-            if (pagesStr) parts.push(pagesStr);
-            if (wordsStr) parts.push(`<strong style="color:#0c4a6e;">${wordsStr}</strong>`);
-            const detailHtml = parts.join(' · ');
-
+            const inv = (inventario || _inventarioPorNombre())[name];
+            const sizeClass = sizeBytes > 2 * 1024 * 1024 ? 'file-size-large' : '';
+            const tieneFiltro = !!(s.pagesFilter && s.pagesFilter.trim());
+            const manual = (s.manualWords === '' || s.manualWords === undefined || s.manualWords === null) ? '' : s.manualWords;
+            const inp = 'padding:5px 7px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;font-family:inherit;';
+            const pagsTxt = pages > 0 ? String(pages) : '—';
             return `
-                <div class="file-item">
-                    <div class="file-item-info">
-                        <span class="file-item-name">${previewBtn} ${escHtml(name)}<span id="settingsBadge_${safeKey}">${buildSettingsBadge(s.pagesFilter, s.instructions, s.manualWords, s.manualPages)}</span></span>
-                        <span class="file-item-size ${sizeClass}">${detailHtml}</span>
+                <div class="file-item fa-row" id="filaArchivo_${safeKey}" style="display:grid;grid-template-columns:${FA_COLS};gap:8px;align-items:center;">
+                    <div class="file-item-info fa-info" style="min-width:0;">
+                        <span class="file-item-name" title="${escAttr(name)}" style="display:flex;align-items:center;gap:4px;min-width:0;overflow:visible;">${previewBtn}<span class="nombre-recortable" data-full="${escAttr(name)}" style="display:block;min-width:0;overflow:hidden;white-space:nowrap;">${escHtml(name)}</span></span>
+                        <span class="file-item-size ${sizeClass}">${formatFileSize(sizeBytes)}</span>
                     </div>
-                    <div class="file-item-actions">
-                        <button id="settingsToggle_${safeKey}" type="button" title="${hasAny ? 'Ajustes configurados — pulsa para editar' : 'Configurar páginas e instrucciones para este archivo'}" onclick="toggleSettingsPanel('${key.replace(/'/g, "\\'")}')" style="background:transparent;border:0;font-size:1.05rem;cursor:pointer;color:${hasAny ? '#d97706' : '#6b7280'};padding:4px 8px;">⚙</button>
-                        ${removeBtnHtml}
+                    <div class="fa-pags" style="text-align:right;color:#64748b;" title="Páginas del archivo"><span class="fa-lbl">págs. </span>${pagsTxt}</div>
+                    <div class="fa-trad" style="display:flex;align-items:center;gap:5px;">
+                        <input type="text" class="fa-filtro" value="${escAttr(s.pagesFilter)}" placeholder="todas" title="Páginas a traducir, p. ej. 1-5, 7, 9-12. Vacío = todas." autocomplete="off"
+                            oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'pagesFilter', this.value)"
+                            style="${inp}width:66px;${tieneFiltro ? 'border-color:#d97706;color:#b45309;font-weight:600;' : ''}">
+                        <span id="faAContar_${safeKey}">${_htmlACotar(inv, pages)}</span>
                     </div>
-                </div>
-                <div id="settingsPanel_${safeKey}" class="file-settings-panel" style="display:${isOpen ? '' : 'none'};margin:0 0 10px 12px;padding:10px 12px;background:#fafafa;border:1px solid #e5e7eb;border-radius:6px;">
-                    <div style="display:flex;flex-wrap:wrap;gap:12px;">
-                        <div style="flex:1;min-width:200px;">
-                            <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Páginas a procesar ${isPdfOrImg === false ? '(opcional)' : '(vacío = todas)'}</label>
-                            <input type="text" value="${escAttr(s.pagesFilter)}" placeholder="ej: 1-5, 7, 9-12"
-                                oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'pagesFilter', this.value)"
-                                style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
-                        </div>
+                    <div class="fa-pal">
+                        <input type="number" min="0" step="1" class="fa-palabras" value="${escAttr(manual)}" placeholder="${wordsAuto != null ? Number(wordsAuto).toLocaleString('es-ES') : 'auto'}"
+                            title="${wordsAuto != null ? 'Del análisis: ' + Number(wordsAuto).toLocaleString('es-ES') + ' palabras. ' : ''}Escribe un número para fijarlo a mano (gana sobre el análisis); vacío = el del análisis."
+                            onchange="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualWords', this.value)"
+                            style="${inp}width:70px;${manual !== '' ? 'border-color:#7c3aed;color:#7c3aed;font-weight:600;' : ''}">
                     </div>
-                    <div style="margin-top:8px;">
-                        <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Instrucciones para este archivo (opc.)</label>
-                        <textarea rows="2" placeholder="ej: solo las partes resaltadas en amarillo"
-                            oninput="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'instructions', this.value)"
-                            style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;font-family:inherit;resize:vertical;">${escHtml(s.instructions)}</textarea>
-                    </div>
-                    <!-- v3.10.34: recuento manual, para cuando el análisis no llega -->
-                    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #d1d5db;">
-                        <div style="font-size:0.78rem;color:#6b7280;margin-bottom:6px;">✎ Recuento manual — si el análisis no consigue este archivo, escribe tú el número. Gana sobre el análisis. Vacío = usar el análisis.</div>
-                        <div style="display:flex;gap:10px;">
-                            <div style="flex:1;">
-                                <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Palabras</label>
-                                <input type="number" min="0" step="1" value="${escAttr(s.manualWords)}" placeholder="del análisis"
-                                    onchange="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualWords', this.value)"
-                                    style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
-                            </div>
-                            <div style="flex:1;">
-                                <label style="display:block;font-size:0.78rem;color:#6b7280;margin-bottom:3px;">Páginas</label>
-                                <input type="number" min="0" step="1" value="${escAttr(s.manualPages)}" placeholder="del análisis"
-                                    onchange="writeSettingsForFile('${nameEsc}', ${pendingAttr}, 'manualPages', this.value)"
-                                    style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.85rem;">
-                            </div>
-                        </div>
-                    </div>
+                    ${removeBtnHtml}
                 </div>
             `;
         }
+        // Al teclear el rango: "→ a contar" de la fila y el total del pie, sin repintar la lista
+        function actualizarFilaArchivo(name, pendingIdx) {
+            const safeKey = cssId(_claveFila(name, pendingIdx));
+            const inv = _inventarioPorNombre()[name];
+            const span = document.getElementById('faAContar_' + safeKey);
+            if (span) span.innerHTML = _htmlACotar(inv, inv ? inv.paginas : 0);
+            const fila = document.getElementById('filaArchivo_' + safeKey);
+            if (fila) {
+                const s = readSettingsForFile(name, pendingIdx);
+                const inp = fila.querySelector('.fa-filtro');
+                if (inp) {
+                    const con = !!(s.pagesFilter && s.pagesFilter.trim());
+                    inp.style.borderColor = con ? '#d97706' : '#d1d5db';
+                    inp.style.color = con ? '#b45309' : '';
+                    inp.style.fontWeight = con ? '600' : '';
+                }
+            }
+            pintarTotalAContar();
+        }
+        function pintarTotalAContar() {
+            const el = document.getElementById('fileTotalAContar');
+            if (!el) return;
+            let r = null;
+            try { r = calcularPaginasATraducir(); } catch (e) {}
+            el.innerHTML = (r && r.hayFiltros) ? ` - <strong style="color:#b45309;">${r.aTraducir}</strong> a contar` : '';
+        }
+
+        // ---------- nombres largos: recorte por el medio, medido en píxeles ----------
+        let _ctxMedida = null;
+        function _anchoTexto(txt, font) {
+            try {
+                if (!_ctxMedida) { const c = document.createElement('canvas'); _ctxMedida = c.getContext && c.getContext('2d'); }
+                if (_ctxMedida) { _ctxMedida.font = font; return _ctxMedida.measureText(txt).width; }
+            } catch (e) {}
+            return txt.length * 7;   // sin canvas (pruebas): aproximación
+        }
+        function recortarPorElMedio(nombre, anchoPx, font) {
+            if (!nombre) return '';
+            if (_anchoTexto(nombre, font) <= anchoPx) return nombre;
+            let lo = 4, hi = nombre.length - 1, mejor = '…';
+            while (lo <= hi) {
+                const k = (lo + hi) >> 1;                 // caracteres que se conservan
+                const fin = Math.ceil(k * 0.6), ini = k - fin;
+                const t = nombre.slice(0, ini) + '…' + nombre.slice(nombre.length - fin);
+                if (_anchoTexto(t, font) <= anchoPx) { mejor = t; lo = k + 1; } else hi = k - 1;
+            }
+            return mejor;
+        }
+        function recortarNombres(raiz) {
+            (raiz || document).querySelectorAll('.nombre-recortable[data-full]').forEach(el => {
+                const full = el.getAttribute('data-full') || '';
+                el.textContent = full;
+                const ancho = el.clientWidth;
+                if (!ancho || el.scrollWidth <= ancho) return;
+                el.textContent = recortarPorElMedio(full, ancho - 1, getComputedStyle(el).font);
+            });
+        }
+        window.addEventListener('resize', () => {
+            clearTimeout(window._recorteTimer);
+            window._recorteTimer = setTimeout(() => { try { recortarNombres(); } catch (e) {} }, 150);
+        });
 
         function escHtml(s) {
             return String(s == null ? '' : s)
@@ -7652,6 +7682,8 @@
             let pendingPages = 0;
 
             // 1) Archivos ya en Drive
+            html += htmlCabeceraArchivos();   // v3.10.60
+            const _inventario = _inventarioPorNombre();   // v3.10.60: páginas a contar por archivo
             if (driveFiles.length > 0) {
                 html += '<div class="folder-files-note">📁 Archivos en Drive (puedes eliminar o añadir más):</div>';
                 // v3.7.24: indexar análisis por nombre para mostrar palabras/páginas
@@ -7672,19 +7704,22 @@
                     // v3.10.0: antes ignoraba pagesByFile, así que el resultado
                     // del botón 📄 Recontar no llegaba nunca a esta lista.
                     const pagesShown = paginasDeArchivo(f.name, f.pages, an && an.pages);
-                    const pStr = pagesShown ? `${pagesShown} pág${pagesShown > 1 ? 's' : ''}` : '';
-                    const wStr = an && an.words != null
-                        ? `${(an.words || 0).toLocaleString('es-ES')} palabras${an.manual ? ' ✎' : ''}`
-                        : '';
+                    // v3.10.60: palabras del análisis (si el recuento es manual, las
+                    // originales del análisis van de placeholder)
+                    let wordsAuto = null;
+                    if (an) {
+                        if (!an.manual && an.words != null) wordsAuto = an.words;
+                        else if (an.manual && an._wordsAnalisis != null && an._wordsAnalisis > 0) wordsAuto = an._wordsAnalisis;
+                    }
                     html += renderFileItemWithSettings({
                         name: f.name,
                         sizeBytes: f.size || 0,
-                        pagesStr: pStr,
-                        wordsStr: wStr,
+                        pages: pagesShown,
+                        wordsAuto: wordsAuto,
                         previewBtn: previewBtn,
-                        removeBtnHtml: `<button class="file-item-remove" onclick="removeDriveFile('${f.id}', ${i})" title="Eliminar de Drive">✕</button>`,
+                        removeBtnHtml: `<button class="file-item-remove" onclick="removeDriveFile('${f.id}', ${i})" title="Eliminar de Drive" style="padding:2px 4px;">✕</button>`,
                         pendingIdx: null,
-                        isPdfOrImg: isPdfOrImg
+                        inventario: _inventario
                     });
                 });
             }
@@ -7701,20 +7736,21 @@
                     const previewBtn = canPreview
                         ? `<button class="btn-preview-local" onclick="previewLocalFile(${i})" title="Ver archivo">👁️</button>`
                         : '';
-                    const pagesStr = f.pages ? `${f.pages} pág${f.pages > 1 ? 's' : ''}` : '';
                     html += renderFileItemWithSettings({
                         name: f.name,
                         sizeBytes: f.size,
-                        pagesStr: pagesStr,
+                        pages: f.pages || 0,
+                        wordsAuto: null,
                         previewBtn: previewBtn,
-                        removeBtnHtml: `<button class="file-item-remove" onclick="removeFile(${i})">✕</button>`,
+                        removeBtnHtml: `<button class="file-item-remove" onclick="removeFile(${i})" title="Quitar de la lista" style="padding:2px 4px;">✕</button>`,
                         pendingIdx: i,
-                        isPdfOrImg: canPreview
+                        inventario: _inventario
                     });
                 });
             }
 
             list.innerHTML = html;
+            try { recortarNombres(list); } catch (e) {}   // v3.10.60: nombres largos por el medio
 
             // pageCount: solo se machaca cuando NO hay carpeta (estado inicial,
             // pendientes locales con conteo pdfjs). En cuanto hay carpeta el
@@ -7785,8 +7821,9 @@
             const wordsHtml = totalWords > 0
                 ? ` - <strong style="color:#0c4a6e;">${totalWords.toLocaleString('es-ES')} palabras</strong>`
                 : '';
-            total.innerHTML = `<strong>${totalCount}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${displayPages}</strong> página(s)${wordsHtml}`;
+            total.innerHTML = `<strong>${totalCount}</strong> archivo(s) - <strong>${formatFileSize(totalSize)}</strong> total - <strong>${displayPages}</strong> página(s)<span id="fileTotalAContar"></span>${wordsHtml}`;
             total.style.display = 'block';
+            pintarTotalAContar();   // v3.10.60: "· N a contar" cuando hay filtros
 
             updateStep2Buttons();
         }
@@ -7922,11 +7959,15 @@
         // de Drive y refresca el panel. Usado al entrar al paso 2 cuando hay
         // folderId pero el frontend no tiene cargada la lista (típico tras
         // "Crear y Analizar" → paso 4 → volver al paso 2).
-        async function refreshFolderFilesFromDrive() {
+        async function refreshFolderFilesFromDrive(opts) {
+            opts = opts || {};
             if (!budgetData.folderId) return;
             try {
                 const data = await apiPost({ action: 'listFolderFiles', folderId: budgetData.folderId });
                 if (data.success && Array.isArray(data.files)) {
+                    // v3.10.59: refresco automático tras crear: si Drive todavía no
+                    // lista nada, se conserva la lista de lo que acabamos de subir
+                    if (opts.conservarSiVacio && data.files.length === 0 && (budgetData.folderFiles || []).length) return;
                     budgetData.folderFiles = data.files;
                     renderStep2Files();
                     // v3.7.67: guardar en la hoja el nº de páginas/archivos real
@@ -8114,14 +8155,20 @@
                         // v3.7.19: trasladar settings de archivos pendientes a budgetData.fileSettings
                         // para que persistan ahora que están en Drive
                         if (!budgetData.fileSettings) budgetData.fileSettings = {};
+                        let _ajustesTrasladados = 0;
                         filesToUpload.forEach(uf => {
                             if (uf.pagesFilter || uf.instructions) {
-                                budgetData.fileSettings[uf.name] = {
+                                // v3.10.59: conservar los ✎ manuales que ya hubiera
+                                budgetData.fileSettings[uf.name] = Object.assign({}, budgetData.fileSettings[uf.name] || {}, {
                                     pagesFilter: uf.pagesFilter || '',
                                     instructions: uf.instructions || ''
-                                };
+                                });
+                                _ajustesTrasladados++;
                             }
                         });
+                        // v3.10.59: y a la hoja. Antes solo se guardaban si después se
+                        // contaban palabras; con "Subir" a secas morían en el navegador.
+                        if (_ajustesTrasladados && budgetData.id) { try { persistFileSettings(); } catch (e) {} }
                         // Limpiar paneles abiertos referidos a pendientes (ya no existen)
                         if (window.openSettingsPanels) {
                             Array.from(window.openSettingsPanels).forEach(k => {
@@ -9393,6 +9440,54 @@
             return false;
         }
         // El trabajo ya tiene código: anotarlo y, si es el abierto, pintarlo.
+        // v3.10.59: los ajustes ⚙ tecleados en archivos PENDIENTES (páginas a
+        // procesar, instrucciones) viven en uploadedFiles[i] hasta que la carpeta
+        // existe. Solo pasaban a fileSettings (y a la hoja) cuando se contaban
+        // palabras; con "Crear carpeta" a secas se perdían. Caso real 1002-04-W:
+        // el paso 4 decía 21 páginas a traducir (el campo se rellenó al teclear)
+        // pero el paso 2 ya no tenía los filtros y el paso 3 contaba las 76.
+        // Aquí se fusionan con los ajustes manuales (✎) que ya estuvieran en
+        // fileSettings y se devuelve el mapa resultante.
+        function fusionarAjustesDePendientes(job, files) {
+            const base = esAbierto(job) ? (budgetData.fileSettings || {}) : ((job.ctx && job.ctx.fileSettings) || {});
+            const fusion = {};
+            Object.keys(base).forEach(n => { fusion[n] = Object.assign({}, base[n]); });
+            (files || []).forEach(f => {
+                if (!f || !f.name) return;
+                if (f.pagesFilter || f.instructions) {
+                    fusion[f.name] = Object.assign({}, fusion[f.name] || {}, { pagesFilter: f.pagesFilter || '', instructions: f.instructions || '' });
+                }
+            });
+            Object.keys(fusion).forEach(n => {
+                const s = fusion[n] || {};
+                const sinNada = !(s.pagesFilter || s.instructions) &&
+                    (s.manualWords === '' || s.manualWords === undefined || s.manualWords === null) &&
+                    (s.manualPages === '' || s.manualPages === undefined || s.manualPages === null);
+                if (sinNada) delete fusion[n];
+            });
+            if (job && job.ctx) job.ctx.fileSettings = fusion;
+            if (esAbierto(job)) budgetData.fileSettings = fusion;
+            return fusion;
+        }
+        function hayAjustesManuales(fs) {
+            return Object.keys(fs || {}).some(n => {
+                const s = fs[n] || {};
+                return (s.manualWords !== '' && s.manualWords !== undefined && s.manualWords !== null) ||
+                       (s.manualPages !== '' && s.manualPages !== undefined && s.manualPages !== null);
+            });
+        }
+        async function guardarAjustesArchivos(job, fs, motivo) {
+            if (!job || !job.budgetId || !fs || !Object.keys(fs).length) return false;
+            try {
+                const r = await apiPost({ action: 'updateBudgetBasicData', budgetId: job.budgetId, fileSettings: fs }, { retry: false, timeoutMs: 40000 });
+                if (!(r && r.success)) prodLogError(job.k('ajustes'), `${job.budgetId} · ajustes por archivo (⚙) no guardados: ` + ((r && r.error) || 'sin éxito'));
+                return !!(r && r.success);
+            } catch (e) {
+                prodLogError(job.k('ajustes'), `${job.budgetId} · ajustes por archivo (⚙) no guardados` + (motivo ? ' (' + motivo + ')' : '') + ': ' + ((e && e.message) || e));
+                return false;
+            }
+        }
+
         function asignarCodigoAlTrabajo(job, r) {
             job.budgetId = r.budgetId;
             job.folderId = r.folderId || '';
@@ -9566,6 +9661,10 @@
                 // ¡Código asignado! Desde aquí se puede empezar otro presupuesto.
                 asignarCodigoAlTrabajo(job, folderResult);
                 stageTimings.backendCreateFolderMs = (folderResult && folderResult._timings && folderResult._timings.totalMs) || 0;
+                // v3.10.59: ajustes ⚙ de los archivos pendientes → fileSettings y hoja
+                // (se guarda sin esperar; se espera al final del trabajo)
+                const ajustesArchivos = fusionarAjustesDePendientes(job, files);
+                const pGuardarAjustes = Object.keys(ajustesArchivos).length ? guardarAjustesArchivos(job, ajustesArchivos, 'al crear') : null;
 
                 // ----- archivos: disco local (Drive Desktop los sube) o Apps Script -----
                 let directUploadResults = null;
@@ -9641,7 +9740,11 @@
                     uploadedFiles = [];
                     if (job.folderFiles) { budgetData.folderFiles = job.folderFiles; budgetData.numArchivos = job.folderFiles.length; }
                     else budgetData.numArchivos = files.length;
-                    setTimeout(() => { if (esAbierto(job) && typeof refreshFolderFilesFromDrive === 'function') refreshFolderFilesFromDrive().catch(() => {}); }, 800);
+                    // v3.10.59: con la lista de la carpeta ya en su sitio, los filtros ⚙
+                    // vuelven a dar las páginas a traducir (paso 3, paso 4 y mensaje)
+                    if (Object.keys(ajustesArchivos).length && (budgetData.folderFiles || []).length) { try { aplicarFiltrosAPaginas(); } catch (e) {} }
+                    // (conservarSiVacio: si Drive aún no lista nada, no borrar la lista que acabamos de subir)
+                    setTimeout(() => { if (esAbierto(job) && typeof refreshFolderFilesFromDrive === 'function') refreshFolderFilesFromDrive({ conservarSiVacio: true }).catch(() => {}); }, 800);
                     if (typeof updateHeaderButtons === 'function') updateHeaderButtons();
                     if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
                     if (_volverAPaso2) showCard(2);
@@ -9655,11 +9758,9 @@
                 // recuento se recupera de la hoja (pedirRecuentoAlServidor).
                 if (withAnalysis) {
                     faseTrabajo(job, 'contando', files.length + ' archivo(s)');
-                    // v3.7.19: fileSettings iniciales desde los archivos subidos
-                    const initialFileSettings = {};
-                    files.forEach(f => {
-                        if (f.pagesFilter || f.instructions) initialFileSettings[f.name] = { pagesFilter: f.pagesFilter || '', instructions: f.instructions || '' };
-                    });
+                    // v3.10.59: los ajustes por archivo ya están fusionados (⚙ de los
+                    // pendientes + ✎ manuales) y guardados en la hoja
+                    const initialFileSettings = ajustesArchivos;
                     const paramsRecuento = () => ({
                         budgetId: job.budgetId, folderId: job.folderId || '', files: files, sourceLang: ctx.sourceLang,
                         internalComments: internalComments, fileSettings: initialFileSettings, numFiles: files.length,
@@ -9725,6 +9826,9 @@
                             prodLogDone(job.k('save'), 'hoja' +
                                 (claudeResult.txtsInDrive ? ' + TXT en Drive' : (claudeResult.txtsPendientes ? ' · TXT en espera de la carpeta' : '')) +
                                 ' (por el servidor)' + (_excelLocal ? ' · ficha Excel en local' : ''));
+                            // v3.10.59: el servidor guarda los ajustes derivados de los
+                            // archivos (sin los recuentos manuales ✎): reponerlos
+                            if (hayAjustesManuales(initialFileSettings)) await guardarAjustesArchivos(job, initialFileSettings, 'tras el recuento');
                         }
                     } catch (saveErr) {
                         console.error('guardado del recuento: fallo', saveErr);
@@ -9737,6 +9841,7 @@
                     if (esAbierto(job)) { showBgBanner('success', msg, false); showGlobalAnalysisBanner('success', msg); setTimeout(hideBgBanner, 4000); }
                     job.resultado = { texto: 'carpeta creada' + (files.length ? ' · ' + files.length + ' archivo(s)' : '') };
                 }
+                if (pGuardarAjustes) { try { await pGuardarAjustes; } catch (e) {} }   // v3.10.59
                 if (enMarcha(job)) faseTrabajo(job, 'hecho');
                 stageTimings.t_end = performance.now();
                 logStageTimingsToSheet(stageTimings, withAnalysis ? 'Crear y Analizar' : 'Crear Carpeta', files.length, approxBytes, job.budgetId);
@@ -13334,12 +13439,16 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const page2 = budgetData.tariffPage2 || 0;
             
             // Calcular precio por páginas (tarifa web)
-            const priceByPages = page1 + Math.max(0, pages - 1) * page2;
-            
+            // v3.10.59: sobre las PÁGINAS CONTABILIZADAS (el campo que acabamos de
+            // rellenar), no sobre el total físico. Caso 1002-04-W: 76 páginas con
+            // filtros ⚙ que dejaban 21 → el campo decía 21 y el precio cobraba 76.
+            const pagesBase = (quotePagesCount && parseInt(quotePagesCount.value) > 0) ? parseInt(quotePagesCount.value) : pages;
+            const priceByPages = page1 + Math.max(0, pagesBase - 1) * page2;
+
             // Mostrar detalle del cálculo por páginas
             if (detailDiv) {
                 detailDiv.innerHTML = `
-                    Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pages - 1)} págs resto) = 
+                    Cálculo: ${page1.toFixed(2).replace('.', ',')} € (1ª pág) + ${page2.toFixed(2).replace('.', ',')} € × (${Math.max(0, pagesBase - 1)} págs resto) =
                     <span class="tariff-calc-result">${priceByPages.toFixed(2).replace('.', ',')} €</span>
                 `;
             }
