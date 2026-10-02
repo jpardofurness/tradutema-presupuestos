@@ -70,7 +70,7 @@
         /* FORM ELEMENTS */
         .form-group { margin-bottom: 16px; }
         label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
-        select, input[type="text"], input[type="number"], input[type="email"], input[type="date"], input[type="time"], textarea {
+        select, input[type="text"], input[type="number"], input[type="email"], input[type="date"], input[type="time"], input[type="password"], textarea {
             width: 100%; padding: 14px 16px; font-size: 1rem; font-family: inherit;
             border: 2px solid var(--border-color); border-radius: var(--radius-md);
             background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;
@@ -718,6 +718,24 @@
             <input type="number" id="uploadMaxMb" class="config-input" min="1" max="20" step="1" value="8" style="max-width:140px;">
             <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">
                 Si los archivos pesan más en total, no se intenta la subida: se crea la carpeta y se te da el enlace para arrastrarlos a Drive directamente.
+            </div>
+
+            <!-- v3.10.58: recuento de palabras en el navegador -->
+            <label style="display:block; font-size:0.82rem; color:#475569; margin-top:14px; margin-bottom:4px;">
+                🤖 Recuento de palabras en el navegador (PC)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#1e293b;margin:4px 0 8px;cursor:pointer;">
+                <input type="checkbox" id="navCountEnabled" style="width:18px;height:18px;"> Contar en este navegador en vez de en Apps Script <span style="color:#16a34a;font-weight:600;">(rápido: sin iLovePDF ni límite de 6 min)</span>
+            </label>
+            <label for="claudeApiKey" style="display:block; font-size:0.82rem; color:#475569; margin-top:6px; margin-bottom:4px;">Clave API de Claude (console.anthropic.com)</label>
+            <input type="password" id="claudeApiKey" class="config-input" placeholder="sk-ant-api03-…" autocomplete="off" style="max-width:520px;">
+            <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">
+                La clave se guarda solo en este navegador (como la URL del API) y se usa para llamar a Claude directamente: sin iLovePDF, sin el límite de 6 min de Apps Script y sin respuestas perdidas. La pestaña debe seguir abierta mientras cuenta (puedes hacer otros presupuestos). Sin clave, o en el móvil, se cuenta en el servidor como hasta ahora.
+            </div>
+            <div style="display:flex;gap:14px;margin-top:8px;font-size:0.82rem;color:#475569;align-items:center;flex-wrap:wrap;">
+                <span>Páginas en paralelo: <input type="number" id="navCountParallel" value="8" min="1" max="16" step="1" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></span>
+                <button type="button" class="btn btn-secondary" onclick="probarClaveClaude()" style="font-size:0.8rem;padding:5px 10px;">🔑 Probar clave</button>
+                <span id="navCountKeyStatus"></span>
             </div>
 
             <button class="btn btn-secondary" onclick="saveConfig()" style="margin-top: 10px; width: 100%;">💾 Guardar</button>
@@ -1946,12 +1964,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.56';
-        const HTML_DATE = '30/09/2026';
+        const HTML_VERSION = '3.10.58';
+        const HTML_DATE = '01/10/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
-        const API_MIN_VERSION = '3.7.88';
+        // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
+        const API_MIN_VERSION = '3.7.90';
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2103,6 +2122,17 @@
                 try { localStorage.setItem('tradutema_upload_max_mb', String(mMb)); } catch (e) {}
             }
 
+            // v3.10.58: recuento en el navegador (clave de Claude, paralelismo)
+            try {
+                const chk = document.getElementById('navCountEnabled');
+                if (chk) localStorage.setItem('tradutema_nav_count', chk.checked ? '1' : '0');
+                const kEl = document.getElementById('claudeApiKey');
+                if (kEl) { const k = (kEl.value || '').trim(); if (k) localStorage.setItem('tradutema_claude_key', k); else localStorage.removeItem('tradutema_claude_key'); }
+                const pEl = document.getElementById('navCountParallel');
+                const pn = pEl ? parseInt(pEl.value, 10) : NaN;
+                if (pn >= 1 && pn <= 16) localStorage.setItem('tradutema_nav_parallel', String(pn));
+            } catch (e) {}
+
             document.getElementById('configSection').style.display = 'none';
             loadData();
         }
@@ -2110,6 +2140,13 @@
         function showConfig() {
             document.getElementById('configSection').style.display = 'block';
             document.getElementById('apiUrl').value = apiUrl;
+            // v3.10.58: recuento en el navegador
+            try {
+                const chk = document.getElementById('navCountEnabled'); if (chk) chk.checked = navCountEnabled();
+                const kEl = document.getElementById('claudeApiKey'); if (kEl) kEl.value = navCountKey();
+                const pEl = document.getElementById('navCountParallel'); if (pEl) pEl.value = navCountParallel();
+                const st = document.getElementById('navCountKeyStatus'); if (st) st.textContent = '';
+            } catch (e) {}
             // v3.7.83: precargar el ajuste de tiempo de subida
             const tEl = document.getElementById('uploadTimeoutSecs');
             if (tEl) tEl.value = Math.round(getUploadTimeoutMs() / 1000);
@@ -6068,7 +6105,7 @@
         function apiVersionInsuficiente() {
             return !!(apiVersion && apiVersion !== '?' && compararVersiones(apiVersion, API_MIN_VERSION) < 0);
         }
-        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_89.gs o posterior), ' +
+        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_90.gs o posterior), ' +
             'luego <b>Implementar → Gestionar implementaciones → ✏️ (editar) → Versión: «Nueva versión» → Implementar</b>. ' +
             'Pegar el código sin crear una versión nueva no cambia lo que se ejecuta.';
         function refrescarAvisoVersionApi() {
@@ -8439,8 +8476,10 @@
                 // minuto o más ANTES del primer reintento. Solo se usa en
                 // llamadas que el servidor sabe deduplicar (createBudgetFolder
                 // con requestId + bloqueo): abortar y reintentar es seguro.
-                const ctrl = (options.timeoutMs && typeof AbortController === 'function') ? new AbortController() : null;
-                const timer = ctrl ? setTimeout(() => ctrl.abort(), options.timeoutMs) : null;
+                // v3.10.57: options.abortController permite al llamador cortar la
+                // petición (recuento recuperado de la hoja antes de que llegue).
+                const ctrl = options.abortController || ((options.timeoutMs && typeof AbortController === 'function') ? new AbortController() : null);
+                const timer = (ctrl && options.timeoutMs) ? setTimeout(() => ctrl.abort(), options.timeoutMs) : null;
                 try {
                     const resp = await fetch(apiUrl, {
                         method: 'POST',
@@ -8472,7 +8511,7 @@
                     if (timer) clearTimeout(timer);
                     const abortado = e && (e.name === 'AbortError' || /aborted/i.test(e.message || ''));
                     ultimoError = abortado
-                        ? new Error(`El servidor tardó más de ${Math.round(options.timeoutMs / 1000)} s al ${accion}; se reintenta.`)
+                        ? new Error(`El servidor tardó más de ${Math.round(options.timeoutMs / 1000)} s al ${accion}` + (intento < intentos ? '; se reintenta.' : ' y se dejó de esperar.'))
                         : e;
                     if (intento < intentos && (abortado || /fetch|network|Failed/i.test(e.message || ''))) {
                         await new Promise(r => setTimeout(r, 1500));
@@ -9148,8 +9187,10 @@
                     const resto = activos.length - 1;
                     // compacto: la cabecera va justa de sitio. El cronómetro está en el panel.
                     const corta = { preparando: 'creando carpeta', creando: 'creando carpeta', escribiendo: 'escribiendo archivos', subiendo: 'subiendo archivos', contando: 'contando palabras', guardando: 'guardando', enviando: 'enviando tasación' };
+                    let faseCorta = corta[principal.fase] || textoFase(principal);
+                    if (principal.fase === 'contando' && principal.progreso && principal.progreso.total) faseCorta = 'contando ' + principal.progreso.hechas + '/' + principal.progreso.total;   // v3.10.58
                     badge.innerHTML = '⏳ ' + (principal.budgetId ? '<b>' + escapeHtml(principal.budgetId) + '</b> · ' : '') +
-                        (corta[principal.fase] || textoFase(principal)) + (resto ? ' <span style="opacity:.85">+' + resto + '</span>' : '');
+                        faseCorta + (resto ? ' <span style="opacity:.85">+' + resto + '</span>' : '');
                     badge.style.background = (principal.fase === 'creando' || principal.fase === 'preparando') ? '#dc2626' : '#f59e0b';
                     badge.title = (principal.fase === 'creando' || principal.fase === 'preparando')
                         ? 'Espera a que termine de crearse la carpeta antes de empezar otro presupuesto'
@@ -9609,131 +9650,88 @@
                 }
 
                 // ----- recuento de palabras (Claude) -----
-                let claudeResult = null;
-                let claudeFailedHard = false;
-                let claudeHardError = '';
+                // v3.10.57: el servidor guarda hoja + TXT antes de responder y
+                // responde ligero; si la respuesta se pierde o llega vacía, el
+                // recuento se recupera de la hoja (pedirRecuentoAlServidor).
                 if (withAnalysis) {
                     faseTrabajo(job, 'contando', files.length + ' archivo(s)');
-                    prodLogStart(job.k('analyze'), `${job.budgetId} · Analizando ${files.length} archivo(s) en el servidor (Claude)`);
-                    try {
-                        claudeResult = await apiPost({
-                            action: 'countWordsParallel', files: files, sourceLang: ctx.sourceLang,
-                            internalComments: internalComments, countMethod: 'claude'
-                        }, { retry: false });
-                    } catch (cErr) {
-                        claudeFailedHard = true;
-                        claudeHardError = (cErr && cErr.message) ? cErr.message : 'Failed to fetch';
+                    // v3.7.19: fileSettings iniciales desde los archivos subidos
+                    const initialFileSettings = {};
+                    files.forEach(f => {
+                        if (f.pagesFilter || f.instructions) initialFileSettings[f.name] = { pagesFilter: f.pagesFilter || '', instructions: f.instructions || '' };
+                    });
+                    const paramsRecuento = () => ({
+                        budgetId: job.budgetId, folderId: job.folderId || '', files: files, sourceLang: ctx.sourceLang,
+                        internalComments: internalComments, fileSettings: initialFileSettings, numFiles: files.length,
+                        aceptarSinCountId: true, etiqueta: 'Crear y Analizar'
+                    });
+                    let pr = await pedirRecuentoAlServidor(job, paramsRecuento());
+                    if (!pr.ok) {
+                        // un reintento automático (fallo transitorio del servidor o de Claude)
+                        job.bg.analysisError = pr.error;
+                        if (esAbierto(job)) {
+                            const msgAuto = `✓ Carpeta creada · ${job.budgetId} · ⚠️ el recuento falló (${pr.error}); reintentando automáticamente...`;
+                            showBgBanner('warning', msgAuto, false);
+                            showGlobalAnalysisBanner('loading', '⏳ ' + msgAuto);
+                        }
+                        pr = await pedirRecuentoAlServidor(job, Object.assign(paramsRecuento(), { intento: 2 }));
                     }
-                    stageTimings.backendClaudeMs = (claudeResult && claudeResult._perf && claudeResult._perf.totalMs) || 0;
-                    // v3.7.97: "éxito" con análisis vacío = fallo duro
-                    if (claudeResult && claudeResult.success &&
-                        (!Array.isArray(claudeResult.analysis) || claudeResult.analysis.length === 0) && files.length > 0) {
-                        try { prodLogError(job.k('analyze'), 'RESPUESTA ANÓMALA (éxito sin análisis): ' + JSON.stringify(claudeResult).substring(0, 600)); } catch (e) {}
-                        claudeFailedHard = true;
-                        claudeHardError = 'análisis vacío con ' + files.length + ' archivo(s)';
-                        claudeResult = null;
-                    }
-                }
-
-                if (withAnalysis && claudeFailedHard) {
-                    // Los archivos YA están en la carpeta: relanzar por la vía del
-                    // servidor (reanalyzeFolder), que además rescata desde la hoja.
-                    prodLogError(job.k('analyze'), claudeHardError);
-                    job.bg.analysisError = claudeHardError;
-                    if (esAbierto(job)) {
-                        const msgAuto = `✓ Carpeta creada · ${job.budgetId} · ⚠️ el primer análisis falló; reintentando automáticamente...`;
-                        showBgBanner('warning', msgAuto, false);
-                        showGlobalAnalysisBanner('loading', '⏳ ' + msgAuto);
-                    }
-                    const ok2 = await ejecutarTrabajoContar(job, { desdeCreacion: true });
-                    if (!ok2) {
-                        const isTimeout = /failed to fetch|networkerror|load failed/i.test(claudeHardError);
-                        const msg = isTimeout
-                            ? `✓ Carpeta creada · ${job.budgetId} · ⚠️ el análisis superó el límite de 6 min de Apps Script (documento largo). Pulsa "Recontar palabras" en el paso 2 para reintentarlo.`
-                            : `✓ Carpeta creada · ${job.budgetId} · ⚠️ el análisis falló: ${claudeHardError}. Pulsa "Recontar palabras" en el paso 2.`;
+                    stageTimings.backendClaudeMs = (pr.res && pr.res._perf && pr.res._perf.totalMs) || 0;
+                    if (!pr.ok) {
+                        const msg = `✓ Carpeta creada · ${job.budgetId} · ⚠️ el recuento falló dos veces (${pr.error}). ` +
+                            `Pulsa "Reintentar" en el registro de trabajos o "Contar palabras" en el paso 2.`;
                         if (esAbierto(job)) { showBgBanner('warning', msg, false); showGlobalAnalysisBanner('warning', msg); }
-                        job.error = 'el recuento falló (' + claudeHardError + ')';
+                        job.bg.analysisError = pr.error;
+                        job.error = 'el recuento falló (' + pr.error + ')';
                         job.reintentar = () => { const j2 = nuevoTrabajo('contar', contextoContarDe(job)); ejecutarTrabajoContar(j2); };
                         faseTrabajo(job, 'error');
                         return;
                     }
-                } else if (withAnalysis && claudeResult) {
-                    prodLogDone(job.k('analyze'), claudeResult.success ? `${claudeResult.totalWords || 0} palabras` : (claudeResult.error || 'sin éxito'));
-                    if (claudeResult._debug) console.log('[Tradutema DEBUG]', claudeResult._debug);
-                    if (claudeResult._perf) logPerfToConsole(claudeResult._perf, 'Crear y Analizar');
-                    if (claudeResult._perf && job.budgetId) {
-                        fetch(apiUrl, { method: 'POST', body: JSON.stringify({ action: 'logPerformance', budgetId: job.budgetId, action_label: 'Crear y Analizar', perf: claudeResult._perf }) })
-                            .catch(e => console.warn('logPerformance fallo:', e));
+                    const claudeResult = pr.res;
+                    const res = {
+                        analysis: claudeResult.analysis || [], totalWords: claudeResult.totalWords || 0,
+                        totalPages: claudeResult.totalPages || totalPages, failedPages: claudeResult.failedPages || [],
+                        otrosIdiomas: claudeResult.otrosIdiomas || null, paginasOtroIdioma: claudeResult.paginasOtroIdioma,
+                        countMethodUsed: claudeResult.countMethodUsed || 'claude', fileSettings: initialFileSettings
+                    };
+                    // ----- guardar -----
+                    // Apps Script 3.7.90+: la hoja y los TXT ya están escritos por el
+                    // servidor (o el recuento viene de la hoja); aquí solo la ficha
+                    // Excel local. Con un Apps Script anterior, como siempre: TXT
+                    // locales + saveWordCountResults.
+                    faseTrabajo(job, 'guardando');
+                    const servidorGuardo = !!(claudeResult.savedByServer || claudeResult._recovered);
+                    if (esAbierto(job)) {
+                        showBgBanner('loading', servidorGuardo ? '💾 Guardando ficha del recuento...' : '💾 Guardando análisis (TXTs + _RECUENTO)...', false);
+                        showGlobalAnalysisBanner('loading', `⏳ ${job.budgetId} · Guardando análisis...`);
                     }
-                    if (claudeResult.success) {
-                        // v3.7.19: fileSettings iniciales desde los archivos subidos
-                        const initialFileSettings = {};
-                        files.forEach(f => {
-                            if (f.pagesFilter || f.instructions) initialFileSettings[f.name] = { pagesFilter: f.pagesFilter || '', instructions: f.instructions || '' };
-                        });
-                        const res = {
-                            analysis: claudeResult.analysis || [], totalWords: claudeResult.totalWords || 0,
-                            totalPages: claudeResult.totalPages || totalPages, failedPages: claudeResult.failedPages || [],
-                            otrosIdiomas: claudeResult.otrosIdiomas || null, paginasOtroIdioma: claudeResult.paginasOtroIdioma,
-                            countMethodUsed: claudeResult.countMethodUsed || 'claude', fileSettings: initialFileSettings
-                        };
-                        // ----- guardar: TXT + ficha Excel en local (si hay carpeta) y fila en la hoja -----
-                        faseTrabajo(job, 'guardando');
-                        if (esAbierto(job)) {
-                            showBgBanner('loading', '💾 Guardando análisis (TXTs + _RECUENTO)...', false);
-                            showGlobalAnalysisBanner('loading', `⏳ ${job.budgetId} · Guardando análisis...`);
-                        }
-                        prodLogStart(job.k('save'), `${job.budgetId} · Guardando recuento + TXTs`);
-                        stageTimings.t_saveResultsStart = performance.now();
-                        try {
+                    prodLogStart(job.k('save'), `${job.budgetId} · ` + (servidorGuardo ? 'Ficha del recuento' : 'Guardando recuento + TXTs'));
+                    stageTimings.t_saveResultsStart = performance.now();
+                    try {
+                        let _txtLocal = false, _excelLocal = false;
+                        if (!servidorGuardo) _txtLocal = await escribirTxtsLocalesDeRecuento(job, res, ctx.sourceLang);
+                        _excelLocal = await escribirExcelLocalDeRecuento(job, res, initialFileSettings);
+                        if (!servidorGuardo) {
                             const _fhLocal = await handleLocalDeTrabajo(job);
-                            if (_fhLocal) {
-                                try {
-                                    for (const item of res.analysis) {
-                                        if (item.extractedText) await writeLocalTextFile(_fhLocal, item.fileName + '.txt', item.extractedText);
-                                    }
-                                    const _mUsed = res.countMethodUsed || countMethod();
-                                    let tsv = 'Presupuesto\t' + job.budgetId + '\nIdioma origen\t' + ctx.sourceLang +
-                                        '\nMetodo de recuento\t' + countMethodLabel(_mUsed, ctx.sourceLang) +
-                                        '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
-                                    res.analysis.forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
-                                    tsv += 'TOTAL\t' + res.totalWords + '\n';
-                                    await writeLocalTextFile(_fhLocal, '_RECUENTO.txt', tsv);
-                                } catch (eTxt) { console.warn('TXTs locales:', eTxt); }
-                                // v3.9.1: ficha Excel junto a los TXT (con los datos del trabajo)
-                                try {
-                                    const bExcel = esAbierto(job)
-                                        ? Object.assign({}, budgetData, { fileAnalysis: res.analysis, fileSettings: Object.assign({}, budgetData.fileSettings || {}, initialFileSettings), wordCount: res.totalWords, pageCount: res.totalPages, countMethodUsed: res.countMethodUsed })
-                                        : presupuestoDelTrabajo(job, res);
-                                    const wb = await construirRecuentoWorkbook({ budget: bExcel });
-                                    const buffer = await wb.xlsx.writeBuffer();
-                                    await writeLocalBinaryFile(_fhLocal, nombreRecuentoExcel(null, job.budgetId),
-                                        new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-                                } catch (eX) { console.warn('Ficha Excel local:', eX); }
-                            }
                             const saveData = await apiPost({
                                 action: 'saveWordCountResults', budgetId: job.budgetId, folderId: job.folderId || '',
                                 skipDrive: !!_fhLocal, analysis: res.analysis, totalWords: res.totalWords, totalPages: res.totalPages,
-                                sourceLang: ctx.sourceLang, fileSettings: initialFileSettings
+                                sourceLang: ctx.sourceLang, fileSettings: initialFileSettings, countId: pr.countId
                             });
                             if (!saveData.success) { console.warn('saveWordCountResults: el backend reportó fallo', saveData); prodLogError(job.k('save'), saveData.error || 'el backend reportó fallo'); }
-                            else prodLogDone(job.k('save'), 'OK');
+                            else prodLogDone(job.k('save'), 'OK' + (_txtLocal ? ' · TXT en local' : '') + (_excelLocal ? ' · ficha Excel en local' : ''));
                             if (saveData._timings && saveData._timings.totalMs) stageTimings.backendSaveResultsMs = saveData._timings.totalMs;
-                        } catch (saveErr) {
-                            console.error('saveWordCountResults: fallo en la llamada', saveErr);
-                            prodLogError(job.k('save'), (saveErr && saveErr.message) || 'fallo en la llamada');
+                        } else {
+                            prodLogDone(job.k('save'), 'hoja' +
+                                (claudeResult.txtsInDrive ? ' + TXT en Drive' : (claudeResult.txtsPendientes ? ' · TXT en espera de la carpeta' : '')) +
+                                ' (por el servidor)' + (_excelLocal ? ' · ficha Excel en local' : ''));
                         }
-                        stageTimings.t_saveResultsEnd = performance.now();
-                        aplicarResultadoRecuento(job, res, { prefijo: '✓ Carpeta creada · ' });
-                    } else {
-                        job.bg.analysisError = claudeResult.error;
-                        const msg = `✓ Carpeta creada · ${job.budgetId} · ⚠️ recuento falló: ${claudeResult.error || ''}`;
-                        if (esAbierto(job)) { showBgBanner('warning', msg, false); showGlobalAnalysisBanner('warning', msg); }
-                        job.error = 'el recuento falló: ' + (claudeResult.error || '');
-                        job.reintentar = () => { const j2 = nuevoTrabajo('contar', contextoContarDe(job)); ejecutarTrabajoContar(j2); };
-                        faseTrabajo(job, 'error');
-                        return;
+                    } catch (saveErr) {
+                        console.error('guardado del recuento: fallo', saveErr);
+                        prodLogError(job.k('save'), (saveErr && saveErr.message) || 'fallo en la llamada');
                     }
+                    stageTimings.t_saveResultsEnd = performance.now();
+                    aplicarResultadoRecuento(job, res, { prefijo: claudeResult._recovered ? '✓ Carpeta creada · recuento recuperado de la hoja · ' : '✓ Carpeta creada · ' });
                 } else {
                     const msg = `✓ Carpeta creada · ${job.budgetId}`;
                     if (esAbierto(job)) { showBgBanner('success', msg, false); showGlobalAnalysisBanner('success', msg); setTimeout(hideBgBanner, 4000); }
@@ -9770,12 +9768,665 @@
             }
         }
 
+        // ============ v3.10.58: RECUENTO DE PALABRAS EN EL NAVEGADOR ============
+        // Petición de Javier (30/09 y 01/10): el recuento por Apps Script es lento
+        // (iLovePDF + Claude en grupos de 5 + límite de 6 min) y frágil (respuestas
+        // perdidas). Aquí el propio navegador trocea los PDF con pdf.js, manda
+        // cada página a Claude directamente (N en paralelo) y cuenta con las
+        // MISMAS reglas que el servidor (mismo prompt, mismo recuento de palabras
+        // "tipo Word", mismo tratamiento de otros idiomas y de páginas vacías).
+        // La clave de Claude se guarda solo en este navegador (Ajustes). Si no
+        // hay clave, o algo no se puede hacer aquí (tipo de archivo, clave
+        // rechazada), el recuento sigue por el servidor como siempre.
+        const NAV_COUNT = {
+            model: 'claude-sonnet-4-5-20250929',   // el mismo que CLAUDE_MODEL en Apps Script
+            maxTokens: 8000,
+            maxRetries: 3,          // 1 intento + 3 reintentos (como callClaudeBatch)
+            longSidePx: 1568,       // Claude reduce a 1568 px el lado largo: mandar más no mejora nada
+            jpegQuality: 0.85,
+            maxImageBytes: 4 * 1048576
+        };
+        function navCountKey() { try { return (localStorage.getItem('tradutema_claude_key') || '').trim(); } catch (e) { return ''; } }
+        function navCountEnabled() {
+            try { const v = localStorage.getItem('tradutema_nav_count'); return v === null ? !!navCountKey() : v === '1'; } catch (e) { return false; }
+        }
+        function navCountParallel() {
+            try { const n = parseInt(localStorage.getItem('tradutema_nav_parallel'), 10); return (n >= 1 && n <= 16) ? n : 8; } catch (e) { return 8; }
+        }
+        function navCountDisponible() { return navCountEnabled() && !!navCountKey() && typeof fetch === 'function'; }
+        function cabecerasClaude(key) {
+            return {
+                'content-type': 'application/json',
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                // sin esta cabecera la API rechaza las llamadas hechas desde un navegador
+                'anthropic-dangerous-direct-browser-access': 'true'
+            };
+        }
+        // Ajustes: probar la clave con una llamada mínima (1 token)
+        async function probarClaveClaude() {
+            const inp = document.getElementById('claudeApiKey');
+            const st = document.getElementById('navCountKeyStatus');
+            const key = inp ? (inp.value || '').trim() : '';
+            if (!st) return;
+            if (!key) { st.innerHTML = '<span style="color:#b45309;">Introduce la clave primero</span>'; return; }
+            st.textContent = '⏳ probando…';
+            try {
+                const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST', headers: cabecerasClaude(key),
+                    body: JSON.stringify({ model: NAV_COUNT.model, max_tokens: 1, messages: [{ role: 'user', content: 'hola' }] })
+                });
+                if (resp.ok) {
+                    st.innerHTML = '<b style="color:#16a34a;">✓ clave válida · ' + NAV_COUNT.model + '</b>';
+                    try { localStorage.setItem('tradutema_claude_key', key); } catch (e) {}
+                } else {
+                    let t = ''; try { t = await resp.text(); } catch (e) {}
+                    st.innerHTML = '<b style="color:#dc2626;">✗ rechazada (HTTP ' + resp.status + ')</b> <span style="color:#64748b;">' + escapeHtml(t.slice(0, 160)) + '</span>';
+                }
+            } catch (e) {
+                st.innerHTML = '<b style="color:#dc2626;">✗ sin respuesta</b> <span style="color:#64748b;">' + escapeHtml((e && e.message) || '') + ' — ¿sin red o bloqueo del navegador?</span>';
+            }
+        }
+
+        // ---------- utilidades ----------
+        function _b64ToBytes(b64) {
+            const bin = atob(b64); const out = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+            return out;
+        }
+        function _bytesToB64(bytes) {
+            const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+            let s = ''; const CH = 0x8000;
+            for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+            return btoa(s);
+        }
+        function tipoPorExtension(nombre) {
+            const m = String(nombre || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+            const ext = m ? m[1] : '';
+            return ({ pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+                      tif: 'image/tiff', tiff: 'image/tiff', bmp: 'image/bmp', heic: 'image/heic', heif: 'image/heif' })[ext] || '';
+        }
+        // Mismo recuento que countWordsLikeWord en Apps Script
+        function countWordsLikeWordFront(text) {
+            if (!text) return 0;
+            const tokens = text.split(/[ \t\n\r\u00A0\u2000-\u200B\u2028\u2029]+/);
+            let n = 0; for (const t of tokens) if (t.length > 0) n++;
+            return n;
+        }
+        async function _canvasAJpegB64(canvas) {
+            const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', NAV_COUNT.jpegQuality));
+            if (!blob) throw new Error('canvas.toBlob devolvió vacío');
+            const buf = await blob.arrayBuffer();
+            return { data: _bytesToB64(new Uint8Array(buf)), bytes: buf.byteLength };
+        }
+        // Imagen suelta demasiado grande → reescalar a JPEG
+        async function _reescalarImagen(b64, mime) {
+            const bytes = _b64ToBytes(b64);
+            const bmp = await createImageBitmap(new Blob([bytes], { type: mime }));
+            const scale = Math.min(1, NAV_COUNT.longSidePx / Math.max(bmp.width, bmp.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bmp.width * scale)); canvas.height = Math.max(1, Math.round(bmp.height * scale));
+            canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+            try { bmp.close(); } catch (e) {}
+            return _canvasAJpegB64(canvas);
+        }
+
+        // ---------- 1. páginas: PDF → JPEG por página (pdf.js); imágenes tal cual ----------
+        // files: [{ name, type, content? (base64), bytes? (ArrayBuffer/Uint8Array), pagesFilter?, instructions? }]
+        async function prepararPaginasNavegador(files, fileSettings, onProgress) {
+            await loadPdfJs();
+            const pages = []; const prepErrors = []; const noSoportados = [];
+            for (const f of files) {
+                const name = f.name;
+                const mime = ((f.type || '') || tipoPorExtension(name)).toLowerCase();
+                const s = (fileSettings && fileSettings[name]) || { pagesFilter: f.pagesFilter || '', instructions: f.instructions || '' };
+                const allowed = parsePageRangeFront(s.pagesFilter || '');
+                const instr = (s.instructions || '').trim();
+                try {
+                    if (mime === 'application/pdf') {
+                        const bytes = f.bytes ? new Uint8Array(f.bytes) : _b64ToBytes(f.content || '');
+                        const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+                        const n = doc.numPages;
+                        for (let i = 1; i <= n; i++) {
+                            if (allowed && !allowed[i]) continue;
+                            const page = await doc.getPage(i);
+                            const vp0 = page.getViewport({ scale: 1 });
+                            const scale = NAV_COUNT.longSidePx / Math.max(vp0.width, vp0.height);
+                            const vp = page.getViewport({ scale: scale });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = Math.max(1, Math.round(vp.width)); canvas.height = Math.max(1, Math.round(vp.height));
+                            const ctx2 = canvas.getContext('2d');
+                            ctx2.fillStyle = '#ffffff'; ctx2.fillRect(0, 0, canvas.width, canvas.height);
+                            await page.render({ canvasContext: ctx2, viewport: vp }).promise;
+                            const img = await _canvasAJpegB64(canvas);
+                            pages.push({ fileName: name, pageNum: i, mediaType: 'image/jpeg', data: img.data, sizeBytes: img.bytes,
+                                         fileInstructions: instr, totalPagesInFile: n, px: canvas.width + 'x' + canvas.height });
+                            try { page.cleanup(); } catch (e) {}
+                            canvas.width = 1; canvas.height = 1;
+                            if (onProgress) onProgress(pages.length, name, i, n);
+                        }
+                        try { await doc.destroy(); } catch (e) {}
+                    } else if (/^image\/(jpeg|png|gif|webp)$/.test(mime)) {
+                        if (allowed && !allowed[1]) continue;
+                        let data = f.content || _bytesToB64(f.bytes || new Uint8Array(0));
+                        let mt = mime; let size = Math.round(data.length * 0.75);
+                        if (size > NAV_COUNT.maxImageBytes) {
+                            const r = await _reescalarImagen(data, mime);
+                            data = r.data; size = r.bytes; mt = 'image/jpeg';
+                        }
+                        pages.push({ fileName: name, pageNum: 1, mediaType: mt, data: data, sizeBytes: size, fileInstructions: instr, totalPagesInFile: 1 });
+                        if (onProgress) onProgress(pages.length, name, 1, 1);
+                    } else {
+                        noSoportados.push(name + (mime ? ' (' + mime + ')' : ''));
+                    }
+                } catch (e) {
+                    prepErrors.push({ fileName: name, pageNum: 0, errorMsg: 'preparación: ' + ((e && e.message) || e) });
+                }
+            }
+            return { pages: pages, prepErrors: prepErrors, noSoportados: noSoportados };
+        }
+
+        // ---------- 2. prompt y parseo: copia fiel de callClaudeBatch (Apps Script) ----------
+        function buildPromptRecuento(sourceLang, internalComments, fileInstr) {
+            const globalInstructions = internalComments
+                ? `\n\nINSTRUCCIONES DEL CLIENTE / USUARIO (prioritarias, aplicar SIEMPRE): "${internalComments}".\nAplica estas instrucciones estrictamente al transcribir. En particular:\n- Si piden traducir/contabilizar SOLO ciertas páginas, transcribe únicamente esas y omite el resto (devuelve {"text": ""} para las otras).\n- Si piden filtrar partes (ej. "solo lo subrayado", "solo cuerpo, sin sellos"), transcribe únicamente esas partes.\n- Si dan contexto sobre el documento (idioma específico, formato, etc.), tenlo en cuenta para decidir qué es transcribible y qué no.\n`
+                : '';
+            const fi = (fileInstr || '').trim();
+            const fileInstrBlock = fi
+                ? `\n\nINSTRUCCIONES ESPECÍFICAS PARA ESTE ARCHIVO (tienen prioridad sobre las reglas generales): "${fi}". Aplica estrictamente: si piden filtrar partes (ej. "solo las partes en amarillo"), transcribe ÚNICAMENTE esas partes y nada más.\n`
+                : '';
+            return `Eres un transcriptor de documentos para una agencia de traducción jurada. El idioma origen del documento es: ${sourceLang}.
+
+REGLA ABSOLUTA: transcribe ÚNICAMENTE el texto en ${sourceLang}. Todo lo que NO esté en ${sourceLang} debe omitirse por completo.
+
+CASO MUY FRECUENTE — DOCUMENTOS MULTILINGÜES:
+Muchos documentos oficiales incluyen texto en otros idiomas además del idioma origen. NO transcribir esos otros idiomas. Ejemplos típicos:
+- APOSTILLAS DE LA HAYA (Convention de La Haye du 5 octobre 1961): suelen llevar el texto en el idioma del país emisor + inglés + francés. Transcribe SOLO la parte en ${sourceLang}. Las traducciones al inglés y francés entre paréntesis o bajo el texto principal (ej. "País / Country / Pays", "Foi assinado por / Has been signed by / A été signé par") deben omitirse, transcribiendo SOLO "País", "Foi assinado por", etc.
+- Documentos españoles con texto en catalán/euskera/gallego/valenciano: si origen es Español, transcribir solo español; si origen es alguna lengua co-oficial, transcribir solo esa lengua.
+- Formularios o sellos que muestran etiquetas en formato "etiqueta_idioma1 / etiqueta_idioma2": transcribir SOLO la del idioma origen.
+- Cualquier traducción literal entre paréntesis al lado del texto en el idioma origen: omitir.
+
+DATOS COMPARTIDOS: los datos idénticos en todos los idiomas (números, nombres propios, fechas, códigos, calificaciones, importes) se transcriben UNA sola vez, no una por cada idioma.
+
+OTRAS REGLAS:
+- Transcribe el texto tal como aparece (NO traducir).
+- Si una página está rotada, igualmente transcribe el texto que puedas leer.
+- Incluye encabezados, tablas, números y sellos legibles del idioma origen.
+- Ignora firmas manuscritas ilegibles y rúbricas.
+- Marca texto ilegible o muy borroso como [ilegible].
+- No inventes ni completes texto que no veas claramente.
+- Mantén el orden de lectura natural del documento.${globalInstructions}${fileInstrBlock}
+
+QUÉ DEBES INFORMAR SOBRE LOS OTROS IDIOMAS:
+Además del texto en ${sourceLang}, indica qué OTROS idiomas aparecen en esta página y CUÁNTAS palabras hay aproximadamente en cada uno. No transcribas ese texto: solo estímalo y cuéntalo. Sirve para avisar al presupuestador de lo que queda fuera del recuento.
+- Si la página está ÍNTEGRAMENTE en otro idioma, devuelve "text": "" y lista ese idioma en "otros_idiomas". Esto es NORMAL y correcto, no es un error.
+- Si no hay nada en otro idioma, devuelve "otros_idiomas": [].
+- Ignora en este recuento las palabras sueltas de membretes, logotipos y nombres propios: solo cuentan bloques de texto reales.
+
+Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
+{"text": "...", "otros_idiomas": [{"idioma": "Inglés", "palabras_aprox": 120}]}`;
+        }
+        // resp: { status, texto, retryAfter }
+        function parseRespuestaClaude(resp) {
+            if (resp.status !== 200) {
+                let detalle = (resp.texto || '').slice(0, 300);
+                try { const j = JSON.parse(resp.texto); if (j && j.error && j.error.message) detalle = j.error.message.slice(0, 300); } catch (e) {}
+                const ra = parseFloat(resp.retryAfter);
+                return { ok: false, errorMsg: 'HTTP ' + resp.status + ' ' + detalle, httpCode: resp.status, retryAfterMs: (ra > 0 && ra < 120) ? Math.round(ra * 1000) : 0 };
+            }
+            try {
+                const json = JSON.parse(resp.texto);
+                const rawText = (json.content && json.content[0] && json.content[0].text) ? json.content[0].text.trim() : '';
+                if (!rawText) return { ok: false, errorMsg: 'Respuesta sin contenido del modelo' };
+                let parsed = null;
+                try { parsed = JSON.parse(rawText); } catch (e) {
+                    const m = rawText.match(/\{[\s\S]*\}/);
+                    if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) { parsed = null; } }
+                }
+                if (!parsed) return { ok: false, errorMsg: 'Respuesta no es JSON válido' };
+                const text = (parsed.text || '').trim();
+                const otrosIdiomas = [];
+                if (Array.isArray(parsed.otros_idiomas)) {
+                    parsed.otros_idiomas.forEach(o => {
+                        if (!o) return;
+                        const nombre = String(o.idioma || o.lang || '').trim();
+                        const pal = parseInt(o.palabras_aprox || o.palabras || 0, 10) || 0;
+                        if (nombre) otrosIdiomas.push({ idioma: nombre, palabras: pal });
+                    });
+                }
+                if (!text && (parsed.sin_texto_origen === true || otrosIdiomas.length > 0)) {
+                    return { ok: true, words: 0, text: '', sinTextoOrigen: true, otrosIdiomas: otrosIdiomas };
+                }
+                if (!text) return { ok: false, errorMsg: 'Modelo devolvió texto vacío', vacio: true };
+                return { ok: true, words: countWordsLikeWordFront(text), text: text, otrosIdiomas: otrosIdiomas };
+            } catch (e) {
+                return { ok: false, errorMsg: 'Parse error: ' + e.message };
+            }
+        }
+        async function _llamarClaudePagina(page, prompt, key) {
+            const content = [
+                { type: 'image', source: { type: 'base64', media_type: page.mediaType, data: page.data } },
+                { type: 'text', text: prompt }
+            ];
+            const body = { model: NAV_COUNT.model, max_tokens: NAV_COUNT.maxTokens, temperature: 0, messages: [{ role: 'user', content: content }] };
+            const resp = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: cabecerasClaude(key), body: JSON.stringify(body) });
+            const texto = await resp.text();
+            let retryAfter = ''; try { retryAfter = resp.headers.get('retry-after') || ''; } catch (e) {}
+            return { status: resp.status, texto: texto, retryAfter: retryAfter };
+        }
+
+        // ---------- 3. N páginas en paralelo con reintentos ----------
+        async function contarPaginasNavegador(pages, sourceLang, internalComments, opts) {
+            opts = opts || {};
+            const key = navCountKey();
+            const paralelo = Math.max(1, Math.min(opts.paralelo || navCountParallel(), pages.length));
+            const results = new Array(pages.length);
+            const perPage = pages.map((p, i) => ({ idx: i, fileName: p.fileName, pageNum: p.pageNum, wholeFile: false, totalPagesInFile: p.totalPagesInFile || 1,
+                                                  sizeBytes: p.sizeBytes || 0, attempts: 0, ms: 0, succeededOnAttempt: null, finalError: null }));
+            const t0 = performance.now();
+            let siguiente = 0, hechas = 0, claveRechazada = false;
+            const INTENTOS = NAV_COUNT.maxRetries + 1;
+            async function procesar(i) {
+                const p = pages[i];
+                const prompt = buildPromptRecuento(sourceLang, internalComments, p.fileInstructions);
+                let vaciosSeguidos = 0, ultimo = null;
+                for (let intento = 1; intento <= INTENTOS; intento++) {
+                    if (claveRechazada) break;
+                    if (intento > 1) {
+                        const espera = Math.min(30000, 2000 * Math.pow(2, intento - 2)) + ((ultimo && ultimo.retryAfterMs) || 0);
+                        await new Promise(r => setTimeout(r, espera));
+                    }
+                    const tA = performance.now(); perPage[i].attempts++;
+                    let r;
+                    try { r = parseRespuestaClaude(await _llamarClaudePagina(p, prompt, key)); }
+                    catch (e) { r = { ok: false, errorMsg: 'red: ' + ((e && e.message) || e) }; }
+                    perPage[i].ms += Math.round(performance.now() - tA);
+                    if (r.ok) {
+                        perPage[i].succeededOnAttempt = intento; perPage[i].finalError = null;
+                        perPage[i].words = r.words || 0; perPage[i].textLength = (r.text || '').length;
+                        results[i] = { fileName: p.fileName, pageNum: p.pageNum, words: r.words, text: r.text, error: false,
+                                       otrosIdiomas: r.otrosIdiomas || [], sinTextoOrigen: !!r.sinTextoOrigen };
+                        return;
+                    }
+                    ultimo = r; perPage[i].finalError = r.errorMsg;
+                    vaciosSeguidos = r.vacio ? vaciosSeguidos + 1 : 0;
+                    if (r.httpCode === 401 || r.httpCode === 403) { claveRechazada = true; break; }
+                    if (r.httpCode === 400 || r.httpCode === 413) break;   // petición mal formada / demasiado grande: reintentar no ayuda
+                }
+                if (vaciosSeguidos >= INTENTOS) {
+                    // vacío determinista (como en el servidor): 0 palabras, sin texto en idioma origen
+                    perPage[i].finalError = null;
+                    results[i] = { fileName: p.fileName, pageNum: p.pageNum, words: 0, text: '', error: false, otrosIdiomas: [], sinTextoOrigen: true, inferido: true };
+                    return;
+                }
+                results[i] = { fileName: p.fileName, pageNum: p.pageNum, words: 0, text: '', error: true, errorMsg: ultimo ? ultimo.errorMsg : 'error', otrosIdiomas: [] };
+            }
+            async function worker() {
+                while (!claveRechazada) {
+                    const i = siguiente++;
+                    if (i >= pages.length) return;
+                    await procesar(i);
+                    hechas++;
+                    if (opts.onProgress) { try { opts.onProgress(hechas, pages.length, results); } catch (e) {} }
+                }
+            }
+            const workers = []; for (let k = 0; k < paralelo; k++) workers.push(worker());
+            await Promise.all(workers);
+            results._claveRechazada = claveRechazada;
+            results._perf = {
+                model: NAV_COUNT.model, totalMs: Math.round(performance.now() - t0), pass1Ms: Math.round(performance.now() - t0), retryMs: 0,
+                chunkSize: paralelo, pauseMs: 0, requests: pages.length, failures: results.filter(r => r && r.error).length, perPage: perPage, navegador: true
+            };
+            return results;
+        }
+
+        // ---------- 4. agregación por archivo (como countWordsParallel) ----------
+        function agregarResultadosNavegador(pages, results, prepErrors) {
+            const byFile = {};
+            pages.forEach((src, idx) => {
+                const r = results[idx]; if (!r) return;
+                if (!byFile[r.fileName]) byFile[r.fileName] = { fileName: r.fileName, words: 0, pages: 0, text: '', otrosIdiomas: {} };
+                const bf = byFile[r.fileName];
+                bf.words += r.words || 0;
+                bf.pages += 1;
+                (r.otrosIdiomas || []).forEach(o => { if (o && o.idioma) bf.otrosIdiomas[o.idioma] = (bf.otrosIdiomas[o.idioma] || 0) + (o.palabras || 0); });
+                if (r.text) bf.text += (bf.text ? '\n\n--- Página ' + r.pageNum + ' ---\n\n' : '') + r.text;
+            });
+            const analysis = Object.values(byFile).map(f => ({ fileName: f.fileName, words: f.words, pages: f.pages, extractedText: f.text || '', otrosIdiomas: f.otrosIdiomas || {} }));
+            const acc = {}; let paginasOtro = 0;
+            results.forEach(r => {
+                if (!r) return;
+                if (r.sinTextoOrigen) paginasOtro++;
+                (r.otrosIdiomas || []).forEach(o => { if (o && o.idioma) acc[o.idioma] = (acc[o.idioma] || 0) + (o.palabras || 0); });
+            });
+            const failedPages = results.filter(r => r && r.error).map(r => ({ fileName: r.fileName, pageNum: r.pageNum, errorMsg: r.errorMsg || '' }))
+                .concat(prepErrors || []);
+            return {
+                success: true, analysis: analysis,
+                totalWords: analysis.reduce((s, f) => s + f.words, 0),
+                totalPages: analysis.reduce((s, f) => s + (f.pages || 0), 0),
+                failedPages: failedPages, otrosIdiomas: acc, paginasOtroIdioma: paginasOtro,
+                countMethodUsed: 'claude', _perf: results._perf, navegador: true
+            };
+        }
+
+        // ---------- 5. archivos de la carpeta local (recontar sin tenerlos en memoria) ----------
+        async function archivosDeCarpetaLocal(fh) {
+            const out = [];
+            for await (const [nombre, handle] of fh.entries()) {
+                if (handle.kind !== 'file') continue;
+                if (!nombre || nombre.charAt(0) === '_') continue;
+                const mime = tipoPorExtension(nombre);
+                if (!mime) continue;   // txt, xlsx, docx… no son documentos a contar
+                const file = await handle.getFile();
+                out.push({ name: nombre, type: mime, bytes: await file.arrayBuffer(), size: file.size });
+            }
+            out.sort((a, b) => a.name.localeCompare(b.name));
+            return out;
+        }
+
+        // ---------- 6. orquestación de un trabajo ----------
+        function _htmlProgresoNavegador(budgetId, pages, results, hechas, paralelo) {
+            const porArchivo = {};
+            pages.forEach((p, i) => {
+                if (!porArchivo[p.fileName]) porArchivo[p.fileName] = { total: 0, hechas: 0, palabras: 0, fallos: 0 };
+                const a = porArchivo[p.fileName]; a.total++;
+                const r = results[i];
+                if (r) { a.hechas++; a.palabras += r.words || 0; if (r.error) a.fallos++; }
+            });
+            const palabras = Object.values(porArchivo).reduce((s, a) => s + a.palabras, 0);
+            const total = pages.length;
+            let html = `${escapeHtml(budgetId)} · Contando con Claude desde el navegador · <span style="color:#fbbf24;">${hechas}/${total} páginas</span> · ${paralelo} en paralelo` +
+                       (hechas ? ` · ${palabras.toLocaleString('es-ES')} palabras hasta ahora` : '');
+            Object.keys(porArchivo).forEach(n => {
+                const a = porArchivo[n];
+                const estado = a.hechas === a.total ? (a.fallos ? ` ⚠️ ${a.fallos} pág. fallaron` : ' ✓') : '…';
+                html += `<div style="color:#94a3b8;margin-left:14px;">${escapeHtml(n)} · ${a.hechas}/${a.total} págs` + (a.hechas ? ` · ${a.palabras.toLocaleString('es-ES')} palabras` : '') + estado + '</div>';
+            });
+            return html;
+        }
+        function prodLogUpdate(id, text) {
+            const e = prodLog.entries.find(x => x.id === id);
+            if (e) { e.text = text; prodLogRender(); }
+        }
+        // p: { budgetId, files, sourceLang, internalComments, fileSettings, etiqueta }
+        // Devuelve { ok, res } | { ok:false, error, fallbackServidor }
+        async function contarEnNavegador(job, p) {
+            const files = p.files || [];
+            const kP = job.k('nav-prep');
+            prodLogStart(kP, `${p.budgetId} · Preparando páginas en el navegador (pdf.js)`);
+            faseTrabajo(job, 'contando', 'en el navegador · preparando páginas');
+            let prep;
+            try {
+                prep = await prepararPaginasNavegador(files, p.fileSettings, (n, nombre) => { job.detalle = `en el navegador · preparando páginas (${n})`; });
+            } catch (e) {
+                prodLogError(kP, (e && e.message) || String(e));
+                return { ok: false, fallbackServidor: true, error: 'preparación en el navegador: ' + ((e && e.message) || e) };
+            }
+            if (prep.noSoportados.length) {
+                prodLogError(kP, 'tipo(s) que el navegador no procesa: ' + prep.noSoportados.join(', ') + ' → se cuenta en el servidor');
+                return { ok: false, fallbackServidor: true, error: 'tipo no soportado en el navegador: ' + prep.noSoportados.join(', ') };
+            }
+            if (!prep.pages.length) {
+                const msg = prep.prepErrors.length ? prep.prepErrors.map(e => e.fileName + ': ' + e.errorMsg).join(' | ') : 'No quedan páginas tras aplicar el filtro';
+                prodLogError(kP, msg);
+                return { ok: false, fallbackServidor: !!prep.prepErrors.length, error: msg };
+            }
+            prodLogDone(kP, `${files.length} archivo(s) · ${prep.pages.length} página(s)` + (prep.prepErrors.length ? ` · ⚠️ ${prep.prepErrors.length} archivo(s) no se pudieron abrir` : ''));
+
+            const kC = job.k('nav-count');
+            const paralelo = Math.max(1, Math.min(navCountParallel(), prep.pages.length));
+            prodLogStart(kC, _htmlProgresoNavegador(p.budgetId, prep.pages, [], 0, paralelo));
+            job.progreso = { hechas: 0, total: prep.pages.length };
+            faseTrabajo(job, 'contando', `en el navegador · 0/${prep.pages.length} páginas · ${paralelo} en paralelo`);
+            const results = await contarPaginasNavegador(prep.pages, p.sourceLang, p.internalComments || '', {
+                paralelo: paralelo,
+                onProgress: (h, t, rs) => {
+                    job.progreso = { hechas: h, total: t };
+                    job.detalle = `en el navegador · ${h}/${t} páginas · ${paralelo} en paralelo`;
+                    prodLogUpdate(kC, _htmlProgresoNavegador(p.budgetId, prep.pages, rs, h, paralelo));
+                    renderTrabajos();
+                }
+            });
+            job.progreso = null;
+            if (results._claveRechazada) {
+                prodLogUpdate(kC, `${escapeHtml(p.budgetId)} · Contando con Claude desde el navegador`);
+                prodLogError(kC, 'la API de Claude rechazó la clave (HTTP 401/403): revisa Ajustes → se cuenta en el servidor');
+                return { ok: false, fallbackServidor: true, error: 'clave de Claude rechazada' };
+            }
+            const res = agregarResultadosNavegador(prep.pages, results, prep.prepErrors);
+            prodLogUpdate(kC, `${escapeHtml(p.budgetId)} · Contando con Claude desde el navegador · ${prep.pages.length} páginas · ${paralelo} en paralelo`);
+            if (res.failedPages.length && res.failedPages.length >= prep.pages.length) {
+                prodLogError(kC, 'ninguna página se pudo contar: ' + (res.failedPages[0].errorMsg || ''));
+                return { ok: false, fallbackServidor: true, error: 'navegador: ' + (res.failedPages[0].errorMsg || 'todas las páginas fallaron') };
+            }
+            prodLogDone(kC, `${res.totalWords.toLocaleString('es-ES')} palabras · ${res.totalPages} pág.` +
+                (res.failedPages.length ? ` · ⚠️ ${res.failedPages.length} pág. fallaron` : '') +
+                ` · ${(res._perf.totalMs / 1000).toFixed(1)} s`);
+            return { ok: true, res: res };
+        }
+
+        // ============ v3.10.57: RECUENTO A PRUEBA DE RESPUESTAS PERDIDAS ============
+        // Caso real 0930-03-M (30/09): el servidor contó bien dos veces (107 s,
+        // 5.031 palabras; luego 5.022) pero la primera respuesta se perdió
+        // ("Failed to fetch" a los 4m54s: llevaba dentro todo el texto
+        // extraído) y la segunda llegó VACÍA (éxito sin análisis); el navegador
+        // escribió ceros en _RECUENTO.txt y en la ficha Excel y mostró "0
+        // palabras" con la hoja correcta. Desde aquí:
+        //  1. Cada recuento lleva un countId. El servidor (Apps Script 3.7.90)
+        //     guarda él mismo el resultado en la hoja (con ese countId) y los
+        //     TXT en Drive ANTES de responder, y responde ligero (sin texto).
+        //  2. Mientras se espera la respuesta, se consulta la hoja cada poco:
+        //     en cuanto aparece un recuento con nuestro countId, vale, llegue o
+        //     no la respuesta. Una respuesta perdida o vacía ya no pierde nada.
+        //  3. Nunca se escribe un recuento vacío: ni en pantalla, ni en local.
+        const RECUENTO_ESPERA = { primeraMs: 40000, cadaMs: 20000, maxMs: 400000, timeoutMs: 330000 };
+        function nuevoCountId() { return 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+        function _esperaCancelable(ms) {
+            let t = null, fin = null;
+            const p = new Promise(r => { fin = r; t = setTimeout(r, ms); });
+            p.cancelar = () => { if (t) clearTimeout(t); t = null; if (fin) fin(); };
+            return p;
+        }
+        // Lee la hoja y devuelve el recuento SOLO si es el nuestro (countId).
+        // Con un Apps Script anterior a 3.7.90 la hoja no lleva countId: entonces
+        // solo se acepta si el que llama lo permite (presupuesto recién creado,
+        // que no puede tener un recuento anterior) y hay palabras.
+        async function leerRecuentoDeHoja(budgetId, countId, aceptarSinCountId) {
+            const resp = await apiPost({ action: 'getBudget', budgetId: budgetId }, { retry: false, timeoutMs: 30000 });
+            const b = resp && resp.success && resp.budget;
+            if (!b || !Array.isArray(b.analisisDetalle) || b.analisisDetalle.length === 0) return null;
+            const idHoja = b.analisisCountId;
+            const esMio = idHoja ? (idHoja === countId)
+                                 : (aceptarSinCountId && idHoja === undefined && parseFloat(b.palabras) > 0);
+            if (!esMio) return null;
+            return {
+                analysis: b.analisisDetalle, totalWords: parseFloat(b.palabras) || 0, totalPages: parseFloat(b.paginas) || 0,
+                failedPages: [], otrosIdiomas: null, countMethodUsed: 'claude',
+                fileSettings: (b.fileSettings && Object.keys(b.fileSettings).length) ? b.fileSettings : null,
+                textoRecortado: !!b.analisisTextoRecortado, at: b.analisisAt || '',
+                savedByServer: true, txtsInDrive: true, _recovered: true
+            };
+        }
+        // Pide el recuento al servidor (countWordsParallel con los archivos en
+        // memoria, o reanalyzeFolder con la carpeta de Drive) y devuelve
+        // { ok, res, error, perdida }. Nunca devuelve un recuento vacío.
+        async function pedirRecuentoAlServidor(job, p) {
+            const countId = nuevoCountId();
+            job.bg.countId = countId;
+            const porArchivos = Array.isArray(p.files) && p.files.length > 0;
+            // v3.10.58: recuento en el navegador (Ajustes: clave de Claude) cuando
+            // tenemos aquí los archivos. Si no se puede (tipo de archivo, clave
+            // rechazada…), sigue por el servidor como siempre.
+            if (porArchivos && navCountDisponible() && !p.sinNavegador) {
+                const rn = await contarEnNavegador(job, p);
+                if (rn.ok) {
+                    const res = rn.res;
+                    if (res._perf) {
+                        logPerfToConsole(res._perf, (p.etiqueta || 'Recuento') + ' · navegador');
+                        if (p.budgetId) {
+                            fetch(apiUrl, { method: 'POST', body: JSON.stringify({ action: 'logPerformance', budgetId: p.budgetId, action_label: (p.etiqueta || 'Recuento') + ' · navegador', perf: res._perf }) })
+                                .catch(e => console.warn('logPerformance fallo:', e));
+                        }
+                    }
+                    return { ok: true, res: res, countId: countId, perdida: false, navegador: true };
+                }
+                if (!rn.fallbackServidor) return { ok: false, error: rn.error, perdida: false };
+            }
+            const numFiles = porArchivos ? p.files.length : (p.numFiles || 0);
+            const payload = porArchivos
+                ? { action: 'countWordsParallel', files: p.files, sourceLang: p.sourceLang, internalComments: p.internalComments || '',
+                    countMethod: 'claude', budgetId: p.budgetId, folderId: p.folderId || '', fileSettings: p.fileSettings || {},
+                    countId: countId, light: true }
+                : { action: 'reanalyzeFolder', folderId: p.folderId, budgetId: p.budgetId, sourceLang: p.sourceLang,
+                    internalComments: p.internalComments || '', fileSettings: p.fileSettings || {}, countMethod: 'claude', countId: countId };
+            const kA = job.k('analyze' + (p.intento && p.intento > 1 ? p.intento : ''));
+            prodLogStart(kA, `${p.budgetId} · ${porArchivos ? 'Analizando' : 'Reanalizando'} ${numFiles || ''} archivo(s) en el servidor (Claude)` + (p.intento > 1 ? ' · reintento' : ''));
+            const t0 = Date.now();
+            const ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+            let terminado = false, esperaHoja = null;
+
+            const pRespuesta = apiPost(payload, { retry: false, timeoutMs: RECUENTO_ESPERA.timeoutMs, abortController: ctrl })
+                .then(data => ({ tipo: 'respuesta', data }), err => ({ tipo: 'error', err }));
+            // consulta de la hoja en paralelo (la respuesta puede perderse)
+            const pHoja = (async () => {
+                esperaHoja = _esperaCancelable(RECUENTO_ESPERA.primeraMs); await esperaHoja;
+                while (!terminado && Date.now() - t0 < RECUENTO_ESPERA.maxMs) {
+                    try {
+                        const rec = await leerRecuentoDeHoja(p.budgetId, countId, !!p.aceptarSinCountId);
+                        if (rec) return { tipo: 'hoja', rec };
+                    } catch (e) { /* siguiente consulta */ }
+                    if (terminado) break;
+                    esperaHoja = _esperaCancelable(RECUENTO_ESPERA.cadaMs); await esperaHoja;
+                }
+                return { tipo: 'hoja', rec: null };
+            })();
+
+            let primero = await Promise.race([pRespuesta, pHoja]);
+            if (primero.tipo === 'hoja' && !primero.rec) primero = await pRespuesta;   // la consulta agotó su tiempo: queda la respuesta
+            let res = null, motivoPerdida = '';
+            if (primero.tipo === 'hoja' && primero.rec) {
+                // la hoja ganó: el servidor terminó pero la respuesta no llega
+                terminado = true; if (ctrl) { try { ctrl.abort(); } catch (e) {} }
+                res = primero.rec;
+                prodLogDone(kA, `${res.totalWords} palabras · ${res.totalPages} pág. · recuperado de la hoja (la respuesta HTTP no llegó)`);
+            } else if (primero.tipo === 'respuesta' || primero.tipo === 'error') {
+                if (primero.tipo === 'error') {
+                    motivoPerdida = (primero.err && primero.err.message) || 'Failed to fetch';
+                } else {
+                    const data = primero.data;
+                    if (data && data.success && Array.isArray(data.analysis) && data.analysis.length > 0) {
+                        res = data;
+                    } else if (data && data.success) {
+                        // "éxito" sin análisis = respuesta anómala → como si se hubiera perdido
+                        let cruda = ''; try { cruda = JSON.stringify(data).slice(0, 400); } catch (e) {}
+                        motivoPerdida = 'respuesta sin análisis (' + cruda + ')';
+                    } else {
+                        // error real del servidor: no hay nada que recuperar de la hoja
+                        terminado = true; if (esperaHoja) esperaHoja.cancelar();
+                        const err = (data && data.error) || 'sin éxito';
+                        prodLogError(kA, err);
+                        return { ok: false, error: err, perdida: false };
+                    }
+                }
+                if (!res) {
+                    // respuesta perdida o vacía: el servidor guarda en la hoja; esperar a que aparezca
+                    prodLogError(kA, motivoPerdida + ' · esperando el recuento en la hoja (el servidor sigue trabajando)');
+                    if (esAbierto(job)) {
+                        showBgBanner('loading', `⏳ ${p.budgetId} · la respuesta del recuento no llegó; recuperándolo desde la hoja...`, false);
+                        showGlobalAnalysisBanner('loading', `⏳ ${p.budgetId} · recuperando el recuento desde la hoja...`);
+                    }
+                    if (esperaHoja) esperaHoja.cancelar();     // consultar ya, sin esperar el intervalo
+                    const rHoja = await pHoja;
+                    if (rHoja && rHoja.rec) {
+                        res = rHoja.rec;
+                        prodLogDone(kA, `${res.totalWords} palabras · ${res.totalPages} pág. · recuperado de la hoja tras ${motivoPerdida.slice(0, 160)}`);
+                    } else {
+                        terminado = true;
+                        prodLogError(kA, 'sin recuento en la hoja tras ' + Math.round((Date.now() - t0) / 1000) + ' s: ' + motivoPerdida);
+                        return { ok: false, error: motivoPerdida, perdida: true };
+                    }
+                } else {
+                    prodLogDone(kA, `${res.totalWords || 0} palabras · ${res.totalPages || 0} pág.` +
+                        (res.savedByServer ? ' · guardado por el servidor' : '') +
+                        (res.txtsPendientes ? ' · TXT en espera de la carpeta de Drive' : ''));
+                }
+            }
+            terminado = true; if (esperaHoja) esperaHoja.cancelar();
+            if (res._debug) console.log('[Tradutema DEBUG]', res._debug);
+            if (res._perf) { logPerfToConsole(res._perf, p.etiqueta || 'Recuento'); }
+            if (res._perf && p.budgetId) {
+                fetch(apiUrl, { method: 'POST', body: JSON.stringify({ action: 'logPerformance', budgetId: p.budgetId, action_label: p.etiqueta || 'Recuento', perf: res._perf }) })
+                    .catch(e => console.warn('logPerformance fallo:', e));
+            }
+            // TXT en _TXT_PENDIENTES (modo local sin carpeta en Drive todavía):
+            // el servidor los mueve en cuanto resolveBudgetFolder encuentre la carpeta.
+            if (res.txtsPendientes && !job.folderId) {
+                resolveLocalFolderId(p.budgetId, 12).then(r => {
+                    if (r && r.folderId) {
+                        job.folderId = r.folderId; job.folderUrl = r.folderUrl || '';
+                        if (esAbierto(job)) { budgetData.folderId = r.folderId; budgetData.folderUrl = r.folderUrl || ''; if (typeof updateHeaderButtons === 'function') updateHeaderButtons(); }
+                        prodLogDone(job.k('txt-pend'), `${p.budgetId} · carpeta en Drive: TXT del recuento colocados`);
+                    } else {
+                        prodLogError(job.k('txt-pend'), `${p.budgetId} · la carpeta aún no está en Drive: los TXT esperan en _TXT_PENDIENTES (se colocan al abrir el presupuesto)`);
+                    }
+                }).catch(() => {});
+            }
+            return { ok: true, res: res, countId: countId, perdida: false };
+        }
+
+        // Ficha Excel _RECUENTO_<id>.xlsx en la carpeta local (si la hay). Los
+        // TXT y _RECUENTO.txt los escribe el servidor en Drive; Drive Desktop
+        // los baja. Nunca se escribe con un análisis vacío.
+        async function escribirExcelLocalDeRecuento(job, res, fileSettingsExtra) {
+            if (!res || !Array.isArray(res.analysis) || res.analysis.length === 0) return false;
+            const fh = await handleLocalDeTrabajo(job);
+            if (!fh) return false;
+            try {
+                const bExcel = esAbierto(job)
+                    ? Object.assign({}, budgetData, { fileAnalysis: res.analysis, fileSettings: Object.assign({}, budgetData.fileSettings || {}, fileSettingsExtra || {}), wordCount: res.totalWords, pageCount: res.totalPages, countMethodUsed: res.countMethodUsed })
+                    : presupuestoDelTrabajo(job, res);
+                // v3.10.58: con tope de tiempo; si ExcelJS (CDN) no carga, el
+                // recuento se aplica igual y solo falta la ficha.
+                const wb = await Promise.race([
+                    construirRecuentoWorkbook({ budget: bExcel }),
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('ficha Excel: tiempo agotado (45 s)')), 45000))
+                ]);
+                const buffer = await wb.xlsx.writeBuffer();
+                await writeLocalBinaryFile(fh, nombreRecuentoExcel(null, job.budgetId),
+                    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+                return true;
+            } catch (eX) { console.warn('Ficha Excel local:', eX); return false; }
+        }
+        // TXT + _RECUENTO.txt en local: SOLO cuando el servidor no los ha
+        // escrito él (Apps Script anterior a 3.7.90, que devuelve el texto).
+        async function escribirTxtsLocalesDeRecuento(job, res, sourceLang) {
+            if (!res || !Array.isArray(res.analysis) || res.analysis.length === 0) return false;
+            const fh = await handleLocalDeTrabajo(job);
+            if (!fh) return false;
+            try {
+                for (const item of res.analysis) {
+                    if (item.extractedText) await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText);
+                }
+                let tsv = 'Presupuesto\t' + job.budgetId + '\nIdioma origen\t' + sourceLang +
+                    '\nMetodo de recuento\t' + countMethodLabel(res.countMethodUsed || countMethod(), sourceLang) +
+                    '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
+                res.analysis.forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
+                tsv += 'TOTAL\t' + res.totalWords + '\n';
+                await writeLocalTextFile(fh, '_RECUENTO.txt', tsv);
+                return true;
+            } catch (eTxt) { console.warn('TXTs locales:', eTxt); return false; }
+        }
+
         // ============ CONTAR PALABRAS (carpeta ya creada) COMO TRABAJO ============
         function contextoContarDe(job) {
             return {
                 budgetId: job.budgetId, folderId: job.folderId || '', sourceLang: job.ctx.sourceLang,
                 internalComments: job.ctx.internalComments || '', fileSettings: job.ctx.fileSettings || {},
-                numFiles: (job.ctx.files || []).length, localHandle: job.ctx.localHandle || null
+                numFiles: (job.ctx.files || []).length, localHandle: job.ctx.localHandle || null,
+                // v3.10.57: con los archivos aún en memoria se recuenta sin
+                // depender de que la carpeta esté ya en Drive
+                files: (Array.isArray(job.ctx.files) && job.ctx.files.length) ? job.ctx.files : null
             };
         }
         // Botón del paso 2 ("Contar / Recontar palabras →", "Subir y contar →").
@@ -9824,55 +10475,36 @@
         async function ejecutarTrabajoContar(job, opts) {
             opts = opts || {};
             const ctx = job.ctx;
-            if (!ctx.folderId) {
-                const r = await resolveLocalFolderId(ctx.budgetId, 4);
-                if (r && r.folderId) { ctx.folderId = r.folderId; job.folderId = r.folderId; if (esAbierto(job)) { budgetData.folderId = r.folderId; budgetData.folderUrl = r.folderUrl || ''; } }
+            let tieneArchivos = Array.isArray(ctx.files) && ctx.files.length > 0;
+            // v3.10.58: para contar en el navegador al recontar, los archivos se
+            // leen de la carpeta local (Google Drive Desktop) si está enlazada.
+            if (!tieneArchivos && navCountDisponible()) {
+                try {
+                    const fhL = await handleLocalDeTrabajo(job);
+                    if (fhL) { const lf = await archivosDeCarpetaLocal(fhL); if (lf.length) { ctx.files = lf; tieneArchivos = true; } }
+                } catch (e) { console.warn('archivos de la carpeta local:', e); }
             }
             if (!ctx.folderId) {
+                const r = await resolveLocalFolderId(ctx.budgetId, tieneArchivos ? 1 : 4);
+                if (r && r.folderId) { ctx.folderId = r.folderId; job.folderId = r.folderId; if (esAbierto(job)) { budgetData.folderId = r.folderId; budgetData.folderUrl = r.folderUrl || ''; } }
+            }
+            if (!ctx.folderId && !tieneArchivos) {
                 job.error = 'la carpeta aún no está en Drive (Google Drive Desktop no ha sincronizado)';
                 job.reintentar = () => { const j2 = nuevoTrabajo('contar', Object.assign({}, ctx)); ejecutarTrabajoContar(j2); };
                 faseTrabajo(job, 'error');
                 return false;
             }
-            faseTrabajo(job, 'contando', ctx.numFiles ? ctx.numFiles + ' archivo(s)' : '');
+            const numFiles = tieneArchivos ? ctx.files.length : (ctx.numFiles || 0);
+            faseTrabajo(job, 'contando', numFiles ? numFiles + ' archivo(s)' : '');
             const t_start = performance.now();
-            const numFiles = ctx.numFiles || 0;
-            async function recoverAnalysisFromSheet() {
-                for (let intento = 1; intento <= 2; intento++) {
-                    await new Promise(r => setTimeout(r, intento === 1 ? 3000 : 8000));
-                    try {
-                        const resp = await apiPost({ action: 'getBudget', budgetId: ctx.budgetId }, { retry: false });
-                        const b = resp && resp.success && resp.budget;
-                        if (b && parseFloat(b.palabras) > 0 && Array.isArray(b.analisisDetalle) && b.analisisDetalle.length > 0) {
-                            return { analysis: b.analisisDetalle, totalWords: parseFloat(b.palabras) || 0, totalPages: parseFloat(b.paginas) || 0 };
-                        }
-                    } catch (e) { /* siguiente intento */ }
-                }
-                return null;
-            }
             try {
-                prodLogStart(job.k('reanalyze'), `${ctx.budgetId} · Analizando documento con Claude (${numFiles} archivo(s))`);
-                let data;
-                try {
-                    data = await apiPost({
-                        action: 'reanalyzeFolder', folderId: ctx.folderId, budgetId: ctx.budgetId, sourceLang: ctx.sourceLang,
-                        internalComments: ctx.internalComments || '', fileSettings: ctx.fileSettings || {}, countMethod: 'claude'
-                    }, { retry: false });
-                } catch (fetchErr) {
-                    const isTimeout = /failed to fetch|networkerror|load failed/i.test(fetchErr.message || '');
-                    prodLogError(job.k('reanalyze'), isTimeout ? 'timeout >6 min (Apps Script) o red' : (fetchErr.message || 'error'));
-                    prodLogStart(job.k('recover'), 'Respuesta perdida: comprobando si el análisis quedó guardado');
-                    const rec = await recoverAnalysisFromSheet();
-                    if (rec) {
-                        prodLogDone(job.k('recover'), `Recuperado de la hoja: ${rec.totalWords} palabras · ${rec.totalPages} pág.`);
-                        data = { success: true, analysis: rec.analysis, totalWords: rec.totalWords, totalPages: rec.totalPages, failedPages: [], _recovered: true };
-                    } else {
-                        prodLogError(job.k('recover'), 'sin datos guardados en la hoja');
-                        throw fetchErr;
-                    }
-                }
-                prodLogDone(job.k('reanalyze'), data && data.success ? `${data.totalWords || 0} palabras · ${data.totalPages || 0} pág.` : ((data && data.error) || 'sin éxito'));
-                if (data._perf) logPerfToConsole(data._perf, 'Reanalizar');
+                const pr = await pedirRecuentoAlServidor(job, {
+                    budgetId: ctx.budgetId, folderId: ctx.folderId || '', files: tieneArchivos ? ctx.files : null,
+                    sourceLang: ctx.sourceLang, internalComments: ctx.internalComments || '', fileSettings: ctx.fileSettings || {},
+                    numFiles: numFiles, aceptarSinCountId: false, etiqueta: 'Reanalizar'
+                });
+                if (!pr.ok) throw new Error(pr.error || 'sin éxito');
+                const data = pr.res;
                 const total_ms = Math.round(performance.now() - t_start);
                 const claudeMs = (data._perf && data._perf.totalMs) || 0;
                 fetch(apiUrl, { method: 'POST', body: JSON.stringify({
@@ -9881,48 +10513,36 @@
                     meta: { numFiles: numFiles, totalBytes: 0 }
                 }) }).catch(e => console.warn('logStageTimings fallo:', e));
 
-                if (data.success) {
-                    faseTrabajo(job, 'guardando');
-                    const res = {
-                        analysis: data.analysis || [], totalWords: data.totalWords || 0, totalPages: data.totalPages || 0,
-                        failedPages: data.failedPages || [], otrosIdiomas: data.otrosIdiomas || null, paginasOtroIdioma: data.paginasOtroIdioma,
-                        countMethodUsed: data.countMethodUsed || countMethod(), fileSettings: null
-                    };
-                    // TXT + _RECUENTO + Excel en local, si este presupuesto tiene carpeta local
+                faseTrabajo(job, 'guardando');
+                const res = {
+                    analysis: data.analysis || [], totalWords: data.totalWords || 0, totalPages: data.totalPages || 0,
+                    failedPages: data.failedPages || [], otrosIdiomas: data.otrosIdiomas || null, paginasOtroIdioma: data.paginasOtroIdioma,
+                    countMethodUsed: data.countMethodUsed || countMethod(), fileSettings: data.fileSettings || null
+                };
+                // Apps Script anterior a 3.7.90 con archivos en memoria: guarda el navegador
+                if (tieneArchivos && !data.savedByServer && !data._recovered) {
+                    await escribirTxtsLocalesDeRecuento(job, res, ctx.sourceLang);
                     try {
-                        const fh = await handleLocalDeTrabajo(job);
-                        if (fh) {
-                            for (const item of res.analysis) { if (item.extractedText) await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText); }
-                            let tsv = 'Presupuesto\t' + ctx.budgetId + '\nIdioma origen\t' + ctx.sourceLang +
-                                '\nMetodo de recuento\t' + countMethodLabel(res.countMethodUsed, ctx.sourceLang) +
-                                '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
-                            res.analysis.forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
-                            tsv += 'TOTAL\t' + res.totalWords + '\n';
-                            await writeLocalTextFile(fh, '_RECUENTO.txt', tsv);
-                            try {
-                                const bExcel = esAbierto(job)
-                                    ? Object.assign({}, budgetData, { fileAnalysis: res.analysis, wordCount: res.totalWords, pageCount: res.totalPages, countMethodUsed: res.countMethodUsed })
-                                    : presupuestoDelTrabajo(job, res);
-                                const wb = await construirRecuentoWorkbook({ budget: bExcel });
-                                const buffer = await wb.xlsx.writeBuffer();
-                                await writeLocalBinaryFile(fh, nombreRecuentoExcel(null, ctx.budgetId),
-                                    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-                            } catch (eX) { console.warn('Ficha Excel local:', eX); }
-                        }
-                    } catch (eLoc) { console.warn('Copia local del recuento:', eLoc); }
-                    aplicarResultadoRecuento(job, res, { prefijo: '✓ Análisis completado · ', metodo: true, refrescarPresupuesto: true });
-                    if (esAbierto(job) && !opts.desdeCreacion && (res.failedPages || []).length === 0 && res.totalWords > 0 && !formatOtrosIdiomas(res.otrosIdiomas)) {
-                        showSuccess(`Análisis completado · ${res.totalWords} palabras · ${res.totalPages} páginas`, ctx.budgetId);
-                        setTimeout(() => { hideSuccess(); if (esAbierto(job)) showCard(4); }, 1800);
-                    }
-                    faseTrabajo(job, 'hecho');
-                    return true;
+                        const fhL = await handleLocalDeTrabajo(job);
+                        const saveData = await apiPost({
+                            action: 'saveWordCountResults', budgetId: ctx.budgetId, folderId: ctx.folderId || '',
+                            skipDrive: !!fhL, analysis: res.analysis, totalWords: res.totalWords, totalPages: res.totalPages,
+                            sourceLang: ctx.sourceLang, fileSettings: ctx.fileSettings || {}, countId: pr.countId
+                        });
+                        if (!saveData.success) prodLogError(job.k('save'), saveData.error || 'el backend reportó fallo');
+                    } catch (eS) { prodLogError(job.k('save'), (eS && eS.message) || 'fallo al guardar'); }
                 }
-                job.error = data.error || 'sin éxito';
-                if (esAbierto(job)) { showStatus('Error: ' + data.error, 'error'); showGlobalAnalysisBanner('error', `❌ ${ctx.budgetId} · Error: ${data.error}`); }
+                try { await escribirExcelLocalDeRecuento(job, res, null); } catch (eLoc) { console.warn('Copia local del recuento:', eLoc); }
+                aplicarResultadoRecuento(job, res, { prefijo: data._recovered ? '✓ Recuento recuperado de la hoja · ' : '✓ Análisis completado · ', metodo: true, refrescarPresupuesto: true });
+                if (esAbierto(job) && !opts.desdeCreacion && (res.failedPages || []).length === 0 && res.totalWords > 0 && !formatOtrosIdiomas(res.otrosIdiomas)) {
+                    showSuccess(`Análisis completado · ${res.totalWords} palabras · ${res.totalPages} páginas`, ctx.budgetId);
+                    setTimeout(() => { hideSuccess(); if (esAbierto(job)) showCard(4); }, 1800);
+                }
+                faseTrabajo(job, 'hecho');
+                return true;
             } catch (e) {
                 job.error = e.message || String(e);
-                if (esAbierto(job)) showStatus('Error: ' + e.message, 'error');
+                if (esAbierto(job)) { showStatus('Error: ' + job.error, 'error'); showGlobalAnalysisBanner('error', `❌ ${ctx.budgetId} · Error: ${job.error}`); }
             }
             job.reintentar = () => { const j2 = nuevoTrabajo('contar', Object.assign({}, ctx)); ejecutarTrabajoContar(j2); };
             faseTrabajo(job, 'error');
@@ -12569,7 +13189,11 @@
         
         // Obtener plazo
         function getQuoteDays() {
-            return document.getElementById('quoteDays').value || '';
+            // v3.10.58: un plazo de 0 (o negativo) no es un plazo: 1001-01-M salió
+            // con "Plazo aproximado: 0 días laborables" y entrega "hoy".
+            const v = String(document.getElementById('quoteDays').value || '').trim();
+            const n = parseInt(v, 10);
+            return (isNaN(n) || n <= 0) ? '' : v;
         }
 
         // v3.7.63: el importe al cliente SIEMPRE en euros enteros (sin céntimos).
@@ -13198,9 +13822,19 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         function mensajeDeOtroPresupuesto(msg) {
             if (!msg || !budgetData.id) return '';
             const refs = [];
-            const re = /\b(\d{4}-\d{2})(?:-[A-Z])?\b/g;
+            // v3.10.58: caso real 1001-01-M. El archivo del cliente se llamaba
+            // "2026-10-01 Kit - Hannah…pdf" y la lista de documentos del mensaje lo
+            // cita: "2026-10" encajaba como referencia y bloqueaba el envío. Una
+            // referencia es MMDD-NN(-X) con mes y día válidos, no un trozo de
+            // fecha (no va precedida ni seguida de dígitos o "-dígito"), y las
+            // líneas de la lista de documentos ("• nombre.pdf") no se miran.
+            const sinDocs = msg.split('\n').filter(l => !/^\s*[•·\-]\s/.test(l)).join('\n');
+            const re = /(?<![\d-])(\d{2})(\d{2})-(\d{2})(?:-[A-Z])?(?!-?\d)/g;
             let m;
-            while ((m = re.exec(msg)) !== null) refs.push(m[1]);
+            while ((m = re.exec(sinDocs)) !== null) {
+                const mes = parseInt(m[1], 10), dia = parseInt(m[2], 10);
+                if (mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31) refs.push(m[1] + m[2] + '-' + m[3]);
+            }
             const actual = String(budgetData.id).slice(0, 7);
             const ajenas = refs.filter(r => r !== actual);
             if (ajenas.length) {
