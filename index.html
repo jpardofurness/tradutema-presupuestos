@@ -136,17 +136,12 @@
         .btn-secondary:hover { border-color: var(--tradutema-blue); color: var(--tradutema-blue); }
         .btn-success { background: var(--accent-green) !important; }
         .btn-gold { background: linear-gradient(135deg, var(--accent-gold) 0%, #c4983f 100%) !important; }
-        .btn-orange { background: linear-gradient(135deg, var(--accent-orange) 0%, #e67e22 100%) !important; }
         
         .btn-row { display: flex; gap: 12px; margin-top: 16px; }
         .btn-row .btn { flex: 1; }
         
         /* ACTION BUTTON (Big) */
         .action-btn { width: 100%; padding: 20px; font-size: 1.1rem; margin-top: 8px; }
-        
-        /* RESULTS BOX */
-        .results-box { background: linear-gradient(135deg, rgba(52,152,219,0.05) 0%, rgba(212,168,83,0.1) 100%); border-radius: var(--radius-md); padding: 16px; margin-top: 16px; }
-        .results-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px; }
         .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .result-item { background: white; padding: 12px; border-radius: var(--radius-sm); }
         .result-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
@@ -155,19 +150,6 @@
         .result-item.highlight .result-label { color: rgba(255,255,255,0.7); }
         .result-item.highlight .result-value { color: white; }
         .result-item.full-width { grid-column: 1 / -1; }
-        
-        /* WORD COUNT TABLE */
-        .word-count-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; table-layout: fixed; }
-        .word-count-table th, .word-count-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
-        .word-count-table th:first-child, .word-count-table td:first-child { width: 55%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .word-count-table th:nth-child(2), .word-count-table td:nth-child(2) { width: 25%; text-align: right; }
-        .word-count-table th:nth-child(3), .word-count-table td:nth-child(3) { width: 20%; text-align: right; }
-        .word-count-table th { background: var(--bg-primary); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); }
-        .word-count-table td.number { font-family: 'Space Mono', monospace; }
-        .word-count-table tr.total { background: var(--tradutema-blue); color: white; font-weight: 600; }
-        .word-count-table tr.total td { border-bottom: none; }
-        .btn-mini-breakdown { background: var(--tradutema-orange); color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; cursor: pointer; margin-left: 8px; vertical-align: middle; }
-        .btn-mini-breakdown:hover { background: #e67e22; }
         .btn-preview { text-decoration: none; font-size: 1.05rem; margin-right: 8px; display: inline-block; padding: 2px 6px; border-radius: 6px; background: #dbeafe; color: #1e40af; transition: all 0.15s; }
         .btn-preview:hover { background: #bfdbfe; transform: scale(1.05); }
         .btn-preview-local { background: #dbeafe; color: #1e40af; border: none; font-size: 1.05rem; cursor: pointer; padding: 2px 6px; margin-right: 8px; vertical-align: middle; border-radius: 6px; transition: all 0.15s; }
@@ -188,7 +170,6 @@
         /* COUNT OPTIONS */
         .count-options { display: flex; flex-direction: column; gap: 12px; }
         .count-options .action-btn { margin-top: 0; }
-        .btn-hint { font-size: 0.75rem; font-weight: 400; opacity: 0.8; margin-left: 4px; }
         
         .proposed-rate-fields { margin-top: 12px; padding: 12px; background: rgba(212,168,83,0.05); border-radius: var(--radius-md); border: 1px solid rgba(212,168,83,0.3); }
         .proposed-rate-fields.hidden { display: none; }
@@ -329,27 +310,6 @@
         .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; flex-shrink: 0; background: var(--bg-primary); }
         .modal-footer .btn { flex: 1; }
         
-        /* MODAL DESGLOSE */
-        .modal-content { background: white; width: 100%; max-width: 450px; max-height: 85vh; border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column; }
-        .modal-content .modal-header { background: var(--tradutema-blue); color: white; }
-        .modal-content .modal-header h3 { margin: 0; font-size: 1.1rem; }
-        .modal-content .modal-close { background: rgba(255,255,255,0.2); color: white; }
-        .breakdown-instruction { font-size: 0.85rem; color: #666; margin-bottom: 12px; text-align: center; }
-        .breakdown-list { max-height: 300px; overflow-y: auto; }
-        .breakdown-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border-color); gap: 12px; }
-        .breakdown-item.excluded { opacity: 0.4; text-decoration: line-through; background: #f9f9f9; }
-        .breakdown-item .page-num { font-weight: 600; color: var(--tradutema-blue); min-width: 60px; }
-        .breakdown-item .page-words { flex: 1; text-align: right; font-size: 0.95rem; }
-        .breakdown-item .page-words strong { font-size: 1.1rem; }
-        .breakdown-item .page-remove { width: 28px; height: 28px; border: none; background: #fee; color: #c00; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .breakdown-item .page-remove:hover { background: #fcc; }
-        .breakdown-item.excluded .page-remove { background: #efe; color: #0a0; }
-        .breakdown-total { padding: 16px; background: var(--bg-primary); display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 12px; border-radius: var(--radius-md); }
-        .breakdown-total strong { font-size: 1.3rem; color: var(--tradutema-orange); }
-        .breakdown-pages { color: #666; font-size: 0.9rem; }
-        .btn-breakdown { margin-top: 12px; width: 100%; }
-        .breakdown-item .page-estimated { font-size: 0.75rem; color: #999; margin-left: 4px; }
-        
         /* EDITABLE MESSAGE */
         .editable-message { width: 100%; min-height: 200px; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit; font-size: 0.9rem; line-height: 1.5; resize: vertical; }
         .editable-message:focus { outline: none; border-color: var(--tradutema-blue); }
@@ -372,21 +332,7 @@
         .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
         .spinner.dark { border-color: rgba(52,152,219,0.2); border-top-color: var(--tradutema-blue); }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-message { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px; color: var(--text-secondary); font-size: 0.9rem; }
         .loading-message .spinner { border-color: rgba(52,152,219,0.2); border-top-color: var(--tradutema-blue); }
-        .loading-box { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 30px; text-align: center; }
-        
-        /* ANALYSIS SUMMARY */
-        .analysis-summary { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 16px; margin-top: 16px; }
-        .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
-        .summary-row:last-child { border-bottom: none; }
-        .summary-row.highlight { background: rgba(52,152,219,0.1); margin: 8px -16px -12px; padding: 12px 16px; border-radius: 0 0 var(--radius-sm) var(--radius-sm); border-bottom: none; }
-        .summary-label { color: var(--text-secondary); }
-        .summary-value { font-weight: 600; color: var(--text-primary); }
-        .summary-row.highlight .summary-value { color: var(--tradutema-blue); font-size: 1.1rem; }
-        .tariff-detail { margin-top: 12px; padding: 8px 12px; background: rgba(52,152,219,0.05); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 0.85rem; }
-        .tariff-detail strong { color: var(--tradutema-blue); }
-        .tariff-result { margin-left: 12px; color: var(--accent-green); font-weight: 600; }
         
         /* FOOTER */
         .footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 0.75rem; }
@@ -615,10 +561,11 @@
 </head>
 <body>
     <!-- v3.7.49: panel de log en pantalla (estilo Tradutema PRODUCTION) -->
-    <div id="prodLogPanel" style="display:none; position:fixed; bottom:14px; right:14px; width:380px; max-width:92vw; max-height:55vh; z-index:9999; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; overflow:hidden;">
+    <div id="prodLogPanel" style="display:none; position:fixed; bottom:14px; right:14px; width:430px; max-width:92vw; max-height:55vh; z-index:9999; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; overflow:hidden;">
         <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#1e293b; border-bottom:1px solid #334155;">
-            <span style="font-weight:700; letter-spacing:.3px;">📋 Tradutema · Proceso</span>
-            <span>
+            <span style="font-weight:700; letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; margin-right:8px;">📋 Tradutema · Proceso</span>
+            <span style="white-space:nowrap; flex-shrink:0;">
+                <button id="prodLogStopBtn" onclick="detenerTodo()" title="Detener todos los trabajos y peticiones en curso" style="background:none;border:1px solid #334155;color:#94a3b8;cursor:pointer;font-size:11px;border-radius:5px;padding:1px 6px;margin-right:6px;font-weight:700;">⏹ detener todo</button>
                 <button id="prodLogCopyBtn" onclick="prodLogCopy()" title="Copiar log" style="background:none;border:1px solid #334155;color:#cbd5e1;cursor:pointer;font-size:11px;border-radius:5px;padding:1px 6px;margin-right:6px;">📋 copiar</button>
                 <button onclick="prodLogClear()" title="Limpiar" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;margin-right:6px;">limpiar</button>
                 <button onclick="document.getElementById('prodLogPanel').style.display='none'" title="Cerrar" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;">✕</button>
@@ -1308,116 +1255,9 @@
             </a>
         </div>
 
-        <!-- STEP 3: ANÁLISIS DE DOCUMENTOS (automático) -->
-        <div class="card hidden" id="step3Card">
-            <div class="card-title">
-                Análisis de documentos
-                <span class="step-badge">PASO 3 - Opcional</span>
-            </div>
-            
-            <!-- Loading mientras se analiza (oculto por defecto) -->
-            <div id="step3Loading" class="loading-box hidden">
-                <div class="loading-message">
-                    <span class="spinner"></span> Analizando documentos...
-                </div>
-            </div>
-            
-            <!-- Resultados del análisis (se muestran cuando termina) -->
-            <div class="results-box hidden" id="step3Results">
-                <div class="results-title">📊 Resumen del análisis</div>
-                
-                <!-- Tabla de archivos -->
-                <table class="word-count-table" id="wordCountTable">
-                    <thead>
-                        <tr>
-                            <th>Archivo</th>
-                            <th style="text-align:right">Palabras</th>
-                            <th style="text-align:right">Páginas</th>
-                        </tr>
-                    </thead>
-                    <tbody id="wordCountBody"></tbody>
-                </table>
-                
-                <!-- Resumen de totales y tarifa -->
-                <div class="analysis-summary" id="analysisSummary">
-                    <div class="summary-row">
-                        <span class="summary-label">Total archivos:</span>
-                        <span class="summary-value" id="summaryFiles">-</span>
-                    </div>
-                    <div class="summary-row">
-                        <span class="summary-label">Total páginas:</span>
-                        <span class="summary-value" id="summaryPages">-</span>
-                    </div>
-                    <div class="summary-row highlight">
-                        <span class="summary-label">Tarifa por páginas (<span id="langPairDisplay">--</span>):</span>
-                        <span class="summary-value" id="summaryPricePages">-</span>
-                    </div>
-                </div>
-                
-                <!-- Info de tarifa por página -->
-                <div class="tariff-detail" id="tariffDetail">
-                    <small>Cálculo: <span id="tariffPage1Display">--</span> € (1ª pág) + <span id="tariffPage2Display">--</span> € × (<span id="calcPagesRest">0</span> págs resto) = <strong id="calcTotal">0,00</strong> €</small>
-                </div>
-                
-                <!-- Editor de tarifa por palabra (solo si hay palabras) -->
-                <div class="tariff-editor hidden" id="tariffEditorWords">
-                    <label>Tarifa:</label>
-                    <input type="number" id="customTariff" step="0.01" min="0" onchange="updateTotalPrice()">
-                    <span class="tariff-unit">€/palabra</span>
-                    <span class="tariff-result">= <strong id="priceByWords">0,00</strong> €</span>
-                </div>
-            </div>
-            
-            <!-- Botón para análisis profundo de palabras -->
-            <button class="btn btn-primary btn-orange action-btn" id="countWordsBtn" onclick="countWords()">
-                🔢 Analizar Palabras
-            </button>
-            
-            <div class="btn-row" style="margin-top: 16px;">
-                <button class="btn btn-primary" onclick="completeStep3()">Continuar →</button>
-            </div>
-        </div>
-
-        <!-- MODAL VER TXT EXTRAÍDO -->
-        <div class="modal-overlay" id="txtPreviewModal" onclick="closeTxtPreviewModal()">
-            <div class="modal-content" style="max-width:700px;max-height:80vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">
-                <div class="modal-header">
-                    <h3 id="txtPreviewTitle">📄 Texto extraído</h3>
-                    <button class="modal-close" onclick="closeTxtPreviewModal()">✕</button>
-                </div>
-                <div class="modal-body" style="flex:1;overflow-y:auto;">
-                    <textarea id="txtPreviewContent" readonly style="width:100%;min-height:300px;font-family:monospace;font-size:0.8rem;border:1px solid #ddd;border-radius:6px;padding:10px;resize:vertical;background:#f9f9f9;box-sizing:border-box;"></textarea>
-                </div>
-                <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-                    <button class="btn btn-secondary" onclick="copyTxtContent()">📋 Copiar</button>
-                    <button class="btn btn-secondary" onclick="downloadTxtContent()">⬇️ Descargar</button>
-                    <button class="btn btn-primary" onclick="closeTxtPreviewModal()">Cerrar</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL DESGLOSE POR PÁGINA -->
-        <div class="modal-overlay" id="breakdownModal">
-            <div class="modal-content modal-breakdown">
-                <div class="modal-header">
-                    <h3>📄 Desglose por página</h3>
-                    <button class="modal-close" onclick="closeBreakdownModal()">✕</button>
-                </div>
-                <div class="modal-body">
-                    <p class="breakdown-instruction">Haz clic en ✕ para excluir una página del total</p>
-                    <div class="breakdown-list" id="breakdownList"></div>
-                    <div class="breakdown-total">
-                        <span>TOTAL:</span>
-                        <strong><span id="breakdownTotalWords">0</span> palabras</strong>
-                        <span class="breakdown-pages">(<span id="breakdownTotalPages">0</span> páginas)</span>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" onclick="resetBreakdown()">Restaurar todo</button>
-                    <button class="btn btn-primary" onclick="applyBreakdown()">Aplicar cambios</button>
-                </div>
-            </div>
-        </div>
+        <!-- (v3.10.63: fuera la pantalla antigua "Análisis de documentos" —paso 3 viejo, ya
+             sin acceso desde la barra— con su tabla, su cálculo "1ª pág + resto" sobre las
+             columnas C/D de Tarifas y los modales de desglose por página y de TXT) -->
 
         <!-- STEP 4: TASACIÓN PROVEEDORES -->
         <div class="card hidden" id="step4Card">
@@ -1557,6 +1397,8 @@
                 <div id="metodoDefectoNota" style="display:none;margin-top:8px;font-size:0.8rem;color:#475569;"></div>
                 <!-- v3.8.7: ficha de la tarificación guardada (por qué se dio este precio) -->
                 <div id="quoteConfigStamp" class="hidden" style="margin-top:10px;padding:8px 10px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;font-size:0.8rem;color:#065f46;line-height:1.5;"></div>
+                <!-- v3.10.65: los documentos han cambiado desde que se guardó la ficha -->
+                <div id="fichaDesfasadaAviso" style="display:none;margin-top:8px;padding:8px 10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;font-size:0.8rem;color:#92400e;line-height:1.5;"></div>
             </div>
             
             <!-- OPCIÓN 1: Cálculo por páginas (tarifa web) -->
@@ -1913,13 +1755,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.62';
-        const HTML_DATE = '02/10/2026';
+        const HTML_VERSION = '3.10.65';
+        const HTML_DATE = '09/10/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.92';   // v3.10.62: fuera los metadatos del documento (3.10.61: tramos web, plazos, método por defecto)
+        const API_MIN_VERSION = '3.7.94';   // v3.10.64: envío al cliente con sendId (el servidor no vuelve a enviar lo ya enviado)
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1971,8 +1813,6 @@
             folderFiles: [],           // Archivos de la carpeta de Drive
             tariffPerWord: 0,
             tariffPerWordManual: null, // v3.10.47: tarifa €/pal editada a mano en paso 5
-            tariffPage1: 0,
-            tariffPage2: 0,
             contactedProviders: [],    // Traductores a los que se envió tasación
             chosenProvider: null,      // Traductor elegido para el presupuesto
             historialTraductores: {},  // Historial de envíos a traductores
@@ -2423,7 +2263,8 @@
             const _elT = document.getElementById('bsBarTarif');
             if (_wrapT && _elT) {
                 const _txt = formatearTarif(compactarTarif(budgetData.quoteConfig));
-                if (_txt) { _elT.textContent = _txt; _wrapT.classList.remove('hidden'); }
+                const _rc = budgetData.quoteConfig && budgetData.quoteConfig.recalculadaPorDocumentos;   // v3.10.65
+                if (_txt) { _elT.textContent = _txt + (_rc ? ' · ⚠️ recalculado, sin guardar' : ''); _wrapT.classList.remove('hidden'); }
                 else { _elT.textContent = ''; _wrapT.classList.add('hidden'); }
             }
             const _elDocs = document.getElementById('bsBarDocs');
@@ -2433,7 +2274,12 @@
             _elPag.innerHTML = paginasHtml;
             _elPag.title = paginasTitulo || '';
             document.getElementById('bsBarTarifa').textContent = fmtTarifa(tarifa);
-            document.getElementById('bsBarImporte').textContent = fmtEuros(importe);
+            // v3.10.65: si la ficha se recalculó por cambio de documentos, el importe nuevo va al lado del guardado
+            const _rcImp = budgetData.quoteConfig && budgetData.quoteConfig.recalculadaPorDocumentos;
+            const _impNuevo = _rcImp && _rcImp.importeDespues != null && Math.abs(_rcImp.importeDespues - importe) > 0.001 ? _rcImp.importeDespues : null;
+            document.getElementById('bsBarImporte').innerHTML = _impNuevo != null
+                ? `<span style="text-decoration:line-through;color:#94a3b8;">${escapeHtml(fmtEuros(importe))}</span> <span style="color:#b45309;">${escapeHtml(fmtEuros(_impNuevo))} sin guardar</span>`
+                : escapeHtml(fmtEuros(importe));
             document.getElementById('bsBarPlazo').textContent = plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—';
 
             // v3.7.100: enlaces al pedido WooCommerce y al Dashboard CRM
@@ -2635,7 +2481,7 @@
                 clientEmail: '', clientWhatsApp: '',
                 wordCount: null, pageCount: null, fileAnalysis: [],
                 folderFiles: [],
-                tariffPerWord: 0, tariffPerWordManual: null, tariffPage1: 0, tariffPage2: 0,
+                tariffPerWord: 0, tariffPerWordManual: null,
                 contactedProviders: [], chosenProvider: null,
                 historialTraductores: {}, historialCliente: {},
                 fileSettings: {}
@@ -2743,6 +2589,8 @@
             // v3.8.7: limpiar la ficha de tarificación del presupuesto anterior
             budgetData.quoteConfig = null;
             budgetData.countMethodUsed = null;
+            _ultimoInventarioPersistido = null;   // v3.10.65
+            if (typeof pintarAvisoFicha === 'function') pintarAvisoFicha(null);
             if (typeof renderQuoteConfigStamp === 'function') renderQuoteConfigStamp(null);
             document.querySelectorAll('.calc-method-option').forEach(l => l.classList.remove('cm-active'));
             const _mw = document.getElementById('msgIncludeWords');
@@ -5646,6 +5494,7 @@
                     }
                     budgetData.numeroPedido = b.numeroPedido || '';   // v3.7.100: para enlaces Pedido/Dashboard en la barra
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
+                    _ultimoInventarioPersistido = (parseInt(b.paginas) || 0) + '/' + (parseInt(b.numArchivos) || 0);   // v3.10.65
                     budgetData.hasRecuento = !!b.hasRecuento;  // v3.7.22
                     
                     // Restaurar traductores contactados
@@ -5745,7 +5594,6 @@
                     completedSteps.clear();
                     completedSteps.add(1); // Languages always done
                     completedSteps.add(2); // Files + Folder always done when resuming
-                    if (budgetData.wordCount || budgetData.pageCount) completedSteps.add(3);
                     const estado = b.estado || '';
                     if (estado.startsWith('1-') || estado.startsWith('2-') || estado === 'Tasación enviada' || estado === 'Enviado') completedSteps.add(4);
                     if (estado.startsWith('2-') || estado === 'Enviado') completedSteps.add(5);
@@ -5993,7 +5841,7 @@
         function apiVersionInsuficiente() {
             return !!(apiVersion && apiVersion !== '?' && compararVersiones(apiVersion, API_MIN_VERSION) < 0);
         }
-        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_92.gs o posterior), ' +
+        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_94.gs o posterior), ' +
             'luego <b>Implementar → Gestionar implementaciones → ✏️ (editar) → Versión: «Nueva versión» → Implementar</b>. ' +
             'Pegar el código sin crear una versión nueva no cambia lo que se ejecuta.';
         function refrescarAvisoVersionApi() {
@@ -6121,8 +5969,7 @@
                     budgetData.tariffPerWord = parseFloat(String(tariff.tarifaPorPalabraProveedor || tariff.tarifaPorPalabra || 0).replace(',', '.')) || 0;
                     // Col E: tarifa cliente IVA inc. (usada en "Por tarifa por palabra")
                     budgetData.tariffPerWordClient = parseFloat(String(tariff.tarifaPorPalabraClienteIVA || 0).replace(',', '.')) || 0;
-                    budgetData.tariffPage1 = parseFloat(String(tariff.tarifaPagina1).replace(',', '.')) || 0;
-                    budgetData.tariffPage2 = parseFloat(String(tariff.tarifaPagina2).replace(',', '.')) || 0;
+                    // (v3.10.63: la tarifa por página ya no sale de Tarifas; solo de TarifasPaginas)
                 }
             }
 
@@ -6231,18 +6078,6 @@
             completedSteps.add(2);
             updateProgressSteps();
             // Ya no se usa - ahora se usa createFolderAndContinue()
-        }
-
-        function completeStep3() {
-            completedSteps.add(3);
-            updateProgressSteps();
-            saveBudgetDataIfNeeded();  // Guardar páginas y otros datos
-            showCard(4);
-            
-            // Auto-check include word count if we have data
-            if (budgetData.wordCount) {
-                document.getElementById('includeWordCount').classList.add('checked');
-            }
         }
 
         function skipToStep(step) {
@@ -6478,27 +6313,6 @@
                 }
             }
             
-            // Si es paso 3 (Palabras), mostrar tarifas y ejecutar análisis automático de páginas
-            if (step === 3) {
-                // Resetear estado visual del paso 3
-                resetStep3UI();
-                
-                // Actualizar tarifas según combinación de idiomas actual
-                updatePageTariffDisplay();
-                
-                // Decidir qué mostrar
-                if (budgetData.pageCount && budgetData.pageCount > 0) {
-                    // Ya hay datos de páginas guardados - mostrarlos
-                    console.log('showCard: Mostrando resultados existentes (páginas:', budgetData.pageCount, ')');
-                    showExistingWordCountResults();
-                } else {
-                    // Sin datos de análisis - mostrar botón para analizar
-                    console.log('showCard: Sin análisis previo, mostrando botón');
-                    document.getElementById('step3Loading').classList.add('hidden');
-                    document.getElementById('countWordsBtn').classList.remove('hidden');
-                }
-            }
-            
             // Si es paso 4 (Tasación), mostrar historial de envíos a traductores y resumen palabras
             if (step === 4) {
                 renderProviderSendHistory();
@@ -6539,6 +6353,7 @@
                 
                 // Mostrar historial de envíos al cliente
                 renderClientSendHistory();
+                actualizarBotonEnvioCliente();   // v3.10.64: por presupuesto, nunca se queda en "Enviando…"
                 
                 // Mostrar sección de traductores contactados si hay proveedores
                 const contactedSection = document.getElementById('contactedProvidersSection');
@@ -6571,172 +6386,8 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
-        // Resetear UI del paso 3 a estado inicial
-        function resetStep3UI() {
-            const loading = document.getElementById('step3Loading');
-            const results = document.getElementById('step3Results');
-            const countWordsBtn = document.getElementById('countWordsBtn');
-            const editor = document.getElementById('tariffEditorWords');
-            
-            // Ocultar loading
-            if (loading) loading.classList.add('hidden');
-            // Ocultar resultados
-            if (results) results.classList.add('hidden');
-            // Mostrar botón de análisis y resetear texto
-            if (countWordsBtn) {
-                countWordsBtn.classList.remove('hidden');
-                countWordsBtn.innerHTML = '🔢 Analizar Palabras';
-            }
-            // Ocultar editor de tarifa
-            if (editor) editor.classList.add('hidden');
-            
-            // Resetear valores a estado inicial
-            document.getElementById('summaryFiles').textContent = '-';
-            document.getElementById('summaryPages').textContent = '-';
-            document.getElementById('summaryPricePages').textContent = '-';
-            document.getElementById('calcPagesRest').textContent = '0';
-            document.getElementById('calcTotal').textContent = '0,00';
-            document.getElementById('wordCountBody').innerHTML = '';
-        }
-        
-        // Mostrar resultados existentes al retomar
-        function showExistingWordCountResults() {
-            const loading = document.getElementById('step3Loading');
-            const results = document.getElementById('step3Results');
-            const tbody = document.getElementById('wordCountBody');
-            const editor = document.getElementById('tariffEditorWords');
-            const countWordsBtn = document.getElementById('countWordsBtn');
-            
-            if (loading) loading.classList.add('hidden');
-            if (results) results.classList.remove('hidden');
-            
-            const hasWords = budgetData.wordCount && budgetData.wordCount > 0;
-            const hasDetailedAnalysis = budgetData.fileAnalysis && budgetData.fileAnalysis.length > 0;
-            
-            // Mostrar tabla con análisis detallado si existe
-            if (hasDetailedAnalysis) {
-                let html = '';
-                budgetData.fileAnalysis.forEach((file, index) => {
-                    const fileName = file.fileName || file.name || 'Archivo ' + (index + 1);
-                    const hasBreakdown = file.breakdown && file.breakdown.length > 0;
-                    
-                    // Icono de ojo para previsualizar en Google Drive
-                    const previewBtn = file.fileId 
-                        ? `<a href="https://drive.google.com/file/d/${file.fileId}/view" target="_blank" class="btn-preview" title="Ver archivo en Drive">👁️</a>`
-                        : '';
-                    
-                    // Botón para ver el TXT extraído (si existe en el análisis)
-
-                    
-                    const breakdownBtn = hasBreakdown 
-                        ? `<button class="btn-mini-breakdown" onclick="showBreakdownModal(${index})" title="Ver desglose por página">📄</button>`
-                        : '';
-                    
-                    html += `
-                        <tr data-file-index="${index}">
-                            <td>${previewBtn} ${fileName}</td>
-                            <td class="number">${file.words ? file.words.toLocaleString('es-ES') : '-'} ${breakdownBtn}</td>
-                            <td class="number">${file.pages || '-'}</td>
-                        </tr>
-                    `;
-                });
-                
-                html += `
-                    <tr class="total">
-                        <td>TOTAL</td>
-                        <td class="number" id="totalWordsCell">${hasWords ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</td>
-                        <td class="number" id="totalPagesCell">${budgetData.pageCount || '-'}</td>
-                    </tr>
-                `;
-                
-                tbody.innerHTML = html;
-                
-                // Guardar en window.analysisData para funciones de desglose
-                window.analysisData = {
-                    analysis: budgetData.fileAnalysis,
-                    totalWords: budgetData.wordCount,
-                    totalPages: budgetData.pageCount
-                };
-            } else {
-                // Solo mostrar totales si no hay detalle
-                tbody.innerHTML = `
-                    <tr class="totals-row">
-                        <td><strong>TOTAL (guardado)</strong></td>
-                        <td style="text-align:right;"><strong>${hasWords ? budgetData.wordCount.toLocaleString('es-ES') : '-'}</strong></td>
-                        <td style="text-align:right;"><strong>${budgetData.pageCount || '-'}</strong></td>
-                    </tr>
-                `;
-            }
-            
-            // Update summary
-            document.getElementById('summaryFiles').textContent = budgetData.numArchivos || budgetData.fileAnalysis?.length || '-';
-            document.getElementById('summaryPages').textContent = budgetData.pageCount || '-';
-            document.getElementById('langPairDisplay').textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
-            
-            // Calculate prices
-            const page1 = budgetData.tariffPage1 || 0;
-            const page2 = budgetData.tariffPage2 || 0;
-            const pages = budgetData.pageCount || 0;
-            const pagesRest = Math.max(0, pages - 1);
-            const words = budgetData.wordCount || 0;
-            const tariff = budgetData.tariffPerWord || 0;
-            
-            let priceByPages = 0;
-            if (pages > 0) {
-                priceByPages = page1 + pagesRest * page2;
-            }
-            
-            // Update displays
-            document.getElementById('tariffPage1Display').textContent = page1.toFixed(2).replace('.', ',');
-            document.getElementById('tariffPage2Display').textContent = page2.toFixed(2).replace('.', ',');
-            document.getElementById('calcPagesRest').textContent = pagesRest;
-            document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
-            document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
-            
-            // Si hay palabras, mostrar editor de tarifa
-            if (hasWords) {
-                document.getElementById('customTariff').value = tariff;
-                document.getElementById('priceByWords').textContent = (words * tariff).toFixed(2).replace('.', ',');
-                if (editor) editor.classList.remove('hidden');
-            }
-            
-            if (countWordsBtn) {
-                countWordsBtn.classList.remove('hidden');
-                // Mostrar que hay datos guardados, pero permite re-analizar
-                countWordsBtn.innerHTML = '🔢 Reanalizar <span class="btn-hint">(hay datos guardados)</span>';
-            }
-        }
-        
-        function updatePageTariffDisplay() {
-            // Buscar tarifa por página para la combinación actual
-            const tariff = allTariffs.find(t => 
-                t.idiomaOrigen === budgetData.sourceLang && 
-                t.idiomaDestino === budgetData.targetLang
-            );
-            
-            const langPair = document.getElementById('langPairDisplay');
-            const page1 = document.getElementById('tariffPage1Display');
-            const page2 = document.getElementById('tariffPage2Display');
-            
-            if (tariff) {
-                langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
-                const p1 = parseFloat(String(tariff.tarifaPagina1).replace(',', '.')) || 0;
-                const p2 = parseFloat(String(tariff.tarifaPagina2).replace(',', '.')) || 0;
-                const pw = parseFloat(String(tariff.tarifaPorPalabra).replace(',', '.')) || 0;
-                
-                page1.textContent = p1.toFixed(2).replace('.', ',');
-                page2.textContent = p2.toFixed(2).replace('.', ',');
-                
-                // Guardar en budgetData para cálculos
-                budgetData.tariffPage1 = p1;
-                budgetData.tariffPage2 = p2;
-                budgetData.tariffPerWord = pw;
-            } else {
-                langPair.textContent = `${budgetData.sourceLang} > ${budgetData.targetLang}`;
-                page1.textContent = '--';
-                page2.textContent = '--';
-            }
-        }
+        // (v3.10.63: resetStep3UI / showExistingWordCountResults / updatePageTariffDisplay retiradas
+        // con la pantalla antigua del paso 3)
 
         function updateProgressSteps() {
             // Pasos visibles en la barra: 1, 2, 4, 5
@@ -7668,6 +7319,7 @@
             pintarTotalAContar();   // v3.10.60: "· N a contar" cuando hay filtros
 
             updateStep2Buttons();
+            programarSincronizacionDocumentos();   // v3.10.65: ficha, barra, mensaje y hoja al día
         }
 
         // v3.7.18: gestor único de la fila de botones del paso 2.
@@ -8328,6 +7980,217 @@
             return 'OK';
         }
 
+        // ============ v3.10.64: DETENER TODO ============
+        // Petición de Javier (05/10/2026): el botón "Guardar y Enviar Email" se
+        // quedó en "Enviando…" y salían correos repetidos sin forma de pararlo
+        // salvo cerrar la pestaña. Ahora hay una señal de parada común:
+        //   · TODAS las peticiones al servidor (apiPost) y a Claude desde el
+        //     navegador llevan esa señal: "⏹ Detener todo" las corta y NO se
+        //     reintentan.
+        //   · Las esperas (sondeos de la hoja, pausas entre reintentos) se
+        //     cancelan también (_esperaCancelable).
+        //   · Los trabajos en marcha pasan a la fase terminal "detenido" (con
+        //     "reintentar" donde tiene sentido): faseTrabajo deja de avanzarlos.
+        //   · La pantalla vuelve a estar usable: botones, banners, estado.
+        // Lo que el servidor ya tenía empezado (un correo en Gmail, una carpeta)
+        // puede completarse igualmente: aquí se corta lo que depende del navegador.
+        let _stopCtrl = (typeof AbortController === 'function') ? new AbortController() : null;
+        let _stopSeq = 0;                      // nº de paradas; cada petición recuerda con cuál empezó
+        const _esperasActivas = new Set();     // promesas de _esperaCancelable pendientes
+        const _fetchsActivos = new Set();      // AbortController de cada petición en vuelo
+        function _senalParada() { return _stopCtrl ? _stopCtrl.signal : undefined; }
+        // Aborta `ctrl` cuando se pulse "Detener todo". Devuelve la función para desenlazar.
+        function _enlazarParada(ctrl) {
+            if (!ctrl || !_stopCtrl) return () => {};
+            const sig = _stopCtrl.signal;
+            const h = () => { try { ctrl.abort(); } catch (e) {} };
+            if (sig.aborted) { h(); return () => {}; }
+            sig.addEventListener('abort', h);
+            return () => { try { sig.removeEventListener('abort', h); } catch (e) {} };
+        }
+        function _errorDetenido() { const e = new Error('Detenido por el usuario'); e.detenido = true; return e; }
+        function esErrorDeParada(e) { return !!(e && (e.detenido || /Detenido por el usuario/.test(e.message || ''))); }
+        function hayAlgoEnMarcha() {
+            return (typeof trabajosEnMarcha === 'function' && trabajosEnMarcha().length > 0) || _fetchsActivos.size > 0 || _esperasActivas.size > 0;
+        }
+        function detenerTodo() {
+            const activos = (typeof trabajosEnMarcha === 'function') ? trabajosEnMarcha() : [];
+            const nFetch = _fetchsActivos.size, nEsperas = _esperasActivas.size;
+            _stopSeq++;
+            activos.forEach(j => { j.error = 'detenido por el usuario'; faseTrabajo(j, 'detenido'); });
+            const viejo = _stopCtrl;
+            if (typeof AbortController === 'function') _stopCtrl = new AbortController();
+            if (viejo) { try { viejo.abort(); } catch (e) {} }
+            Array.from(_esperasActivas).forEach(p => { try { p.cancelar(); } catch (e) {} });
+            _esperasActivas.clear();
+            // la pantalla vuelve a estar usable
+            try { enviosClienteEnCurso.clear(); actualizarBotonEnvioCliente(); } catch (e) {}
+            try { const b = document.getElementById('providerSendBtn'); if (b) { b.disabled = false; b.innerHTML = 'Enviar'; } } catch (e) {}
+            try { hideStatus(); } catch (e) {}
+            try { hideSuccess(); } catch (e) {}
+            try { hideBgBanner(); } catch (e) {}
+            try { dismissGlobalAnalysisBanner(); } catch (e) {}
+            try { updateStep2Buttons(); } catch (e) {}
+            try { renderWordCountSummary(); } catch (e) {}
+            try { renderTrabajos(); } catch (e) {}
+            const resumen = `${activos.length} trabajo(s)` + (activos.length ? ' (' + activos.map(etiquetaTrabajo).join(', ') + ')' : '') +
+                ` · ${nFetch} petición(es) · ${nEsperas} espera(s)`;
+            const k = 'stop' + _stopSeq;
+            prodLogStart(k, '⏹ Detener todo');
+            prodLogDone(k, resumen + ((nFetch || activos.length) ? ' — lo que el servidor ya tenía en marcha (un correo, una carpeta) puede completarse igualmente' : ''));
+            if (!activos.length && !nFetch && !nEsperas) { showStatus('⏹ No había nada en marcha', 'warning'); setTimeout(hideStatus, 2500); }
+            else { showStatus('⏹ Detenido: ' + resumen, 'warning'); setTimeout(hideStatus, 7000); }
+            return { trabajos: activos.length, peticiones: nFetch, esperas: nEsperas };
+        }
+        function pintarBotonDetener() {
+            const b = document.getElementById('prodLogStopBtn');
+            if (!b) return;
+            const activo = hayAlgoEnMarcha();
+            b.style.background = activo ? '#dc2626' : 'none';
+            b.style.borderColor = activo ? '#dc2626' : '#334155';
+            b.style.color = activo ? 'white' : '#94a3b8';
+            b.title = activo ? 'Detener todos los trabajos y peticiones en curso' : 'No hay nada en marcha';
+        }
+
+        // ============ v3.10.64: ENVÍO AL CLIENTE COMO TRABAJO ============
+        // Caso real (05/10/2026): 6 de los 8 presupuestos enviados por email
+        // salieron dos veces (1005-20-M, tres), y desde el 14/09 pasaba en 1 de
+        // cada 3. Dos fallos juntos:
+        //   1. sendClientEmail llamaba a apiPost con el reintento por defecto
+        //      (2 intentos): si Google tardaba o la respuesta se perdía, el
+        //      segundo intento volvía a enviar el correo, porque el servidor
+        //      no tenía candado para este envío (el de traductores sí).
+        //   2. Si abrías otro presupuesto mientras se enviaba, el botón se
+        //      quedaba en "Enviando…" para siempre (un `return` se saltaba la
+        //      línea que lo restauraba), y era el mismo botón para todos.
+        // Ahora cada clic es un TRABAJO con su sendId: el Apps Script 3.7.94
+        // recuerda 6 h lo que envió con ese sendId (un reintento recibe "ya
+        // enviado" sin que salga nada), así que reintentar es seguro. El botón
+        // refleja si el presupuesto ABIERTO tiene un envío en curso, no el
+        // último clic; y "Detener todo" lo corta.
+        const enviosClienteEnCurso = new Set();   // budgetIds con un envío en vuelo
+        function nuevoSendId(budgetId) { return 'e' + String(budgetId || '').replace(/[^\w-]/g, '') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+        function actualizarBotonEnvioCliente() {
+            const btn = document.getElementById('sendClientBtn');
+            if (!btn) return;
+            const enCurso = !!(budgetData && budgetData.id && enviosClienteEnCurso.has(budgetData.id));
+            btn.disabled = enCurso;
+            btn.innerHTML = enCurso ? '<span class="spinner"></span> Enviando... <span style="font-weight:400;opacity:.85;">(no repitas el envío)</span>' : '💾 Guardar y Enviar Email';
+        }
+        async function sendClientEmail() {
+            const idFlujoEmail = budgetData.id;   // v3.10.44
+            const emailRaw = document.getElementById('clientEmail').value.trim();
+            const email = extractEmail(emailRaw);
+            const whatsapp = document.getElementById('clientWhatsApp').value.trim();
+
+            if (!clientMessageEdited && typeof updateClientMessage === 'function') updateClientMessage();
+            if (!validateClientFields('email_enviar')) return;
+            if (!idFlujoEmail) { showStatus('Primero crea la carpeta del presupuesto', 'warning'); setTimeout(hideStatus, 3000); return; }
+            if (enviosClienteEnCurso.has(idFlujoEmail) || trabajoEnvioClienteDe(idFlujoEmail)) {
+                showStatus('Este presupuesto ya se está enviando; espera a que termine (o pulsa ⏹ Detener todo en el panel Proceso)', 'warning');
+                setTimeout(hideStatus, 4000);
+                return;
+            }
+            const subjectEl = document.getElementById('clientSubject');
+            const ctx = {
+                budgetId: idFlujoEmail,
+                clientEmail: email, clientWhatsApp: whatsapp,
+                amount: getQuoteAmount(),
+                sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang,
+                customMessage: document.getElementById('clientMessageEdit').value,
+                clientSubject: (subjectEl && subjectEl.value.trim()) ? subjectEl.value.trim() : '',
+                quoteDays: getQuoteDays(),
+                urgency: (document.getElementById('quoteUrgency') || {}).value || '',
+                quoteConfig: (typeof collectQuoteConfig === 'function') ? JSON.stringify(collectQuoteConfig()) : '',
+                sendId: nuevoSendId(idFlujoEmail)
+            };
+            // v3.7.24: lo que ve el banner de resumen
+            budgetData.savedQuoteTotal = parseFloat(ctx.amount) || 0;
+            budgetData.savedQuoteDays = ctx.quoteDays;
+            const job = nuevoTrabajo('enviarCliente', ctx);
+            enviosClienteEnCurso.add(idFlujoEmail);
+            actualizarBotonEnvioCliente();
+            ejecutarTrabajoEnviarCliente(job);   // sin await: el presupuesto se puede dejar
+        }
+        function trabajoEnvioClienteDe(budgetId) {
+            return trabajos.find(t => t.tipo === 'enviarCliente' && t.budgetId === budgetId && enMarcha(t)) || null;
+        }
+        function anotarEnvioClienteEnCopias(budgetId, email, fechaEnvio) {
+            try {
+                const c = getBudgetCache(budgetId);
+                if (c) {
+                    const h = (c.historialCliente && typeof c.historialCliente === 'object') ? c.historialCliente : {};
+                    if (!h.email) h.email = [];
+                    if (!h.email.some(x => x.fecha === fechaEnvio && x.destinatario === email)) h.email.push({ fecha: fechaEnvio, destinatario: email });
+                    c.historialCliente = h; c.estado = '2-Presupuesto Enviado'; c.emailCliente = email;
+                    saveBudgetCache(c);
+                }
+            } catch (e) {}
+            try {
+                const b = (allBudgets || []).find(x => x.id === budgetId);
+                if (b) { b.estado = '2-Presupuesto Enviado'; if (typeof guardarCacheLocalPresupuestos === 'function') guardarCacheLocalPresupuestos(allBudgets, budgetsTotal, budgetsShowingAll); }
+            } catch (e) {}
+        }
+        async function ejecutarTrabajoEnviarCliente(job) {
+            const ctx = job.ctx;
+            faseTrabajo(job, 'enviando', 'email a ' + ctx.clientEmail);
+            if (esAbierto(job)) showStatus('Enviando presupuesto al cliente… no repitas el envío', 'loading');
+            try {
+                // Reintentar es seguro: el servidor (3.7.94) no vuelve a enviar lo
+                // que ya envió con este sendId; con un servidor anterior, se
+                // envía UNA sola vez (sin reintento) como hasta la 3.10.57.
+                const servidorConCandado = (typeof compararVersiones === 'function') ? compararVersiones(apiVersion, '3.7.94') >= 0 : false;
+                const data = await apiPost({
+                    action: 'sendClientEmail',
+                    clientEmail: ctx.clientEmail, clientWhatsApp: ctx.clientWhatsApp,
+                    budgetId: ctx.budgetId, amount: ctx.amount,
+                    sourceLang: ctx.sourceLang, targetLang: ctx.targetLang,
+                    customMessage: ctx.customMessage, clientSubject: ctx.clientSubject,
+                    quoteDays: ctx.quoteDays, urgency: ctx.urgency,
+                    quoteConfig: ctx.quoteConfig, sendId: ctx.sendId
+                }, servidorConCandado ? { retry: true, attempts: 3, timeoutMs: 90000 } : { retry: false });
+                if (!data || !data.success) throw new Error((data && data.error) || 'sin respuesta del servidor');
+                const fecha = data.fechaEnvio || '';
+                job.resultado = { texto: 'email enviado a ' + ctx.clientEmail + (data.duplicado ? ' (ya había salido: el servidor evitó el duplicado)' : '') + (data.aviso ? ' · ⚠️ ' + data.aviso : '') };
+                if (esAbierto(job)) {
+                    if (fecha) {
+                        if (!budgetData.historialCliente) budgetData.historialCliente = {};
+                        if (!budgetData.historialCliente.email) budgetData.historialCliente.email = [];
+                        if (!budgetData.historialCliente.email.some(x => x.fecha === fecha && x.destinatario === ctx.clientEmail)) {
+                            budgetData.historialCliente.email.push({ fecha: fecha, destinatario: ctx.clientEmail });
+                        }
+                        try { renderClientSendHistory(); } catch (e) {}
+                    }
+                    budgetData.estado = '2-Presupuesto Enviado';
+                    try { if (ctx.quoteConfig) { budgetData.quoteConfig = JSON.parse(ctx.quoteConfig); renderQuoteConfigStamp(budgetData.quoteConfig); pintarAvisoFicha(null); } } catch (e) {}   // v3.10.65
+                    try { updateBudgetSummaryBar(); } catch (e) {}
+                    hideStatus();
+                    completedSteps.add(5);
+                    updateProgressSteps();
+                    try { versionarRecuentoAlEnviar('Email'); } catch (e) {}   // v3.9.2
+                    showSuccess('¡Presupuesto enviado!', `Email enviado a ${ctx.clientEmail}`, true);
+                }
+                anotarEnvioClienteEnCopias(ctx.budgetId, ctx.clientEmail, fecha);
+                faseTrabajo(job, 'hecho');
+            } catch (error) {
+                if (job.fase === 'detenido' || esErrorDeParada(error)) {
+                    // reintentar = otro clic: sendId nuevo (el candado de 2 min del servidor sigue protegiendo)
+                    job.reintentar = () => { const j2 = nuevoTrabajo('enviarCliente', Object.assign({}, ctx, { sendId: nuevoSendId(ctx.budgetId) })); enviosClienteEnCurso.add(ctx.budgetId); actualizarBotonEnvioCliente(); ejecutarTrabajoEnviarCliente(j2); };
+                    renderTrabajos();
+                } else {
+                    job.error = error.message || String(error);
+                    faseTrabajo(job, 'error');
+                    if (esAbierto(job)) {
+                        showStatus('Error al enviar: ' + job.error + ' — si vuelves a pulsar Enviar, el servidor evita duplicados.', 'error');
+                        setTimeout(hideStatus, 8000);
+                    }
+                }
+            } finally {
+                enviosClienteEnCurso.delete(ctx.budgetId);
+                actualizarBotonEnvioCliente();
+            }
+        }
+
         async function apiPost(payload, opts) {
             const options = opts || {};
             const accion = API_ACTION_LABELS[payload && payload.action] || (payload && payload.action) || 'la operación';
@@ -8367,7 +8230,11 @@
                 // con requestId + bloqueo): abortar y reintentar es seguro.
                 // v3.10.57: options.abortController permite al llamador cortar la
                 // petición (recuento recuperado de la hoja antes de que llegue).
-                const ctrl = options.abortController || ((options.timeoutMs && typeof AbortController === 'function') ? new AbortController() : null);
+                // v3.10.64: toda petición lleva controlador, enlazado a "Detener todo"
+                const stopSeqInicio = _stopSeq;
+                const ctrl = options.abortController || ((typeof AbortController === 'function') ? new AbortController() : null);
+                const desenlazar = _enlazarParada(ctrl);
+                if (ctrl) { _fetchsActivos.add(ctrl); pintarBotonDetener(); }
                 const timer = (ctrl && options.timeoutMs) ? setTimeout(() => ctrl.abort(), options.timeoutMs) : null;
                 try {
                     const resp = await fetch(apiUrl, {
@@ -8378,6 +8245,7 @@
                     });
                     const texto = await resp.text();
                     if (timer) clearTimeout(timer);
+                    desenlazar(); if (ctrl) { _fetchsActivos.delete(ctrl); pintarBotonDetener(); }
                     const limpio = (texto || '').trim();
 
                     if (limpio.startsWith('<') || !limpio) {
@@ -8398,7 +8266,9 @@
                     }
                 } catch (e) {
                     if (timer) clearTimeout(timer);
+                    desenlazar(); if (ctrl) { _fetchsActivos.delete(ctrl); pintarBotonDetener(); }
                     const abortado = e && (e.name === 'AbortError' || /aborted/i.test(e.message || ''));
+                    if (abortado && _stopSeq !== stopSeqInicio) throw _errorDetenido();   // v3.10.64: "Detener todo": sin reintentos
                     ultimoError = abortado
                         ? new Error(`El servidor tardó más de ${Math.round(options.timeoutMs / 1000)} s al ${accion}` + (intento < intentos ? '; se reintenta.' : ' y se dejó de esperar.'))
                         : e;
@@ -8746,18 +8616,21 @@
         // invertidos, y por eso el mensaje decía "Documentos (3)" encima de
         // siete nombres.
         function nombresDeArchivos() {
-            if (uploadedFiles.length > 0) return uploadedFiles.map(f => f.name);
-            const enDrive = (budgetData.folderFiles || [])
+            // v3.10.65: los pendientes de subir se SUMAN a los que ya están en el
+            // presupuesto (Drive, carpeta local o análisis), no los sustituyen.
+            // Antes, con carpeta y un archivo nuevo, la barra decía
+            // "Documentos: 1" y el mensaje al cliente solo listaba el nuevo.
+            const out = []; const vistos = new Set();
+            const add = n => { const k = String(n || '').toLowerCase(); if (!n || vistos.has(k)) return; vistos.add(k); out.push(n); };
+            (budgetData.folderFiles || [])
                 .filter(f => f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_')
-                .map(f => f.name)
-                .filter(Boolean);
-            if (enDrive.length > 0) return enDrive;
+                .forEach(f => add(f.name));
             // Si la lista de Drive aún no ha llegado, la carpeta local ya sabe
-            // qué archivos hay.
-            const local = Object.keys(budgetData.pagesByFile || {});
-            if (local.length > 0) return local;
-            return (budgetData.fileAnalysis || [])
-                .map(f => f.fileName || f.name).filter(Boolean);
+            // qué archivos hay; y si tampoco, el análisis guardado.
+            if (!out.length) Object.keys(budgetData.pagesByFile || {}).forEach(add);
+            if (!out.length) (budgetData.fileAnalysis || []).forEach(f => add(f.fileName || f.name));
+            (uploadedFiles || []).forEach(f => add(f.name));
+            return out;
         }
 
         // ====== v3.9.9: NOMBRES DE PROVEEDOR CON COMA ======
@@ -8995,7 +8868,8 @@
             guardando:  'guardando recuento',
             enviando:   'enviando solicitud de tasación',
             hecho:      'terminado',
-            error:      'error'
+            error:      'error',
+            detenido:   'detenido'        // v3.10.64: "Detener todo"
         };
         function nuevoTrabajo(tipo, ctx) {
             const job = {
@@ -9015,8 +8889,16 @@
             renderTrabajos();
             return job;
         }
-        function enMarcha(job) { return job && job.fase !== 'hecho' && job.fase !== 'error'; }
+        function enMarcha(job) { return job && job.fase !== 'hecho' && job.fase !== 'error' && job.fase !== 'detenido'; }
         function faseTrabajo(job, fase, detalle) {
+            // v3.10.64: "detenido" es terminal. Un trabajo detenido no avanza:
+            // si su flujo intenta pasar a otra fase intermedia, se corta aquí
+            // (el runner lo recoge en su catch); un final tardío (hecho/error)
+            // no lo resucita.
+            if (job.fase === 'detenido' && fase !== 'detenido') {
+                if (fase === 'hecho' || fase === 'error') return false;
+                throw _errorDetenido();
+            }
             job.fase = fase; job.faseDesde = Date.now();
             if (detalle !== undefined) job.detalle = detalle || '';
             if (!enMarcha(job)) job.fin = Date.now();
@@ -9056,7 +8938,10 @@
             return false;
         }
         function etiquetaTrabajo(job) { return job.budgetId || 'nuevo'; }
-        function textoFase(job) { return FASES_TRABAJO[job.fase] || job.fase; }
+        function textoFase(job) {
+            if (job.tipo === 'enviarCliente' && job.fase === 'enviando') return 'enviando email al cliente';   // v3.10.64
+            return FASES_TRABAJO[job.fase] || job.fase;
+        }
         function fmtMmSs(ms) {
             const s = Math.max(0, Math.round(ms / 1000));
             return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
@@ -9077,6 +8962,7 @@
                     // compacto: la cabecera va justa de sitio. El cronómetro está en el panel.
                     const corta = { preparando: 'creando carpeta', creando: 'creando carpeta', escribiendo: 'escribiendo archivos', subiendo: 'subiendo archivos', contando: 'contando palabras', guardando: 'guardando', enviando: 'enviando tasación' };
                     let faseCorta = corta[principal.fase] || textoFase(principal);
+                    if (principal.tipo === 'enviarCliente') faseCorta = 'enviando email al cliente';   // v3.10.64
                     if (principal.fase === 'contando' && principal.progreso && principal.progreso.total) faseCorta = 'contando ' + principal.progreso.hechas + '/' + principal.progreso.total;   // v3.10.58
                     badge.innerHTML = '⏳ ' + (principal.budgetId ? '<b>' + escapeHtml(principal.budgetId) + '</b> · ' : '') +
                         faseCorta + (resto ? ' <span style="opacity:.85">+' + resto + '</span>' : '');
@@ -9090,6 +8976,7 @@
             if (activos.length && !_trabajosTimer) _trabajosTimer = setInterval(renderTrabajos, 1000);
             if (!activos.length && _trabajosTimer) { clearInterval(_trabajosTimer); _trabajosTimer = null; }
             prodLogRender();
+            pintarBotonDetener();   // v3.10.64
         }
         // Bloque de trabajos en el panel "Proceso"
         function htmlTrabajos() {
@@ -9098,6 +8985,7 @@
                 let icon, color;
                 if (enMarcha(t)) { icon = '⏳'; color = '#fbbf24'; }
                 else if (t.fase === 'hecho') { icon = '✓'; color = '#4ade80'; }
+                else if (t.fase === 'detenido') { icon = '⏹'; color = '#94a3b8'; }
                 else { icon = '⚠️'; color = '#f87171'; }
                 const hora = _hhmmss(new Date(t.inicio));
                 const dur = fmtMmSs((t.fin || Date.now()) - t.inicio);
@@ -9106,13 +8994,15 @@
                     cuerpo = textoFase(t) + (t.detalle ? ' · ' + escapeHtml(t.detalle) : '') + ' · ' + dur;
                 } else if (t.fase === 'hecho') {
                     cuerpo = (t.resultado ? escapeHtml(t.resultado.texto) : 'terminado') + ' · ' + dur;
+                } else if (t.fase === 'detenido') {
+                    cuerpo = 'detenido por ti' + (t.detalle ? ' (iba por: ' + escapeHtml(t.detalle) + ')' : '') + ' · ' + dur;
                 } else {
                     cuerpo = 'falló: ' + escapeHtml(t.error || 'error') + ' · ' + dur;
                 }
                 const links = [];
                 if (t.budgetId && !esAbierto(t)) links.push(`<a href="#" onclick="abrirDesdeTrabajo('${t.budgetId}'); return false;" style="color:#93c5fd;">abrir</a>`);
                 if (t.budgetId && esAbierto(t)) links.push('<span style="color:#64748b;">(abierto)</span>');
-                if (t.fase === 'error' && t.reintentar) links.push(`<a href="#" onclick="reintentarTrabajo('${t.jid}'); return false;" style="color:#93c5fd;">reintentar</a>`);
+                if ((t.fase === 'error' || t.fase === 'detenido') && t.reintentar) links.push(`<a href="#" onclick="reintentarTrabajo('${t.jid}'); return false;" style="color:#93c5fd;">reintentar</a>`);
                 return `<div style="padding:4px 0;border-bottom:1px dashed #1e293b;">
                     <span style="color:${color};">${icon}</span> <span style="color:#64748b;">${hora}</span>
                     <b>${escapeHtml(etiquetaTrabajo(t))}</b> · ${cuerpo}${links.length ? ' · ' + links.join(' · ') : ''}
@@ -9604,6 +9494,7 @@
                         aceptarSinCountId: true, etiqueta: 'Crear y Analizar'
                     });
                     let pr = await pedirRecuentoAlServidor(job, paramsRecuento());
+                    if (!enMarcha(job)) throw _errorDetenido();   // v3.10.64
                     if (!pr.ok) {
                         // un reintento automático (fallo transitorio del servidor o de Claude)
                         job.bg.analysisError = pr.error;
@@ -9613,6 +9504,7 @@
                             showGlobalAnalysisBanner('loading', '⏳ ' + msgAuto);
                         }
                         pr = await pedirRecuentoAlServidor(job, Object.assign(paramsRecuento(), { intento: 2 }));
+                        if (!enMarcha(job)) throw _errorDetenido();   // v3.10.64
                     }
                     stageTimings.backendClaudeMs = (pr.res && pr.res._perf && pr.res._perf.totalMs) || 0;
                     if (!pr.ok) {
@@ -9683,6 +9575,13 @@
                 stageTimings.t_end = performance.now();
                 logStageTimingsToSheet(stageTimings, withAnalysis ? 'Crear y Analizar' : 'Crear Carpeta', files.length, approxBytes, job.budgetId);
             } catch (error) {
+                if (job.fase === 'detenido' || esErrorDeParada(error)) {   // v3.10.64: "Detener todo"
+                    job.bg.pendingFiles = files;
+                    // mismo requestId → si el servidor llegó a crear la carpeta, no la duplica
+                    job.reintentar = () => { job.fase = 'preparando'; job.fin = 0; ejecutarTrabajoCrear(job); };
+                    renderTrabajos();
+                    return;
+                }
                 job.bg.folderError = error.message;
                 job.bg.pendingFiles = files;
                 const isFailedToFetch = /failed to fetch|networkerror|load failed/i.test(error.message || '');
@@ -9951,10 +9850,17 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 { type: 'text', text: prompt }
             ];
             const body = { model: NAV_COUNT.model, max_tokens: NAV_COUNT.maxTokens, temperature: 0, messages: [{ role: 'user', content: content }] };
-            const resp = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: cabecerasClaude(key), body: JSON.stringify(body) });
-            const texto = await resp.text();
-            let retryAfter = ''; try { retryAfter = resp.headers.get('retry-after') || ''; } catch (e) {}
-            return { status: resp.status, texto: texto, retryAfter: retryAfter };
+            const ctrl = (typeof AbortController === 'function') ? new AbortController() : null;   // v3.10.64: "Detener todo"
+            const desenlazar = _enlazarParada(ctrl);
+            if (ctrl) { _fetchsActivos.add(ctrl); pintarBotonDetener(); }
+            try {
+                const resp = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: cabecerasClaude(key), body: JSON.stringify(body), signal: ctrl ? ctrl.signal : undefined });
+                const texto = await resp.text();
+                let retryAfter = ''; try { retryAfter = resp.headers.get('retry-after') || ''; } catch (e) {}
+                return { status: resp.status, texto: texto, retryAfter: retryAfter };
+            } finally {
+                desenlazar(); if (ctrl) { _fetchsActivos.delete(ctrl); pintarBotonDetener(); }
+            }
         }
 
         // ---------- 3. N páginas en paralelo con reintentos ----------
@@ -9968,12 +9874,14 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const t0 = performance.now();
             let siguiente = 0, hechas = 0, claveRechazada = false;
             const INTENTOS = NAV_COUNT.maxRetries + 1;
+            const stopSeqInicio = _stopSeq;                 // v3.10.64: "Detener todo" corta el bucle
+            const detenido = () => _stopSeq !== stopSeqInicio;
             async function procesar(i) {
                 const p = pages[i];
                 const prompt = buildPromptRecuento(sourceLang, internalComments, p.fileInstructions);
                 let vaciosSeguidos = 0, ultimo = null;
                 for (let intento = 1; intento <= INTENTOS; intento++) {
-                    if (claveRechazada) break;
+                    if (claveRechazada || detenido()) break;
                     if (intento > 1) {
                         const espera = Math.min(30000, 2000 * Math.pow(2, intento - 2)) + ((ultimo && ultimo.retryAfterMs) || 0);
                         await new Promise(r => setTimeout(r, espera));
@@ -10004,7 +9912,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 results[i] = { fileName: p.fileName, pageNum: p.pageNum, words: 0, text: '', error: true, errorMsg: ultimo ? ultimo.errorMsg : 'error', otrosIdiomas: [] };
             }
             async function worker() {
-                while (!claveRechazada) {
+                while (!claveRechazada && !detenido()) {
                     const i = siguiente++;
                     if (i >= pages.length) return;
                     await procesar(i);
@@ -10131,6 +10039,10 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 }
             });
             job.progreso = null;
+            if (!enMarcha(job)) {   // v3.10.64: detenido por el usuario
+                prodLogError(kC, 'detenido por el usuario');
+                return { ok: false, fallbackServidor: false, error: 'Detenido por el usuario' };
+            }
             if (results._claveRechazada) {
                 prodLogUpdate(kC, `${escapeHtml(p.budgetId)} · Contando con Claude desde el navegador`);
                 prodLogError(kC, 'la API de Claude rechazó la clave (HTTP 401/403): revisa Ajustes → se cuenta en el servidor');
@@ -10166,8 +10078,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         function nuevoCountId() { return 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
         function _esperaCancelable(ms) {
             let t = null, fin = null;
-            const p = new Promise(r => { fin = r; t = setTimeout(r, ms); });
-            p.cancelar = () => { if (t) clearTimeout(t); t = null; if (fin) fin(); };
+            const p = new Promise(r => { fin = r; t = setTimeout(() => { _esperasActivas.delete(p); r(); }, ms); });
+            p.cancelar = () => { if (t) clearTimeout(t); t = null; _esperasActivas.delete(p); if (fin) fin(); };
+            _esperasActivas.add(p);   // v3.10.64: "Detener todo" las cancela
             return p;
         }
         // Lee la hoja y devuelve el recuento SOLO si es el nuestro (countId).
@@ -10215,6 +10128,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 }
                 if (!rn.fallbackServidor) return { ok: false, error: rn.error, perdida: false };
             }
+            if (!enMarcha(job)) return { ok: false, error: 'Detenido por el usuario', perdida: false };   // v3.10.64
             const numFiles = porArchivos ? p.files.length : (p.numFiles || 0);
             const payload = porArchivos
                 ? { action: 'countWordsParallel', files: p.files, sourceLang: p.sourceLang, internalComments: p.internalComments || '',
@@ -10233,12 +10147,12 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             // consulta de la hoja en paralelo (la respuesta puede perderse)
             const pHoja = (async () => {
                 esperaHoja = _esperaCancelable(RECUENTO_ESPERA.primeraMs); await esperaHoja;
-                while (!terminado && Date.now() - t0 < RECUENTO_ESPERA.maxMs) {
+                while (!terminado && enMarcha(job) && Date.now() - t0 < RECUENTO_ESPERA.maxMs) {
                     try {
                         const rec = await leerRecuentoDeHoja(p.budgetId, countId, !!p.aceptarSinCountId);
                         if (rec) return { tipo: 'hoja', rec };
                     } catch (e) { /* siguiente consulta */ }
-                    if (terminado) break;
+                    if (terminado || !enMarcha(job)) break;   // v3.10.64: Detener todo
                     esperaHoja = _esperaCancelable(RECUENTO_ESPERA.cadaMs); await esperaHoja;
                 }
                 return { tipo: 'hoja', rec: null };
@@ -10483,6 +10397,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 faseTrabajo(job, 'hecho');
                 return true;
             } catch (e) {
+                if (job.fase === 'detenido' || esErrorDeParada(e)) {   // v3.10.64: "Detener todo"
+                    job.reintentar = () => { const j2 = nuevoTrabajo('contar', Object.assign({}, ctx)); ejecutarTrabajoContar(j2); };
+                    renderTrabajos();
+                    return false;
+                }
                 job.error = e.message || String(e);
                 if (esAbierto(job)) { showStatus('Error: ' + job.error, 'error'); showGlobalAnalysisBanner('error', `❌ ${ctx.budgetId} · Error: ${job.error}`); }
             }
@@ -10545,380 +10464,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             }
         }
 
-        // ====== WORD COUNT ======
-        async function countPagesOnly() {
-            if (!budgetData.folderId) {
-                showStatus('Primero crea la carpeta del presupuesto', 'warning');
-                return;
-            }
-            
-            const btn = document.getElementById('countPagesBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Contando...';
-            
-            try {
-                showStatus('Contando páginas...', 'loading');
-                
-                const data = await apiPost({
-                        action: 'countPagesOnly',
-                        folderId: budgetData.folderId,
-                        budgetId: budgetData.id
-                    });
-                
-                if (data.success) {
-                    budgetData.fileAnalysis = data.analysis || [];
-                    aplicarAjustesManuales();   // v3.10.34
-                    renderWordCountSummary();   // v3.10.33
-                    budgetData.wordCount = null;  // No contamos palabras
-                    budgetData.pageCount = data.totalPages || 0;
-                    
-                    // Display results (sin palabras)
-                    displayPageCountResults(data);
-                    hideStatus();
-                    
-                    updateTotalPrice();
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
-            }
-            
-            btn.disabled = false;
-            btn.innerHTML = '📄 Solo Páginas <span class="btn-hint">(instantáneo)</span>';
-        }
-        
-        function displayPageCountResults(data) {
-            const tbody = document.getElementById('wordCountBody');
-            let html = '';
-            
-            data.analysis.forEach(file => {
-                html += `
-                    <tr>
-                        <td>${file.fileName}</td>
-                        <td style="text-align:right; color: var(--text-secondary);">--</td>
-                        <td style="text-align:right; font-weight: 600;">${file.pages}</td>
-                    </tr>
-                `;
-            });
-            
-            // Totals
-            html += `
-                <tr class="total-row">
-                    <td><strong>TOTAL</strong></td>
-                    <td style="text-align:right; color: var(--text-secondary);">--</td>
-                    <td style="text-align:right;"><strong>${data.totalPages}</strong></td>
-                </tr>
-            `;
-            
-            tbody.innerHTML = html;
-            
-            // Ocultar sección de palabras, mostrar solo páginas
-            document.getElementById('tariffEditorWords').style.display = 'none';
-            document.getElementById('resultByWords').style.display = 'none';
-            
-            document.getElementById('wordCountResults').classList.remove('hidden');
-        }
-        
-        async function countWords() {
-            if (!budgetData.folderId) {
-                showStatus('Primero crea la carpeta del presupuesto', 'warning');
-                return;
-            }
-            
-            const btn = document.getElementById('countWordsBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Analizando...';
-            
-            try {
-                showStatus('Analizando documentos (puede tardar unos segundos)...', 'loading');
-                
-                const data = await apiPost({
-                        action: 'countWords',
-                        folderId: budgetData.folderId,
-                        budgetId: budgetData.id,
-                        sourceLang: budgetData.sourceLang,
-                        internalComments: budgetData.internalComments || ''
-                    });
-                
-                if (data.success) {
-                    budgetData.fileAnalysis = data.analysis || [];
-                    aplicarAjustesManuales();   // v3.10.34
-                    renderWordCountSummary();   // v3.10.33
-                    budgetData.wordCount = data.totalWords || 0;
-                    budgetData.pageCount = data.totalPages || 0;
-                    
-                    // Display results
-                    displayWordCountResults(data);
-                    hideStatus();
-                    
-                    // Set custom tariff from config
-                    document.getElementById('customTariff').value = (parseFloat(budgetData.tariffPerWord) || 0).toFixed(2);
-                    updateTotalPrice();
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
-            }
-            
-            btn.disabled = false;
-            btn.innerHTML = '🔢 Reanalizar <span class="btn-hint">(análisis completado ✓)</span>';
-        }
-
-        function displayWordCountResults(data) {
-            const results = document.getElementById('step3Results');
-            const tbody = document.getElementById('wordCountBody');
-            const editor = document.getElementById('tariffEditorWords');
-            
-            // Guardar datos de análisis globalmente para el desglose
-            window.analysisData = data;
-            
-            let html = '';
-            
-            data.analysis.forEach((file, index) => {
-                const fileName = file.fileName || file.name || 'Sin nombre';
-                const hasBreakdown = file.breakdown && file.breakdown.length > 0;
-                
-                // Icono de ojo para previsualizar en Google Drive
-                const previewBtn = file.fileId 
-                    ? `<a href="https://drive.google.com/file/d/${file.fileId}/view" target="_blank" class="btn-preview" title="Ver archivo">👁️</a>`
-                    : '';
-                
-                // Botón de desglose si tiene breakdown
-                const breakdownBtn = hasBreakdown 
-                    ? `<button class="btn-mini-breakdown" onclick="showBreakdownModal(${index})" title="Ver desglose por página">📄</button>`
-                    : '';
-                
-                html += `
-                    <tr data-file-index="${index}">
-                        <td>${previewBtn} ${fileName}</td>
-                        <td class="number">${file.words.toLocaleString('es-ES')} ${breakdownBtn}</td>
-                        <td class="number">${file.pages}</td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                <tr class="total">
-                    <td>TOTAL</td>
-                    <td class="number" id="totalWordsCell">${data.totalWords.toLocaleString('es-ES')}</td>
-                    <td class="number" id="totalPagesCell">${data.totalPages}</td>
-                </tr>
-            `;
-            
-            tbody.innerHTML = html;
-            
-            // Update summary
-            document.getElementById('summaryFiles').textContent = data.analysis.length;
-            document.getElementById('summaryPages').textContent = data.totalPages;
-            
-            // Mostrar editor de tarifa por palabra
-            if (editor) editor.classList.remove('hidden');
-            if (results) results.classList.remove('hidden');
-        }
-        
-        // ====== FUNCIONES DE DESGLOSE POR ARCHIVO ======
-        let currentBreakdown = [];
-        let currentFileIndex = 0;
-        
-        // ====== MODAL VER TXT EXTRAÍDO ======
-        let currentTxtFilename = '';
-        
-        function openTxtPreviewModal(filename, text) {
-            currentTxtFilename = filename;
-            document.getElementById('txtPreviewTitle').textContent = '📄 ' + filename + '.txt';
-            document.getElementById('txtPreviewContent').value = text || '(Sin texto extraído)';
-            document.getElementById('txtPreviewModal').classList.add('active');
-        }
-        
-        function closeTxtPreviewModal() {
-            document.getElementById('txtPreviewModal').classList.remove('active');
-        }
-        
-        function copyTxtContent() {
-            const content = document.getElementById('txtPreviewContent').value;
-            navigator.clipboard.writeText(content).then(() => {
-                showStatus('Texto copiado al portapapeles', 'success');
-                setTimeout(hideStatus, 1500);
-            });
-        }
-        
-        function downloadTxtContent() {
-            const content = document.getElementById('txtPreviewContent').value;
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = currentTxtFilename + '.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function showBreakdownModal(fileIndex) {
-            const modal = document.getElementById('breakdownModal');
-            const data = window.analysisData;
-            
-            if (!data || !data.analysis || !data.analysis[fileIndex]) {
-                showStatus('No hay datos de análisis', 'error');
-                return;
-            }
-            
-            const file = data.analysis[fileIndex];
-            currentFileIndex = fileIndex;
-            
-            if (!file.breakdown || file.breakdown.length === 0) {
-                showStatus('No hay desglose disponible para este archivo', 'error');
-                return;
-            }
-            
-            // Mostrar nombre del archivo en el modal
-            const fileName = file.fileName || file.name || 'Archivo';
-            document.querySelector('#breakdownModal .modal-header h3').textContent = '📄 ' + fileName;
-            
-            // Copiar breakdown para edición
-            currentBreakdown = JSON.parse(JSON.stringify(file.breakdown));
-            
-            renderBreakdown();
-            modal.classList.add('visible');
-        }
-        
-        function closeBreakdownModal() {
-            const modal = document.getElementById('breakdownModal');
-            modal.classList.remove('visible');
-        }
-        
-        function renderBreakdown() {
-            const list = document.getElementById('breakdownList');
-            let html = '';
-            
-            currentBreakdown.forEach((item, index) => {
-                const excluded = !item.included;
-                const estimated = item.estimated ? '<span class="page-estimated">(est.)</span>' : '';
-                
-                html += `
-                    <div class="breakdown-item ${excluded ? 'excluded' : ''}" data-index="${index}">
-                        <span class="page-num">Página ${item.page}</span>
-                        <span class="page-words"><strong>${item.words.toLocaleString('es-ES')}</strong> palabras ${estimated}</span>
-                        <button class="page-remove" onclick="togglePage(${index})" title="${excluded ? 'Incluir' : 'Excluir'}">
-                            ${excluded ? '✓' : '✕'}
-                        </button>
-                    </div>
-                `;
-            });
-            
-            list.innerHTML = html;
-            updateBreakdownTotals();
-        }
-        
-        function togglePage(index) {
-            currentBreakdown[index].included = !currentBreakdown[index].included;
-            renderBreakdown();
-        }
-        
-        function updateBreakdownTotals() {
-            const includedItems = currentBreakdown.filter(item => item.included);
-            const totalWords = includedItems.reduce((sum, item) => sum + item.words, 0);
-            const totalPages = includedItems.length;
-            
-            document.getElementById('breakdownTotalWords').textContent = totalWords.toLocaleString('es-ES');
-            document.getElementById('breakdownTotalPages').textContent = totalPages;
-        }
-        
-        function resetBreakdown() {
-            const data = window.analysisData;
-            if (data && data.analysis && data.analysis[currentFileIndex]) {
-                // Restaurar del original
-                const originalFile = data.analysis[currentFileIndex];
-                if (originalFile.originalBreakdown) {
-                    currentBreakdown = JSON.parse(JSON.stringify(originalFile.originalBreakdown));
-                } else {
-                    // Si no hay original guardado, marcar todas como incluidas
-                    currentBreakdown.forEach(item => item.included = true);
-                }
-                renderBreakdown();
-            }
-        }
-        
-        function applyBreakdown() {
-            const data = window.analysisData;
-            if (!data || !data.analysis[currentFileIndex]) return;
-            
-            const file = data.analysis[currentFileIndex];
-            
-            // Guardar breakdown original si no existe
-            if (!file.originalBreakdown) {
-                file.originalBreakdown = JSON.parse(JSON.stringify(file.breakdown));
-            }
-            
-            // Actualizar breakdown del archivo
-            file.breakdown = currentBreakdown;
-            
-            // Calcular nuevos totales del archivo
-            const includedItems = currentBreakdown.filter(item => item.included);
-            file.words = includedItems.reduce((sum, item) => sum + item.words, 0);
-            file.pages = includedItems.length;
-            
-            // Recalcular totales globales
-            let totalWords = 0;
-            let totalPages = 0;
-            data.analysis.forEach(f => {
-                totalWords += f.words;
-                totalPages += f.pages;
-            });
-            data.totalWords = totalWords;
-            data.totalPages = totalPages;
-            
-            // Actualizar budgetData
-            budgetData.wordCount = totalWords;
-            budgetData.pageCount = totalPages;
-            
-            // Actualizar la fila del archivo en la tabla
-            const row = document.querySelector(`tr[data-file-index="${currentFileIndex}"]`);
-            if (row) {
-                const cells = row.querySelectorAll('td');
-                cells[1].innerHTML = `${file.words.toLocaleString('es-ES')} <button class="btn-mini-breakdown" onclick="showBreakdownModal(${currentFileIndex})" title="Ver desglose por página">📄</button>`;
-                cells[2].textContent = file.pages;
-            }
-            
-            // Actualizar fila de totales
-            document.getElementById('totalWordsCell').textContent = totalWords.toLocaleString('es-ES');
-            document.getElementById('totalPagesCell').textContent = totalPages;
-            
-            // Actualizar resumen
-            document.getElementById('summaryPages').textContent = totalPages;
-            
-            // Actualizar precio
-            updateTotalPrice();
-            
-            closeBreakdownModal();
-            showStatus('Desglose actualizado', 'success');
-            setTimeout(hideStatus, 2000);
-        }
-
-        function updateTotalPrice() {
-            const tariff = parseFloat(document.getElementById('customTariff').value) || 0;
-            const words = budgetData.wordCount || 0;
-            const pages = budgetData.pageCount || 0;
-            
-            // Price by words
-            const priceByWords = (words * tariff).toFixed(2).replace('.', ',');
-            document.getElementById('priceByWords').textContent = priceByWords;
-            
-            // Price by pages
-            const page1 = budgetData.tariffPage1 || 0;
-            const page2 = budgetData.tariffPage2 || 0;
-            const pagesRest = Math.max(0, pages - 1);
-            let priceByPages = 0;
-            if (pages > 0) {
-                priceByPages = page1 + pagesRest * page2;
-            }
-            
-            // Update displays
-            document.getElementById('calcPagesRest').textContent = pagesRest;
-            document.getElementById('calcTotal').textContent = priceByPages.toFixed(2).replace('.', ',');
-            document.getElementById('summaryPricePages').textContent = priceByPages.toFixed(2).replace('.', ',') + ' €';
-        }
+        // (v3.10.63: countPagesOnly / countWords / displayWordCountResults / displayPageCountResults,
+        // el desglose por página y el modal de TXT se han retirado con la pantalla antigua del paso 3)
 
         // ====== PROVIDERS ======
         function renderProviders() {
@@ -11714,6 +11261,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     setTimeout(() => { hideSuccess(); if (esAbierto(job)) showCard(5); }, 2000);
                 }
             } catch (error) {
+                if (job.fase === 'detenido' || esErrorDeParada(error)) {   // v3.10.64: "Detener todo"
+                    job.detalle = 'enviados ' + ok + ' de ' + providers.length;
+                    renderTrabajos();
+                    return;
+                }
                 // v3.7.96: sin reintento automático, un fallo real llega aquí.
                 // OJO: la respuesta perdida NO implica que el envío no saliera;
                 // el candado del backend (v3.7.60) evita duplicados al reintentar.
@@ -12546,6 +12098,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 // contexto del recuento en el momento de tarificar
                 words: budgetData.wordCount || 0,
                 pages: budgetData.pageCount || 0,
+                // v3.10.65: inventario exacto (páginas, a traducir, palabras, documentos)
+                inventario: (function () { try { const i = inventarioActual(); return { paginas: i.paginas, aTraducir: i.aTraducir, palabras: i.palabras, archivos: i.archivos }; } catch (e) { return null; } })(),
                 countMethod: budgetData.countMethodUsed || countMethod(),
                 otrosIdiomas: budgetData.otrosIdiomas || null,   // v3.8.8
                 sourceLang: budgetData.sourceLang || '',
@@ -12594,6 +12148,202 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 renderQuoteConfigStamp(cfg);
             } catch (e) {
                 console.warn('applyQuoteConfig:', e);
+            }
+        }
+
+        // ============ v3.10.65: LA FICHA MANDA… SALVO QUE LOS DOCUMENTOS HAYAN CAMBIADO ============
+        // Caso real 1007-13-W (09/10/2026): presupuesto enviado con 4 documentos
+        // (8 páginas, 167 €). Javier añade un PDF de 2 páginas: el pie del paso 2
+        // decía 10 páginas, la barra "Páginas: 10" pero "Documentos: 1", el
+        // cálculo seguía en "8 pág · 167 €", el paso 4 restauraba 8/8/8/167 de
+        // la ficha guardada mientras el detalle calculaba 203 € para 10, y el
+        // mensaje al cliente hablaba "del documento enviado" (solo el nuevo).
+        // Dos causas:
+        //   1. applyQuoteConfig restaura la ficha tal cual se guardó (v3.10.14,
+        //      para no perder lo tecleado), también cuando los documentos ya no
+        //      son los mismos. Ahora, tras restaurarla, se compara con el
+        //      inventario actual (páginas, páginas a traducir, palabras,
+        //      documentos): si cambió, los campos pasan a los valores actuales,
+        //      el importe se recalcula si era el automático (si lo escribiste a
+        //      mano se respeta y se avisa), la barra y el mensaje se actualizan,
+        //      y queda un aviso hasta que guardes o envíes. Si los documentos
+        //      vuelven a ser los de la ficha (quitas el archivo), se restaura.
+        //   2. nombresDeArchivos devolvía SOLO los pendientes de subir cuando
+        //      había alguno (pensado para un presupuesto nuevo): con carpeta y
+        //      archivos nuevos, la barra y el mensaje al cliente perdían los
+        //      documentos que ya estaban en Drive. Ahora devuelve la unión.
+        let _sincDocsTimer = null;
+        let _ultimoInventarioPersistido = null;
+        const _numF = x => { const n = parseFloat(String(x == null ? '' : x).replace(',', '.')); return isNaN(n) ? 0 : n; };
+        function inventarioActual() {
+            const r = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null;
+            const total = r ? r.total : (parseInt(budgetData.pageCount) || 0);
+            const aTraducir = r ? (r.hayFiltros ? r.aTraducir : r.total) : total;
+            return {
+                paginas: total,
+                aTraducir: aTraducir,
+                palabras: parseInt(budgetData.wordCount) || 0,
+                archivos: nombresDeArchivos().length,
+                hayFiltros: !!(r && r.hayFiltros),
+                sinContar: (uploadedFiles || []).length   // documentos aún no subidos ni contados
+            };
+        }
+        // Inventario con el que se guardó la ficha (fichas antiguas: se deduce de sus campos)
+        function inventarioDeFicha(cfg) {
+            const f = (cfg && cfg.fields) || {};
+            if (cfg && cfg.inventario) return cfg.inventario;
+            return {
+                paginas: parseInt(cfg && cfg.pages) || parseInt(f.quoteTotalPages) || 0,
+                aTraducir: parseInt(f.quotePagesCount) || parseInt(f.quotePagesToTranslate) || parseInt(cfg && cfg.pages) || 0,
+                palabras: parseInt(cfg && cfg.words) || parseInt(f.quoteWordCount) || parseInt(f.directWordCount) || 0,
+                archivos: null
+            };
+        }
+        // La ficha "de referencia": la guardada de verdad (si la de memoria ya es una recalculada, su origen)
+        function fichaBase(cfg) { return (cfg && cfg.recalculadaPorDocumentos && cfg.recalculadaPorDocumentos.origenCfg) || cfg; }
+        // ¿Qué ha cambiado entre la ficha guardada y los documentos de ahora?
+        function fichaDesfasada(cfg) {
+            if (!cfg || !cfg.fields || !budgetData.id) return null;
+            const base = fichaBase(cfg);
+            const ahora = inventarioActual();
+            const antes = inventarioDeFicha(base);
+            const cambios = [];
+            if (ahora.paginas > 0 && antes.paginas > 0 && ahora.paginas !== antes.paginas) cambios.push({ que: 'páginas', de: antes.paginas, a: ahora.paginas });
+            const trad = ahora.aTraducir > 0 && antes.aTraducir > 0 && ahora.aTraducir !== antes.aTraducir;
+            if (trad && (ahora.hayFiltros || ahora.aTraducir !== ahora.paginas || antes.aTraducir !== antes.paginas)) cambios.push({ que: 'páginas a traducir', de: antes.aTraducir, a: ahora.aTraducir });
+            if (ahora.palabras > 0 && antes.palabras > 0 && ahora.palabras !== antes.palabras) cambios.push({ que: 'palabras', de: antes.palabras, a: ahora.palabras });
+            if (antes.archivos != null && ahora.archivos > 0 && ahora.archivos !== antes.archivos) cambios.push({ que: 'documentos', de: antes.archivos, a: ahora.archivos });
+            if (!cambios.length) return null;
+            return { cambios: cambios, ahora: ahora, antes: antes, base: base };
+        }
+        function _setVal(id, v) { const el = document.getElementById(id); if (el && v != null && v !== '') el.value = v; }
+        function _getVal(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+        // Importe guardado = el que la app calculó sola con los datos guardados → se puede recalcular
+        function importeEraAutomatico(base, antes) {
+            const f = base.fields || {};
+            switch (base.method) {
+                case 'pages': {
+                    const n = antes.aTraducir || antes.paginas;
+                    if (!n) return false;
+                    const calc = calcularPrecioPorPaginas(budgetData.sourceLang, budgetData.targetLang, n).total;
+                    const g = _numF(f.quoteAmountPages);
+                    return Math.abs(Math.round(calc) - g) < 0.01 || Math.abs(calc - g) < 0.01;
+                }
+                case 'direct': {
+                    const calc = _numF(f.directTariffPerWord) * (antes.palabras || _numF(f.directWordCount));
+                    return calc > 0 && Math.abs(Math.round(calc) - _numF(f.quoteAmountDirect)) < 0.51;
+                }
+                default: return false;   // words (margen decidido a mano) y provider: nunca se tocan solos
+            }
+        }
+        function pintarAvisoFicha(info) {
+            const aviso = document.getElementById('fichaDesfasadaAviso');
+            if (!aviso) return;
+            if (!info) { aviso.style.display = 'none'; return; }
+            const lista = (info.cambios || []).map(c => `${c.que} ${c.de} → ${c.a}`).join(', ');
+            let txt = `⚠️ <b>Los documentos han cambiado desde que se guardó la ficha</b> (${escapeHtml(lista)}). `;
+            if (info.importeDespues != null && Math.abs(info.importeDespues - info.importeAntes) > 0.001) txt += `Importe recalculado: <b>${_eur(info.importeAntes)} → ${_eur(info.importeDespues)}</b>. `;
+            else if (info.importeDespues != null) txt += `El importe no cambia (${_eur(info.importeAntes)}). `;
+            else if (info.importeAlternativo != null) txt += `El importe guardado (<b>${_eur(info.importeAntes)}</b>) lo escribiste a mano y se mantiene; el cálculo automático ahora daría <b>${_eur(info.importeAlternativo)}</b>. `;
+            else if (info.metodo === 'words') txt += `Revisa el importe: el coste y el margen sugerido se han recalculado con los datos nuevos. `;
+            if (info.sinContar) txt += `📄 Hay <b>${info.sinContar} documento(s) nuevo(s) sin contar</b>: pulsa «Subir y contar palabras» en el paso 2 antes de dar el precio. `;
+            if (clientMessageEdited) txt += `✍️ El mensaje al cliente está editado a mano: revísalo. `;
+            txt += `Guarda o envía para dejar la hoja al día.`;
+            aviso.innerHTML = txt;
+            aviso.style.display = '';
+        }
+        // Tras restaurar la ficha (initStep5TariffCalc) o al cambiar los
+        // documentos (paso 2): pone los campos al día y recalcula si procede.
+        function reconciliarFichaConDocumentos() {
+            const cfg = budgetData.quoteConfig;
+            const d = fichaDesfasada(cfg);
+            if (!d) {
+                if (cfg && cfg.recalculadaPorDocumentos) {
+                    // los documentos vuelven a ser los de la ficha guardada: se restaura tal cual
+                    const base = fichaBase(cfg);
+                    budgetData.quoteConfig = base;
+                    try { applyQuoteConfig(base); } catch (e) {}
+                    try { updateBudgetSummaryBar(); } catch (e) {}
+                    if (!clientMessageEdited) { try { updateClientMessage(); } catch (e) {} }
+                }
+                pintarAvisoFicha(null);
+                return null;
+            }
+            const base = d.base, f = base.fields || {};
+            const ahora = d.ahora, antes = d.antes;
+            const auto = importeEraAutomatico(base, antes);
+            // 1) cantidades → actuales
+            _setVal('quoteTotalPages', ahora.paginas);
+            _setVal('quotePagesToTranslate', ahora.aTraducir);
+            _setVal('quotePagesCount', ahora.aTraducir);
+            budgetData.pagesToTranslate = ahora.hayFiltros ? ahora.aTraducir : null;
+            budgetData.quotePagesCount = ahora.hayFiltros ? ahora.aTraducir : null;
+            if (ahora.palabras > 0) { _setVal('quoteWordCount', ahora.palabras); _setVal('directWordCount', ahora.palabras); }
+            // 2) importe
+            let importeAntes = 0, importeDespues = null, importeAlternativo = null;
+            const sinContar = (ahora.sinContar > 0 && (base.method === 'words' || base.method === 'direct')) ? ahora.sinContar : 0;
+            switch (base.method) {
+                case 'pages': {
+                    importeAntes = _numF(f.quoteAmountPages);
+                    const n = ahora.aTraducir || ahora.paginas;
+                    if (auto) { recalculateQuoteFromPages(); importeDespues = _numF(_getVal('quoteAmountPages')); }
+                    else {
+                        const c = calcularPrecioPorPaginas(budgetData.sourceLang, budgetData.targetLang, n);
+                        importeAlternativo = Math.round(c.total);
+                        try { const dv = document.getElementById('step5TariffDetail'); if (dv) dv.innerHTML = htmlDetallePaginas(c, budgetData.sourceLang, budgetData.targetLang); } catch (e) {}
+                    }
+                    break;
+                }
+                case 'direct':
+                    importeAntes = _numF(f.quoteAmountDirect);
+                    if (auto && ahora.palabras > 0) { recalculateFromDirect(); importeDespues = _numF(_getVal('quoteAmountDirect')); }
+                    else if (ahora.palabras > 0) importeAlternativo = Math.round(_numF(_getVal('directTariffPerWord')) * ahora.palabras);
+                    break;
+                case 'words':
+                    importeAntes = _numF(f.quoteAmountWords);
+                    try { recalculateFromWords(); } catch (e) {}   // coste y margen sugerido al día; el importe lo decides tú
+                    break;
+                default:
+                    importeAntes = _numF(f.quoteAmountProvider);
+            }
+            // 3) ficha en memoria = lo que se ve (barra y listado la reflejan); se guarda al Guardar/Enviar
+            const nueva = collectQuoteConfig();
+            nueva.savedAt = base.savedAt;
+            nueva.recalculadaPorDocumentos = {
+                origenCfg: base, metodo: base.method, cambios: d.cambios,
+                importeAntes: importeAntes, importeDespues: importeDespues, importeAlternativo: importeAlternativo,
+                sinContar: sinContar, en: new Date().toISOString()
+            };
+            budgetData.quoteConfig = nueva;
+            try { renderQuoteConfigStamp(nueva); } catch (e) {}
+            try { updateBudgetSummaryBar(); } catch (e) {}
+            if (!clientMessageEdited) { try { updateClientMessage(); } catch (e) {} }
+            pintarAvisoFicha(nueva.recalculadaPorDocumentos);
+            return d;
+        }
+        // Paso 2: al añadir o quitar documentos, todo lo que depende de ellos se
+        // pone al día (campos del paso 4, ficha, barra, mensaje) y la hoja
+        // recibe páginas y nº de documentos sin esperar a cambiar de paso.
+        function programarSincronizacionDocumentos() {
+            if (!budgetData || !budgetData.id) return;
+            if (_sincDocsTimer) clearTimeout(_sincDocsTimer);
+            _sincDocsTimer = setTimeout(sincronizarDocumentos, 350);
+        }
+        function sincronizarDocumentos() {
+            _sincDocsTimer = null;
+            if (!budgetData || !budgetData.id) return;
+            try { aplicarFiltrosAPaginas(); } catch (e) {}
+            try { reconciliarFichaConDocumentos(); } catch (e) { console.warn('reconciliarFicha:', e); }
+            try { updateBudgetSummaryBar(); } catch (e) {}
+            if (!clientMessageEdited) { try { updateClientMessage(); } catch (e) {} }
+            // la hoja: páginas y nº de documentos, solo si han cambiado y no hay un trabajo escribiéndolos ya
+            if (typeof trabajoDelAbierto === 'function' && trabajoDelAbierto()) return;
+            const inv = inventarioActual();
+            const firma = inv.paginas + '/' + inv.archivos;
+            if (inv.paginas > 0 && inv.archivos > 0 && firma !== _ultimoInventarioPersistido) {
+                _ultimoInventarioPersistido = firma;
+                apiPost({ action: 'updateBudgetBasicData', budgetId: budgetData.id, pages: inv.paginas, numArchivos: inv.archivos }, { retry: false, timeoutMs: 30000 })
+                    .catch(e => console.warn('páginas/documentos en la hoja:', e && e.message));
             }
         }
 
@@ -12674,9 +12424,13 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (cfg.providerName && cfg.method === 'provider') {
                 partes.push(`proveedor: ${escapeHtml(cfg.providerName)}${cfg.providerQuote ? ' · ' + escapeHtml(cfg.providerQuote) : ''}`);
             }
+            const _rc = cfg.recalculadaPorDocumentos;   // v3.10.65
             box.innerHTML = `<b>🔒 Tarificación guardada</b> — método: <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || CALC_METHOD_LABELS_LEGACY[cfg.method] || cfg.method)}</b>`
                 + (partes.length ? `<br>Datos usados: ${partes.join(' · ')}` : '')
-                + (fecha ? `<br><span style="color:#047857;font-size:0.75rem;">Guardado el ${escapeHtml(fecha)}</span>` : '');
+                + (fecha ? `<br><span style="color:#047857;font-size:0.75rem;">Guardado el ${escapeHtml(fecha)}</span>` : '')
+                + (_rc ? `<br><span style="color:#92400e;font-size:0.75rem;">⚠️ Recalculada por cambio de documentos (${escapeHtml((_rc.cambios || []).map(c => c.que + ' ' + c.de + ' → ' + c.a).join(', '))}) · pendiente de guardar</span>` : '');
+            box.style.background = _rc ? '#fffbeb' : '#ecfdf5';
+            box.style.borderColor = _rc ? '#fcd34d' : '#a7f3d0';
             box.classList.remove('hidden');
         }
 
@@ -13125,15 +12879,15 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 }
                 return { total: total, partes: partes, tramos: tramos, conTramos: true, pages: pages };
             }
-            const page1 = budgetData.tariffPage1 || 0, page2 = budgetData.tariffPage2 || 0;
-            return { total: pages > 0 ? page1 + Math.max(0, pages - 1) * page2 : 0, partes: null, conTramos: false, pages: pages, page1: page1, page2: page2 };
+            // v3.10.63: sin tramos no hay precio por páginas (las columnas C/D de
+            // Tarifas se retiraron: la 3.7.93 las pasó a TarifasPaginas).
+            return { total: 0, partes: null, conTramos: false, pages: pages };
         }
         const _eur = v => (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €';
         function htmlDetallePaginas(c, src, tgt) {
             if (!c.conTramos) {
-                return `Cálculo: ${_eur(c.page1)} (1ª pág) + ${_eur(c.page2)} × (${Math.max(0, c.pages - 1)} págs resto) = ` +
-                    `<span class="tariff-calc-result">${_eur(c.total)}</span>` +
-                    `<div style="color:#94a3b8;font-size:0.75rem;margin-top:3px;">Sin tramos en la pestaña TarifasPaginas para ${escapeHtml(src || '')} → ${escapeHtml(tgt || '')}: se usa Tarifas (1ª página / resto).</div>`;
+                return `<div style="color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px;line-height:1.5;">⚠️ <b>Sin tarifa por páginas para ${escapeHtml(src || '')} → ${escapeHtml(tgt || '')}.</b> ` +
+                    `Añade sus filas en la pestaña <b>TarifasPaginas</b> de la hoja (Idioma Origen, Idioma Destino, Páginas desde, Páginas hasta, €/página) o elige otro método.</div>`;
             }
             const sumandos = c.partes.map(p => `${p.n} pág${p.n === 1 ? '.' : 's.'} × ${_eur(p.precio)}`).join(' &nbsp;+&nbsp; ');
             const tramosTxt = c.tramos.map((t, i) => (i === c.tramos.length - 1 && t.hasta >= 1000) ? t.desde + '+' : (t.desde === t.hasta ? String(t.desde) : t.desde + '-' + t.hasta)).join(' · ');
@@ -13268,10 +13022,6 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 if (directHint) directHint.textContent = words > 0 ? '(del análisis)' : '(introducir manualmente)';
             }
             
-            // Obtener tarifas por página
-            const page1 = budgetData.tariffPage1 || 0;
-            const page2 = budgetData.tariffPage2 || 0;
-            
             // Calcular precio por páginas (tarifa web)
             // v3.10.59: sobre las PÁGINAS CONTABILIZADAS (el campo que acabamos de
             // rellenar), no sobre el total físico. Caso 1002-04-W: 76 páginas con
@@ -13325,6 +13075,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             // final: lo guardado gana siempre sobre lo calculado por defecto.
             if (budgetData.quoteConfig) {
                 applyQuoteConfig(budgetData.quoteConfig);
+                reconciliarFichaConDocumentos();   // v3.10.65: si los documentos cambiaron, manda lo actual
+            } else {
+                pintarAvisoFicha(null);
             }
             // v3.10.61: plazo mínimo de la web (rellena "Plazo" si está vacío y pinta la fecha)
             try { proponerPlazoWeb(); } catch (e) { console.warn('proponerPlazoWeb:', e); }
@@ -13831,6 +13584,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
 
             // v3.10.55: por apiPost (queda en el panel Proceso) y el fallo se
             // propaga: "Guardar" y el guardado tras copiar ya lo enseñan.
+            const cfgGuardada = collectQuoteConfig();   // v3.8.7 / v3.10.65: la que queda en memoria tras guardar
             const r = await apiPost({
                 action: 'saveClientData',
                 budgetId: budgetData.id,
@@ -13840,9 +13594,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 clientMessage: clientMessage,
                 quoteDays: quoteDaysValue,
                 urgency: urgency,
-                quoteConfig: JSON.stringify(collectQuoteConfig())   // v3.8.7
+                quoteConfig: JSON.stringify(cfgGuardada)
             }, { retry: false });
             if (!r || !r.success) throw new Error((r && r.error) || 'el servidor no confirmó el guardado');
+            budgetData.quoteConfig = cfgGuardada;
+            try { renderQuoteConfigStamp(cfgGuardada); pintarAvisoFicha(null); updateBudgetSummaryBar(); } catch (e) {}
             console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue + ', urgencia: ' + urgency);
         }
 
@@ -14143,66 +13899,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             }
         }
 
-        async function sendClientEmail() {
-            const idFlujoEmail = budgetData.id;   // v3.10.44
-            const emailRaw = document.getElementById('clientEmail').value.trim();
-            const email = extractEmail(emailRaw);
-            const whatsapp = document.getElementById('clientWhatsApp').value.trim();
-            
-            if (!clientMessageEdited && typeof updateClientMessage === 'function') updateClientMessage();
-            if (!validateClientFields('email_enviar')) return;
-            
-            const btn = document.getElementById('sendClientBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Enviando...';
-            
-            try {
-                showStatus('Enviando presupuesto al cliente...', 'loading');
-                
-                const customMessage = document.getElementById('clientMessageEdit').value;
-                const quoteDaysValue = getQuoteDays();
-                const subjectEl = document.getElementById('clientSubject');
-                const clientSubject = (subjectEl && subjectEl.value.trim()) ? subjectEl.value.trim() : '';
-                
-                const data = await apiPost({
-                        action: 'sendClientEmail',
-                        clientEmail: email,
-                        clientWhatsApp: whatsapp,
-                        budgetId: budgetData.id,
-                        amount: getQuoteAmount(),
-                        sourceLang: budgetData.sourceLang,
-                        targetLang: budgetData.targetLang,
-                        customMessage: customMessage,
-                        clientSubject: clientSubject,
-                        quoteDays: quoteDaysValue
-                    });
-                
-                if (data.success) {
-                    // Actualizar historial local
-                    if (data.fechaEnvio) {
-                        if (!sigueSiendo(idFlujoEmail)) { console.warn('email de ' + idFlujoEmail + ' enviado; ya hay otro presupuesto abierto'); return; }   // v3.10.44
-                        if (!budgetData.historialCliente) budgetData.historialCliente = {};
-                        if (!budgetData.historialCliente.email) budgetData.historialCliente.email = [];
-                        budgetData.historialCliente.email.push({ fecha: data.fechaEnvio, destinatario: email });
-                        renderClientSendHistory();
-                    }
-                    
-                    hideStatus();
-                    completedSteps.add(5);
-                    updateProgressSteps();
-                    versionarRecuentoAlEnviar('Email');   // v3.9.2
-                    showSuccess('¡Presupuesto enviado!', `Email enviado a ${email}`, true);
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                showStatus('Error: ' + error.message, 'error');
-                setTimeout(hideStatus, 3000);
-            }
-            
-            btn.disabled = false;
-            btn.innerHTML = '💾 Guardar y Enviar Email';
-        }
+        // (v3.10.64: sendClientEmail vive ahora junto a ejecutarTrabajoEnviarCliente — envío como trabajo con sendId)
 
         // ====== STATUS & SUCCESS ======
         // v3.7.32: registrar un resumen GLOBAL de etapas en la hoja Performance.
