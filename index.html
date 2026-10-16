@@ -589,7 +589,7 @@
                 <button id="hdrBtnDriveFolder" onclick="openDriveFolder()" title="Abrir carpeta del presupuesto en Google Drive" style="display:none;background:#34a853;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📂 Drive</button>
                 <button id="hdrBtnLocalFolder" onclick="openLocalFolder()" title="Abrir la carpeta local del presupuesto en el Explorador (y copiar la ruta)" style="display:none;background:#0ea5e9;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">💻 Local</button>
                 <!-- v3.7.34: botón Guardar siempre visible para persistir datos editados del presupuesto -->
-                <button id="hdrBtnSave" onclick="saveCurrentBudget()" title="Guardar los datos editados del presupuesto (tarifa, plazo, email, mensaje, etc.)" style="display:none;background:#f59e0b;color:white;border:0;border-radius:5px;padding:6px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;">💾 Guardar</button>
+                <button id="hdrBtnSave" onclick="saveCurrentBudget()" title="Guardar todo lo editado: idiomas, contacto, notas, comentarios a traductores, tarifa, plazo y mensaje al cliente" style="display:none;background:#f59e0b;color:white;border:0;border-radius:5px;padding:6px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;">💾 Guardar</button>
                 <button id="hdrBtnRecuento" onclick="abrirRecuentoExcel()" title="Descargar el recuento de palabras en Excel (desglose por archivo e idiomas)" style="display:none;background:#16a34a;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Recuento</button>
                 <button id="hdrBtnSheet" onclick="openSpreadsheet()" title="Abrir Google Sheet de parámetros (Presupuestos, Tarifas, Proveedores, etc.)" style="background:#137333;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Sheet</button>
                 <button class="delete-btn" id="deleteBudgetBtn" onclick="confirmDeleteBudgetFromHeader()" title="Eliminar presupuesto y carpeta" style="display: none;">🗑️</button>
@@ -1201,7 +1201,7 @@
             <!-- Notas internas / instrucciones para el análisis -->
             <div class="form-group" style="margin-top: 16px;">
                 <label>📝 Notas e instrucciones (opcional)</label>
-                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2 · Solo el cuerpo del documento, sin sellos · El documento está en X idioma · Revisar formato..." style="min-height: 60px;"></textarea>
+                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2 · Solo el cuerpo del documento, sin sellos · El documento está en X idioma · Revisar formato..." style="min-height: 60px;" oninput="onNotasChange()"></textarea>
                 <small style="color: #666; font-size: 11px;">📌 Se aplican al análisis con IA: si pides "solo página 1", la extracción y el recuento se restringirán a esa página. También aparecen en el listado de presupuestos para referencia.</small>
             </div>
             
@@ -1317,7 +1317,7 @@
             
             <div class="form-group">
                 <label>💬 Comentarios para proveedores</label>
-                <textarea id="providerComments" placeholder="Detalles sobre el documento, formato de entrega, etc."></textarea>
+                <textarea id="providerComments" placeholder="Detalles sobre el documento, formato de entrega, etc." oninput="onComentariosProveedorChange()"></textarea>
                 <small style="color: #666; font-size: 11px;">Se incluirán en el mensaje a los traductores.</small>
             </div>
             
@@ -1607,12 +1607,12 @@
             
             <div class="form-group">
                 <label>Email del cliente (opcional, para envío directo)</label>
-                <input type="email" id="clientEmail" placeholder="" oninput="updateClientChannelButtons()">
+                <input type="email" id="clientEmail" placeholder="" oninput="onContactoPaso4Change()">
             </div>
             
             <div class="form-group">
                 <label>WhatsApp del cliente (opcional)</label>
-                <input type="tel" id="clientWhatsApp" placeholder="" oninput="updateClientChannelButtons()">
+                <input type="tel" id="clientWhatsApp" placeholder="" oninput="onContactoPaso4Change()">
             </div>
             
             <!-- v3.7.52: asunto del email editable (se rellena solo; puedes añadir
@@ -1755,13 +1755,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.65';
-        const HTML_DATE = '09/10/2026';
+        const HTML_VERSION = '3.10.66';
+        const HTML_DATE = '16/10/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.94';   // v3.10.64: envío al cliente con sendId (el servidor no vuelve a enviar lo ya enviado)
+        const API_MIN_VERSION = '3.7.95';   // v3.10.66: Guardar también vacía email/WhatsApp y guarda los comentarios a traductores
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2590,6 +2590,7 @@
             budgetData.quoteConfig = null;
             budgetData.countMethodUsed = null;
             _ultimoInventarioPersistido = null;   // v3.10.65
+            _estadoCargado = { email: '', whatsapp: '', comentariosProveedor: '' };   // v3.10.66
             if (typeof pintarAvisoFicha === 'function') pintarAvisoFicha(null);
             if (typeof renderQuoteConfigStamp === 'function') renderQuoteConfigStamp(null);
             document.querySelectorAll('.calc-method-option').forEach(l => l.classList.remove('cm-active'));
@@ -4698,14 +4699,6 @@
                 .replace(/'/g, '&#39;');
         }
 
-        // Guardar contacto del cliente
-        function onContactChange() {
-            const email = document.getElementById('clientEmail');
-            const whatsapp = document.getElementById('clientWhatsApp');
-            if (email) budgetData.clientEmail = email.value.trim();
-            if (whatsapp) budgetData.clientWhatsApp = whatsapp.value.trim();
-        }
-
         // v3.7.88: mismo tratamiento que el arranque — el listado de
         // presupuestos se guarda en localStorage; al entrar se pinta al
         // instante la copia local y se refresca en segundo plano. El spinner
@@ -5467,6 +5460,8 @@
                     }
                     budgetData.clientEmail = b.emailCliente || '';
                     budgetData.clientWhatsApp = b.whatsappCliente || '';
+                    // v3.10.66: para saber si luego se vacía un contacto que había
+                    _estadoCargado = { email: String(b.emailCliente || '').trim(), whatsapp: String(b.whatsappCliente || '').trim(), comentariosProveedor: String(b.comentariosProveedor || '') };
                     budgetData.savedClientMessage = b.mensajeCliente || '';
                     budgetData.savedAmount = b.importe || '';
                     budgetData.savedQuoteDays = b.plazo || '';
@@ -5841,7 +5836,7 @@
         function apiVersionInsuficiente() {
             return !!(apiVersion && apiVersion !== '?' && compararVersiones(apiVersion, API_MIN_VERSION) < 0);
         }
-        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_94.gs o posterior), ' +
+        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_95.gs o posterior), ' +
             'luego <b>Implementar → Gestionar implementaciones → ✏️ (editar) → Versión: «Nueva versión» → Implementar</b>. ' +
             'Pegar el código sin crear una versión nueva no cambia lo que se ejecuta.';
         function refrescarAvisoVersionApi() {
@@ -6000,6 +5995,7 @@
 
             // v3.7.47: canal deducido siempre del contacto (ya no hay selector).
             budgetData.channel = deriveChannelFromContact();
+            if (typeof espejarContactoAPaso4 === 'function') espejarContactoAPaso4();   // v3.10.66
             checkStep1Complete();
             if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
         }
@@ -6106,35 +6102,63 @@
             showCard(step);
         }
         
-        // Guardar datos básicos del presupuesto si ha sido creado
-        async function saveBudgetDataIfNeeded() {
+        // Guardar datos básicos del presupuesto si ha sido creado.
+        // v3.10.66: opts.lanzar = true (💾 Guardar) propaga el fallo al llamador;
+        // sin él (Continuar / cambiar de paso) se avisa en pantalla en vez de
+        // tragárselo en la consola. Viajan también los comentarios a
+        // traductores y, si se vació un contacto que había, borrarEmail /
+        // borrarWhatsApp (el servidor solo pisa con valor, nunca con vacío).
+        async function saveBudgetDataIfNeeded(opts) {
             if (!budgetData.id) return;  // Solo si existe el presupuesto
-            
+            opts = opts || {};
+            const idFlujo = budgetData.id;
+            const vac = (typeof contactosVaciados === 'function') ? contactosVaciados() : {};
+            const email = extractEmail((budgetData.clientEmail || '').trim());
+            const whatsapp = (budgetData.clientWhatsApp || '').trim();
+            const req = {
+                action: 'updateBudgetBasicData',
+                budgetId: idFlujo,
+                sourceLang: budgetData.sourceLang,
+                targetLang: budgetData.targetLang,
+                channel: budgetData.channel,
+                numArchivos: budgetData.numArchivos,
+                pages: budgetData.pageCount,
+                clientEmail: email,
+                clientWhatsApp: whatsapp,
+                internalComments: budgetData.internalComments || '',
+                // v3.10.44: nota — budgetId se lee al ARRANCAR esta llamada, así
+                // que un cambio de presupuesto durante la espera no la desvía
+                // v3.10.34: con recuento manual, la hoja recibe el total corregido
+                wordCount: (budgetData.fileAnalysis || []).some(a => a.manual) ? budgetData.wordCount : undefined,
+                // v3.10.28: los ajustes ⚙ por archivo (rango de páginas
+                // e instrucciones) viajaban SOLO al relanzar el
+                // análisis. Si escribías "solo 1-2" y guardabas sin
+                // reanalizar, el dato moría en el navegador.
+                fileSettings: budgetData.fileSettings || {}
+            };
+            if (budgetData.providerComments !== undefined) req.providerComments = String(budgetData.providerComments || '');
+            if (vac.email) req.borrarEmail = true;
+            if (vac.whatsapp) req.borrarWhatsApp = true;
             try {
-                const result = await apiPost({
-                        action: 'updateBudgetBasicData',
-                        budgetId: budgetData.id,
-                        sourceLang: budgetData.sourceLang,
-                        targetLang: budgetData.targetLang,
-                        channel: budgetData.channel,
-                        numArchivos: budgetData.numArchivos,
-                        pages: budgetData.pageCount,
-                        clientEmail: budgetData.clientEmail,
-                        clientWhatsApp: budgetData.clientWhatsApp,
-                        internalComments: budgetData.internalComments || '',
-                        // v3.10.44: nota — budgetId se lee al ARRANCAR esta llamada, así
-                        // que un cambio de presupuesto durante la espera no la desvía
-                        // v3.10.34: con recuento manual, la hoja recibe el total corregido
-                        wordCount: (budgetData.fileAnalysis || []).some(a => a.manual) ? budgetData.wordCount : undefined,
-                        // v3.10.28: los ajustes ⚙ por archivo (rango de páginas
-                        // e instrucciones) viajaban SOLO al relanzar el
-                        // análisis. Si escribías "solo 1-2" y guardabas sin
-                        // reanalizar, el dato moría en el navegador.
-                        fileSettings: budgetData.fileSettings || {}
-                    });
+                // escrituras idempotentes: reintentar es seguro
+                const result = await apiPost(req, { retry: true, attempts: 2, timeoutMs: 45000 });
+                if (!result || !result.success) throw new Error((result && result.error) || 'el servidor no confirmó el guardado');
                 console.log('Datos básicos guardados:', result);
+                // copia local + listado: lo que el servidor acaba de escribir
+                const aplicaNuevo = (typeof servidorAnteriorA === 'function') ? !servidorAnteriorA('3.7.95') : true;
+                const campos = { origen: req.sourceLang || undefined, destino: req.targetLang || undefined, canal: req.channel || undefined,
+                                 comentariosInternos: req.internalComments,
+                                 emailCliente: email || (req.borrarEmail && aplicaNuevo ? '' : undefined),
+                                 whatsappCliente: whatsapp || (req.borrarWhatsApp && aplicaNuevo ? '' : undefined),
+                                 comentariosProveedor: (req.providerComments !== undefined && aplicaNuevo) ? req.providerComments : undefined };
+                if (typeof actualizarCopiasTrasGuardar === 'function') actualizarCopiasTrasGuardar(idFlujo, campos);
             } catch (error) {
                 console.error('Error guardando datos básicos:', error);
+                if (opts.lanzar) throw error;
+                if (!(error && error.detenido)) {
+                    showStatus('⚠️ No he podido guardar los datos del paso 1 de ' + idFlujo + ' (' + ((error && error.message) || error) + '). Pulsa 💾 Guardar para reintentarlo.', 'warning');
+                    setTimeout(hideStatus, 7000);
+                }
             }
         }
 
@@ -9228,6 +9252,7 @@
             renderTrabajos();
             if (!esAbierto(job)) return;
             budgetData.id = r.budgetId;
+            _estadoCargado = { email: String((job.ctx && job.ctx.clientEmail) || '').trim(), whatsapp: String((job.ctx && job.ctx.clientWhatsApp) || '').trim(), comentariosProveedor: '' };   // v3.10.66
             budgetData.folderId = r.folderId || '';
             budgetData.folderUrl = r.folderUrl || '';
             if (!budgetData.estado) budgetData.estado = '0-Pendiente';
@@ -13562,11 +13587,128 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             return str;
         }
 
+        // ============ v3.10.66: "GUARDAR" GUARDA TODO LO EDITABLE ============
+        // Caso real 1013-01-W (16/10/2026): cambias las notas o el teléfono en el
+        // paso 1, pulsas 💾 Guardar (cabecera), sale "✓ Guardado"… y al reabrir
+        // está lo viejo. Guardar solo mandaba los datos del paso 4
+        // (saveClientData), que leía el contacto de los campos del paso 4 (aún
+        // con el valor antiguo) y no sabía nada de las notas; las notas solo
+        // pasaban a budgetData al pulsar "Continuar" del paso 1. Ahora:
+        //   · cada campo editable actualiza budgetData al teclear (notas,
+        //     comentarios a traductores, contacto del paso 1 y del paso 4, que
+        //     van espejados entre sí);
+        //   · Guardar recoge todo y manda las dos llamadas (datos básicos +
+        //     cliente) a la vez; si una falla, lo dice en vez de "✓ Guardado";
+        //   · vaciar el email o el WhatsApp también se guarda, y los comentarios
+        //     a traductores se guardan sin tener que enviar (Apps Script 3.7.95;
+        //     con uno anterior se avisa de que eso no se ha aplicado);
+        //   · la copia local y el listado se actualizan con lo guardado, para
+        //     que al reabrir no se pinte lo viejo mientras se consulta el servidor.
+        let _estadoCargado = { email: '', whatsapp: '', comentariosProveedor: '' };
+        function onNotasChange() {
+            const el = document.getElementById('internalComments');
+            if (el) budgetData.internalComments = el.value.trim();
+        }
+        function onComentariosProveedorChange() {
+            const el = document.getElementById('providerComments');
+            if (el) budgetData.providerComments = el.value.trim();
+        }
+        // contacto editado en el paso 4 → budgetData + campos del paso 1
+        function onContactoPaso4Change() {
+            const e4 = document.getElementById('clientEmail'), w4 = document.getElementById('clientWhatsApp');
+            const e1 = document.getElementById('clientEmailStep1'), w1 = document.getElementById('clientWhatsAppStep1');
+            if (e4) { budgetData.clientEmail = e4.value.trim(); if (e1 && e1.value !== e4.value) e1.value = e4.value; }
+            if (w4) { budgetData.clientWhatsApp = w4.value.trim(); if (w1 && w1.value !== w4.value) w1.value = w4.value; }
+            budgetData.channel = deriveChannelFromContact();
+            try { updateClientChannelButtons(); } catch (e) {}
+            try { checkStep1Complete(); } catch (e) {}
+            try { updateBudgetSummaryBar(); } catch (e) {}
+        }
+        // contacto editado en el paso 1 → campos del paso 4 (budgetData lo pone onStep1Change)
+        function espejarContactoAPaso4() {
+            const e4 = document.getElementById('clientEmail'), w4 = document.getElementById('clientWhatsApp');
+            const e1 = document.getElementById('clientEmailStep1'), w1 = document.getElementById('clientWhatsAppStep1');
+            if (e4 && e1 && e4.value !== e1.value) e4.value = e1.value;
+            if (w4 && w1 && w4.value !== w1.value) w4.value = w1.value;
+            try { updateClientChannelButtons(); } catch (e) {}
+        }
+        // budgetData ← todo lo editable que haya en pantalla
+        function recogerCamposEditables() {
+            onNotasChange();
+            onComentariosProveedorChange();
+            const src = document.getElementById('sourceLang'), tgt = document.getElementById('targetLang');
+            if (src && src.value) budgetData.sourceLang = src.value;
+            if (tgt && tgt.value) budgetData.targetLang = tgt.value;
+            const e1 = document.getElementById('clientEmailStep1'), w1 = document.getElementById('clientWhatsAppStep1');
+            if (e1) budgetData.clientEmail = e1.value.trim();
+            if (w1) budgetData.clientWhatsApp = w1.value.trim();
+            budgetData.channel = deriveChannelFromContact();
+        }
+        // ¿Se ha vaciado a propósito un contacto que el presupuesto tenía al abrirlo?
+        function contactosVaciados() {
+            return {
+                email: !(budgetData.clientEmail || '').trim() && !!_estadoCargado.email,
+                whatsapp: !(budgetData.clientWhatsApp || '').trim() && !!_estadoCargado.whatsapp
+            };
+        }
+        function servidorAnteriorA(v) {
+            return !!(apiVersion && apiVersion !== '?' && typeof compararVersiones === 'function' && compararVersiones(apiVersion, v) < 0);
+        }
+        // Copia local del presupuesto (la que "Retomar" abre al instante) y
+        // listado: reflejan lo recién guardado. Claves con los nombres de la hoja
+        // (emailCliente, comentariosInternos…); las undefined no se tocan.
+        function actualizarCopiasTrasGuardar(budgetId, campos) {
+            const def = {}; Object.keys(campos || {}).forEach(k => { if (campos[k] !== undefined) def[k] = campos[k]; });
+            if (!Object.keys(def).length) return;
+            try {
+                const c = getBudgetCache(budgetId);
+                if (c) { Object.assign(c, def); saveBudgetCache(c); }
+            } catch (e) {}
+            try {
+                const b = (allBudgets || []).find(x => x.id === budgetId);
+                if (b) {
+                    ['origen', 'destino', 'canal', 'emailCliente', 'whatsappCliente', 'comentariosInternos', 'importe', 'plazo']
+                        .forEach(k => { if (k in def) b[k] = def[k]; });
+                    if (typeof guardarCacheLocalPresupuestos === 'function') guardarCacheLocalPresupuestos(allBudgets, budgetsTotal, budgetsShowingAll);
+                }
+            } catch (e) {}
+        }
+        // 💾 Guardar de la cabecera: datos básicos (idiomas, contacto, notas,
+        // comentarios a traductores, ajustes por archivo) + ficha, importe,
+        // plazo, urgencia y mensaje al cliente. Las dos llamadas a la vez; si
+        // una falla, se dice cuál. Devuelve { aviso } cuando algo pedido no se
+        // ha podido aplicar por tener un Apps Script anterior a la 3.7.95.
+        async function guardarPresupuesto() {
+            if (!budgetData.id) throw new Error('no hay presupuesto cargado');
+            recogerCamposEditables();
+            const vaciados = contactosVaciados();
+            const comentariosCambiados = (budgetData.providerComments !== undefined) &&
+                String(budgetData.providerComments || '').trim() !== String(_estadoCargado.comentariosProveedor || '').trim();
+            const [r1, r2] = await Promise.allSettled([saveBudgetDataIfNeeded({ lanzar: true }), saveClientData()]);
+            const errores = [];
+            if (r1.status === 'rejected') errores.push('datos básicos (contacto, notas, comentarios): ' + ((r1.reason && r1.reason.message) || r1.reason));
+            if (r2.status === 'rejected') errores.push('ficha, importe y mensaje al cliente: ' + ((r2.reason && r2.reason.message) || r2.reason));
+            if (errores.length) throw new Error(errores.join(' · '));
+            try { updateBudgetSummaryBar(); } catch (e) {}
+            if ((vaciados.email || vaciados.whatsapp || comentariosCambiados) && servidorAnteriorA('3.7.95')) {
+                const que = [];
+                if (vaciados.email) que.push('el email que has vaciado');
+                if (vaciados.whatsapp) que.push('el WhatsApp que has vaciado');
+                if (comentariosCambiados) que.push('los comentarios a traductores');
+                return { aviso: 'el Apps Script del servidor (v' + apiVersion + ') no guarda ' + que.join(' ni ') + ': hace falta la v3.7.95 o superior.' };
+            }
+            _estadoCargado = { email: (budgetData.clientEmail || '').trim(), whatsapp: (budgetData.clientWhatsApp || '').trim(),
+                               comentariosProveedor: String(budgetData.providerComments === undefined ? _estadoCargado.comentariosProveedor : budgetData.providerComments || '') };
+            return {};
+        }
+
         // Guardar datos del cliente en la hoja (sin enviar email)
         async function saveClientData() {
-            const emailRaw = document.getElementById('clientEmail').value.trim();
-            const email = extractEmail(emailRaw);
-            const whatsapp = document.getElementById('clientWhatsApp').value.trim();
+            // v3.10.66: el contacto sale de budgetData (los campos del paso 1 y
+            // del paso 4 lo mantienen al día y van espejados), no del campo del
+            // paso 4, que podía conservar el valor viejo.
+            const email = extractEmail((budgetData.clientEmail || '').trim());
+            const whatsapp = (budgetData.clientWhatsApp || '').trim();
             const amount = getQuoteAmount();
             const clientMessage = document.getElementById('clientMessageEdit').value;
             const quoteDaysValue = getQuoteDays();
@@ -13585,9 +13727,10 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             // v3.10.55: por apiPost (queda en el panel Proceso) y el fallo se
             // propaga: "Guardar" y el guardado tras copiar ya lo enseñan.
             const cfgGuardada = collectQuoteConfig();   // v3.8.7 / v3.10.65: la que queda en memoria tras guardar
+            const idFlujo = budgetData.id;   // v3.10.66
             const r = await apiPost({
                 action: 'saveClientData',
-                budgetId: budgetData.id,
+                budgetId: idFlujo,
                 clientEmail: email,
                 clientWhatsApp: whatsapp,
                 amount: amount,
@@ -13595,8 +13738,15 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 quoteDays: quoteDaysValue,
                 urgency: urgency,
                 quoteConfig: JSON.stringify(cfgGuardada)
-            }, { retry: false });
+            }, { retry: false, timeoutMs: 45000 });
             if (!r || !r.success) throw new Error((r && r.error) || 'el servidor no confirmó el guardado');
+            // v3.10.66: copia local + listado (el servidor solo escribe lo que llega con valor)
+            if (typeof actualizarCopiasTrasGuardar === 'function') actualizarCopiasTrasGuardar(idFlujo, {
+                emailCliente: email || undefined, whatsappCliente: whatsapp || undefined,
+                importe: amount ? (parseFloat(String(amount).replace(',', '.')) || amount) : undefined,
+                mensajeCliente: clientMessage || undefined,
+                plazo: quoteDaysValue ? (parseInt(quoteDaysValue, 10) || quoteDaysValue) : undefined,
+                quoteConfig: JSON.stringify(cfgGuardada) });
             budgetData.quoteConfig = cfgGuardada;
             try { renderQuoteConfigStamp(cfgGuardada); pintarAvisoFicha(null); updateBudgetSummaryBar(); } catch (e) {}
             console.log('Datos guardados: email=' + email + ', mensaje (' + clientMessage.length + ' chars), plazo: ' + quoteDaysValue + ', urgencia: ' + urgency);
@@ -13615,7 +13765,9 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const originalText = btn ? btn.innerHTML : '';
             if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Guardando...'; }
             try {
-                await saveClientData();
+                // v3.10.66: datos básicos (contacto, notas, comentarios) + ficha
+                // y mensaje al cliente, no solo lo del paso 4
+                const res = await guardarPresupuesto();
                 // v3.9.1: la ficha Excel se regenera con cada guardado, así que
                 // lo que consulte PRODUCTION siempre refleja la última versión
                 // de la cotización (tarifa, plazo, condiciones, mensaje).
@@ -13629,12 +13781,21 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                         btn.disabled = false;
                     }, 1800);
                 }
-                showStatus('✓ Presupuesto guardado', 'success');
-                setTimeout(hideStatus, 2000);
+                if (res && res.aviso) {
+                    showStatus('⚠️ Guardado, pero ' + res.aviso, 'warning');
+                    setTimeout(hideStatus, 9000);
+                } else {
+                    showStatus('✓ Presupuesto guardado', 'success');
+                    setTimeout(hideStatus, 2000);
+                }
             } catch(e) {
-                if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
-                showStatus('Error al guardar: ' + e.message, 'error');
-                setTimeout(hideStatus, 3000);
+                if (btn) {
+                    btn.innerHTML = '⚠️ No guardado';
+                    btn.style.background = '#dc2626';
+                    setTimeout(() => { btn.innerHTML = originalText; btn.style.background = '#f59e0b'; btn.disabled = false; }, 2500);
+                }
+                showStatus('❌ No se ha guardado: ' + ((e && e.message) || e), 'error');
+                setTimeout(hideStatus, 8000);
             }
         }
 
