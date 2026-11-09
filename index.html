@@ -70,7 +70,7 @@
         /* FORM ELEMENTS */
         .form-group { margin-bottom: 16px; }
         label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
-        select, input[type="text"], input[type="number"], input[type="email"], input[type="date"], input[type="time"], input[type="password"], textarea {
+        select, input[type="text"], input[type="number"], input[type="email"], input[type="tel"], input[type="date"], input[type="time"], input[type="password"], textarea {
             width: 100%; padding: 14px 16px; font-size: 1rem; font-family: inherit;
             border: 2px solid var(--border-color); border-radius: var(--radius-md);
             background: var(--bg-card); color: var(--text-primary); transition: all 0.2s;
@@ -135,6 +135,39 @@
         .btn-secondary { color: var(--text-secondary); background: white; border: 2px solid var(--border-color); }
         .btn-secondary:hover { border-color: var(--tradutema-blue); color: var(--tradutema-blue); }
         .btn-success { background: var(--accent-green) !important; }
+        /* v3.10.67: Enviar del modal de tasación justo después del clic */
+        .btn-enviando { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; box-shadow: 0 0 0 4px rgba(245,158,11,0.25) !important; cursor: default !important; transform: none !important; }
+        /* v3.10.68: facturas de proveedor (pantalla ancha: la tabla no cabe en 700 px) */
+        main.main.ancha { max-width: 1180px; }
+        .fact-drop { border: 2px dashed #94a3b8; border-radius: 10px; padding: 16px 18px; background: #f8fafc; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+        .fact-drop.over { border-color: var(--tradutema-blue); background: #eff6ff; }
+        .fact-drop .icono { font-size: 1.7rem; }
+        .fact-estado { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+        .fact-estado.cargando { background: #eff6ff; color: #1e40af; }
+        .fact-estado.error { background: #fef2f2; color: #991b1b; }
+        .fact-cab { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; margin-top: 16px; }
+        .fact-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+        .fact-chip { border-radius: 999px; padding: 4px 11px; font-size: 0.82rem; border: 1px solid; }
+        .fact-chip.ok { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+        .fact-chip.ok::before { content: '✔ '; }
+        .fact-chip.warn { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+        .fact-chip.warn::before { content: '⚠️ '; }
+        .fact-chip.err { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+        .fact-chip.err::before { content: '❌ '; }
+        .fact-chip.info { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+        .fact-chip.info::before { content: 'ℹ️ '; }
+        .fact-tabla { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        .fact-tabla th { background: #f1f5f9; color: #475569; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 8px 10px; }
+        .fact-tabla td { padding: 8px 10px; border-top: 1px solid #e5e7eb; }
+        .fact-tabla th.r, .fact-tabla td.r { text-align: right; }
+        .fact-tabla tr.warn td { background: #fffbeb; }
+        .fact-tabla tr.err td { background: #fef2f2; }
+        .fact-tabla tfoot td { border-top: 2px solid #cbd5e1; font-weight: 700; background: #f8fafc; }
+        .fact-acciones { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+        .fact-acciones .btn { width: auto; }
+        .fact-registrada { margin-top: 16px; padding: 12px 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; color: #065f46; font-size: 0.92rem; line-height: 1.6; }
+        .fact-pdf { display: inline-block; padding: 8px 14px; background: white; border: 1.5px solid #15803d; border-radius: 8px; color: #15803d; font-weight: 700; text-decoration: none; cursor: grab; margin: 0 6px; }
+        .fact-pdf:active { cursor: grabbing; }
         .btn-gold { background: linear-gradient(135deg, var(--accent-gold) 0%, #c4983f 100%) !important; }
         
         .btn-row { display: flex; gap: 12px; margin-top: 16px; }
@@ -733,6 +766,13 @@
                         <div class="home-btn-desc">Estadísticas y sugerencias de mejora</div>
                     </div>
                 </button>
+                <button class="home-btn" onclick="showFacturas()">
+                    <span class="home-btn-icon">🧾</span>
+                    <div class="home-btn-text">
+                        <div class="home-btn-title">Facturas de proveedor</div>
+                        <div class="home-btn-desc">Validar y registrar antes de pagar</div>
+                    </div>
+                </button>
                 <button class="home-btn" onclick="showOrderSearch()">
                     <span class="home-btn-icon">🔍</span>
                     <div class="home-btn-text">
@@ -778,6 +818,26 @@
         </div>
 
         <!-- PROVIDERS CONSULT SCREEN -->
+        <!-- v3.10.68: facturas de proveedor -->
+        <div class="card hidden" id="facturasScreen">
+            <button class="back-btn" onclick="factSalir()">← Volver</button>
+            <div class="card-title">🧾 Facturas de proveedor <span style="margin-left:auto;font-weight:normal;text-transform:none;letter-spacing:0;color:#64748b;">avisar si el margen baja de <input type="number" id="factUmbral" min="0" max="95" value="35" onchange="factSetUmbral(this.value)" style="width:56px;padding:3px 6px;border:1.5px solid #cbd5e1;border-radius:6px;"> %</span></div>
+            <div class="fact-drop" id="factDrop" onclick="document.getElementById('factFile').click()" ondragover="factDragOver(event)" ondragleave="factDragLeave(event)" ondrop="factDrop(event)">
+                <span class="icono">📄</span>
+                <div><div id="factDropNombre"></div><div style="font-size:0.85rem;">Arrastra aquí la factura del traductor (PDF o DOCX) o haz clic para elegirla. Un DOCX se convierte a PDF para Dougs.</div></div>
+                <input type="file" id="factFile" accept=".pdf,.docx,.doc,application/pdf" style="display:none;" onchange="factArchivoElegido(this.files); this.value = '';">
+            </div>
+            <div id="factEstadoLectura" class="fact-estado" style="display:none;"></div>
+            <div id="factPanel" class="hidden"></div>
+            <div style="margin-top:22px;border-top:1px solid var(--border-color);padding-top:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                    <div style="font-weight:700;color:#0f172a;">Historial</div>
+                    <label style="font-size:0.85rem;color:#475569;">Proveedor: <select id="factHistProv" onchange="factRenderHistorial()" style="padding:5px 8px;border:1.5px solid #cbd5e1;border-radius:6px;"><option value="">Todos</option></select></label>
+                </div>
+                <div id="factHistorialBody" style="color:#64748b;font-size:0.9rem;">Cargando…</div>
+            </div>
+        </div>
+
         <div class="card hidden" id="providersConsultScreen">
             <button class="back-btn" onclick="showHomeScreen()">← Volver</button>
 
@@ -1293,8 +1353,8 @@
             </div>
             
             <div class="checkbox-row">
-                <div class="custom-checkbox" id="includeWordCount" onclick="toggleCheckbox('includeWordCount')"></div>
-                <span class="checkbox-label">Incluir recuento de palabras/páginas</span>
+                <div class="custom-checkbox" id="includeWordCount" onclick="onCasillaRecuentoClick()"></div>
+                <span class="checkbox-label">Incluir recuento de palabras/páginas <span style="color:#94a3b8;font-weight:normal;">(se marca sola si hay recuento)</span></span>
             </div>
             
             <div class="checkbox-row">
@@ -1595,7 +1655,7 @@
             <div class="quote-row">
                 <div class="form-group">
                     <label>Plazo (días laborables)</label>
-                    <input type="number" id="quoteDays" min="1" placeholder="Ej: 3" onchange="try { proponerPlazoWeb(); } catch (e) {} updateClientMessage()">
+                    <input type="number" id="quoteDays" min="0" placeholder="Ej: 3 · 0 = en el día" onchange="try { proponerPlazoWeb(); } catch (e) {} updateClientMessage()">
                 </div>
                 <div class="form-group">
                     <label>Recargo urgencia (€, opcional)</label>
@@ -1667,6 +1727,30 @@
     </footer>
 
     <!-- Modal Preview Proveedor -->
+    <!-- v3.10.68: email al proveedor cuando la factura no se valida -->
+    <div class="modal-overlay" id="factEmailModal">
+        <div class="modal" style="max-width: 640px;">
+            <div class="modal-header">
+                <span class="modal-title">No validar · email al proveedor</span>
+                <button class="modal-close" onclick="factCerrarEmail()">✕</button>
+            </div>
+            <div class="modal-body">
+                <label style="font-weight:600;display:block;margin-bottom:4px;">Para:</label>
+                <input type="email" id="factEmailPara" style="margin-bottom:10px;">
+                <label style="font-weight:600;display:block;margin-bottom:4px;">Asunto:</label>
+                <input type="text" id="factEmailAsunto" style="margin-bottom:10px;">
+                <label style="font-weight:600;display:block;margin-bottom:4px;">Mensaje (editable):</label>
+                <textarea id="factEmailCuerpo" style="min-height:260px;font-family:inherit;"></textarea>
+                <div id="factEmailAviso" style="color:#b45309;font-size:0.85rem;margin-top:6px;"></div>
+                <div style="color:#64748b;font-size:0.82rem;margin-top:8px;">Se envía desde info@tradutema.com. La factura no se registra.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="factEmailCancelar" onclick="factCerrarEmail()">Cancelar</button>
+                <button class="btn btn-primary btn-success" id="factEmailEnviar" onclick="factEnviarEmail()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="providerPreviewModal">
         <div class="modal">
             <div class="modal-header">
@@ -1678,6 +1762,8 @@
                 <label style="font-weight: 600; margin-bottom: 8px; display: block;">Mensaje (editable):</label>
                 <textarea class="editable-message" id="providerMessageEdit" rows="12"></textarea>
             </div>
+            <!-- v3.10.67: banda de estado tras pulsar Enviar -->
+            <div id="providerSendBand" style="display:none;padding:10px 20px;background:#ecfdf5;border-top:1px solid #a7f3d0;color:#065f46;font-size:0.86rem;line-height:1.45;"></div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeProviderModal()">Cancelar</button>
                 <button class="btn btn-primary btn-success" id="providerSendBtn" onclick="sendProviderEmails()">Enviar</button>
@@ -1755,13 +1841,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.66';
-        const HTML_DATE = '16/10/2026';
+        const HTML_VERSION = '3.10.68';
+        const HTML_DATE = '07/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.95';   // v3.10.66: Guardar también vacía email/WhatsApp y guarda los comentarios a traductores
+        const API_MIN_VERSION = '3.7.97';   // v3.10.68: facturas de proveedor (pedidos de WooCommerce, registro, DOCX→PDF, email)
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -1925,6 +2011,7 @@
 
         // ====== HOME SCREEN ======
         function showHomeScreen() {
+            try { document.querySelector('main.main').classList.remove('ancha'); } catch (e) {}   // v3.10.68
             document.getElementById('homeScreen').classList.remove('hidden');
             document.getElementById('budgetListScreen').classList.add('hidden');
             document.getElementById('progressContainer').classList.add('hidden');
@@ -2280,7 +2367,7 @@
             document.getElementById('bsBarImporte').innerHTML = _impNuevo != null
                 ? `<span style="text-decoration:line-through;color:#94a3b8;">${escapeHtml(fmtEuros(importe))}</span> <span style="color:#b45309;">${escapeHtml(fmtEuros(_impNuevo))} sin guardar</span>`
                 : escapeHtml(fmtEuros(importe));
-            document.getElementById('bsBarPlazo').textContent = plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—';
+            document.getElementById('bsBarPlazo').textContent = esPlazoEnElDia(plazo) ? 'en el día' : (plazo ? plazo + (String(plazo).match(/\D/) ? '' : ' días') : '—');   // v3.10.67
 
             // v3.7.100: enlaces al pedido WooCommerce y al Dashboard CRM
             const pedidoEl = document.getElementById('bsBarPedido');
@@ -2627,6 +2714,7 @@
             const proposedTariff = document.getElementById('proposedTariff');
             const proposedTotal = document.getElementById('proposedTotal');
             if (includeWordCount) includeWordCount.classList.remove('checked');
+            _casillaRecuentoManual = false;   // v3.10.67
             if (includeProposedRate) includeProposedRate.classList.remove('checked');
             if (proposedRateFields) proposedRateFields.classList.add('hidden');
             if (proposedTariff) proposedTariff.value = '';
@@ -5464,7 +5552,7 @@
                     _estadoCargado = { email: String(b.emailCliente || '').trim(), whatsapp: String(b.whatsappCliente || '').trim(), comentariosProveedor: String(b.comentariosProveedor || '') };
                     budgetData.savedClientMessage = b.mensajeCliente || '';
                     budgetData.savedAmount = b.importe || '';
-                    budgetData.savedQuoteDays = b.plazo || '';
+                    budgetData.savedQuoteDays = plazoDeHoja(b.plazo);   // v3.10.67: el 0 (en el día) se conserva
                     budgetData.savedUrgency = b.recargoUrgencia || '';
                     // v3.7.24: sincronizar también los campos que usa el banner de resumen
                     budgetData.savedQuoteTotal = parseFloat(b.importe) || 0;
@@ -5642,7 +5730,7 @@
                         const quoteAmountProvider = document.getElementById('quoteAmountProvider');
                         if (quoteAmountProvider) quoteAmountProvider.value = budgetData.savedAmount;
                     }
-                    if (quoteDays && budgetData.savedQuoteDays) {
+                    if (quoteDays && budgetData.savedQuoteDays !== '' && budgetData.savedQuoteDays != null) {
                         quoteDays.value = budgetData.savedQuoteDays;
                     }
                     // Restaurar recargo de urgencia
@@ -5836,7 +5924,7 @@
         function apiVersionInsuficiente() {
             return !!(apiVersion && apiVersion !== '?' && compararVersiones(apiVersion, API_MIN_VERSION) < 0);
         }
-        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_95.gs o posterior), ' +
+        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_97.gs o posterior), ' +
             'luego <b>Implementar → Gestionar implementaciones → ✏️ (editar) → Versión: «Nueva versión» → Implementar</b>. ' +
             'Pegar el código sin crear una versión nueva no cambia lo que se ejecuta.';
         function refrescarAvisoVersionApi() {
@@ -6192,6 +6280,7 @@
         // palabras" y la tabla seguía en "sin analizar · Total: 0". Ahora se
         // repinta también cada vez que cambia budgetData.fileAnalysis.
         function renderWordCountSummary() {
+            if (typeof proponerCasillaRecuento === 'function') proponerCasillaRecuento();   // v3.10.67: recuento terminado → casilla marcada
             // v3.10.36: SIN guarda por budgetData.id. Al pulsar "Crear carpeta" la
             // app salta al paso 3 antes de que la carpeta exista, y con la guarda
             // que puse en la 3.10.33 la función salía sin tocar el DOM: la tabla
@@ -6341,6 +6430,7 @@
             if (step === 4) {
                 renderProviderSendHistory();
                 if (typeof refreshStep4ContinueHint === 'function') refreshStep4ContinueHint();   // v3.10.50
+                if (typeof proponerCasillaRecuento === 'function') proponerCasillaRecuento();   // v3.10.67
                 
                 // Pre-rellenar comentarios de proveedor con notas internas si está vacío
                 const providerCommentsField = document.getElementById('providerComments');
@@ -8890,6 +8980,7 @@
             subiendo:   'subiendo archivos a Drive',
             contando:   'contando palabras',
             guardando:  'guardando recuento',
+            esperandoCarpeta: 'esperando la carpeta en Drive',   // v3.10.67
             enviando:   'enviando solicitud de tasación',
             hecho:      'terminado',
             error:      'error',
@@ -8984,7 +9075,7 @@
                     const principal = activos.find(t => t.fase === 'creando' || t.fase === 'preparando') || activos[0];
                     const resto = activos.length - 1;
                     // compacto: la cabecera va justa de sitio. El cronómetro está en el panel.
-                    const corta = { preparando: 'creando carpeta', creando: 'creando carpeta', escribiendo: 'escribiendo archivos', subiendo: 'subiendo archivos', contando: 'contando palabras', guardando: 'guardando', enviando: 'enviando tasación' };
+                    const corta = { preparando: 'creando carpeta', creando: 'creando carpeta', escribiendo: 'escribiendo archivos', subiendo: 'subiendo archivos', contando: 'contando palabras', guardando: 'guardando', enviando: 'enviando tasación', esperandoCarpeta: 'esperando carpeta' };
                     let faseCorta = corta[principal.fase] || textoFase(principal);
                     if (principal.tipo === 'enviarCliente') faseCorta = 'enviando email al cliente';   // v3.10.64
                     if (principal.fase === 'contando' && principal.progreso && principal.progreso.total) faseCorta = 'contando ' + principal.progreso.hechas + '/' + principal.progreso.total;   // v3.10.58
@@ -10574,7 +10665,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const _env = (typeof trabajoEnvioDe === 'function') ? trabajoEnvioDe(budgetData.id) : null;   // v3.10.55
             const _sq = document.getElementById('sendQuoteBtn');
             _sq.disabled = selectedProviders.size === 0 || !!_env;
-            _sq.innerHTML = _env ? '<span class="spinner"></span> Enviando solicitud de tasación… (puedes seguir trabajando)' : '✉️ Previsualizar y Enviar Tasación';
+            _sq.innerHTML = _env ? '<span class="spinner"></span> ' + (_env.fase === 'esperandoCarpeta' ? 'Esperando la carpeta en Drive para enviar…' : 'Enviando solicitud de tasación…') + ' (puedes seguir trabajando)' : '✉️ Previsualizar y Enviar Tasación';
             refreshStep4ContinueHint();   // v3.10.50
         }
 
@@ -11043,21 +11134,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             body += `--------------------\n`;
             body += `* Combinación: ${budgetData.sourceLang} > ${budgetData.targetLang}\n`;
             
-            if (includeWords && budgetData.wordCount) {
-                // Singular/plural para palabras
-                const wordsText = budgetData.wordCount === 1 
-                    ? '1 palabra' 
-                    : `${budgetData.wordCount.toLocaleString('es-ES')} palabras`;
-                body += `* Volumen: ${wordsText}\n`;
-                
-                // Singular/plural para páginas
-                if (budgetData.pageCount) {
-                    const pagesText = budgetData.pageCount === 1 
-                        ? '1 página' 
-                        : `${budgetData.pageCount} páginas`;
-                    body += `* Extensión: ${pagesText}\n`;
-                }
-            }
+            // v3.10.67: volumen total y detalle por archivo (o solo páginas si no hay recuento)
+            lineasVolumenProveedor(includeWords).forEach(l => { body += l + '\n'; });
             
             if (deadlineType === 'open') {
                 body += `* Plazo: Abierto (indícame tu mejor plazo)\n`;
@@ -11116,58 +11194,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             return body;
         }
 
-        function closeProviderModal() {
-            document.getElementById('providerPreviewModal').classList.remove('visible');
-        }
-
-        let _sendingProviders = false;   // v3.7.96: guard anti doble clic
-
-        // v3.10.55: el envío de la solicitud de tasación es un TRABAJO: la
-        // preparación (carpeta en Drive, destinatarios, texto) se hace con el
-        // presupuesto abierto; los lotes se mandan en segundo plano y quedan
-        // en el panel Proceso. Antes, si cambiabas de presupuesto a mitad,
-        // los lotes restantes ni se enviaban (v3.10.44). Ahora se envían y
-        // solo se deja de tocar la pantalla.
-        async function sendProviderEmails() {
-            if (trabajoEnvioDe(budgetData.id)) {
-                showStatus('Ya hay un envío en curso para este presupuesto', 'warning'); setTimeout(hideStatus, 3000); prodLogShow(); return;
-            }
-            // v3.8.0: en modo local, resolver la carpeta antes de enviar (los
-            // adjuntos del email salen de Drive)
-            if (!budgetData.folderId && budgetData.id) {
-                showStatus('⏳ Esperando la sincronización de la carpeta con Drive antes de enviar...', 'loading');
-                const r = await resolveLocalFolderId(budgetData.id, 4);
-                if (r && r.folderId) {
-                    budgetData.folderId = r.folderId;
-                    budgetData.folderUrl = r.folderUrl || '';
-                } else {
-                    showStatus('La carpeta aún no está en Drive; los adjuntos no se pueden preparar. Reintenta en unos segundos.', 'warning');
-                    setTimeout(hideStatus, 6000);
-                    return;
-                }
-            }
-            const sendBtn = document.getElementById('providerSendBtn');
-            if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<span class="spinner"></span> Enviando...'; }
-            closeProviderModal();
-            // v3.10.42: exactamente los que se enseñaron en "Destinatarios (N)"
-            const providers = (window._providersToSend || proveedoresSeleccionados()).filter(p => p && p.email);
-            if (!providers.length) {
-                showStatus('No hay destinatarios: vuelve a seleccionar los traductores', 'error'); setTimeout(hideStatus, 4000);
-                if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = 'Enviar'; }
-                return;
-            }
-            const job = nuevoTrabajo('enviar', {
-                budgetId: budgetData.id, folderId: budgetData.folderId,
-                sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang,
-                customMessage: document.getElementById('providerMessageEdit').value,
-                additionalComments: document.getElementById('providerComments').value.trim(),
-                providers: providers.map(p => ({ nombre: p.nombre, email: p.email }))
-            });
-            if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
-            updateSelectedCount();
-            if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = 'Enviar'; }
-            ejecutarTrabajoEnviar(job);   // sin await
-        }
+        // (v3.10.67: sendProviderEmails y closeProviderModal viven arriba, en el módulo de la 3.10.67)
 
         function actualizarCopiasTrasEnvio(budgetId, lote, fechaEnvio) {
             try {
@@ -11195,6 +11222,15 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         async function ejecutarTrabajoEnviar(job) {
             const ctx = job.ctx;
             const providers = ctx.providers || [];
+            // v3.10.67: en modo local, la carpeta de Drive la espera el trabajo (antes
+            // se esperaba con el modal abierto y sin ninguna señal)
+            try { await esperarCarpetaParaEnvio(job); } catch (eCarpeta) {
+                if (job.fase === 'detenido' || esErrorDeParada(eCarpeta)) { renderTrabajos(); return; }
+                job.error = eCarpeta.message || String(eCarpeta);
+                faseTrabajo(job, 'error');
+                if (esAbierto(job)) { showStatus('Error: ' + job.error, 'error'); setTimeout(hideStatus, 9000); try { updateSelectedCount(); } catch (e) {} }
+                return;
+            }
             // v3.10.43: ENVÍO POR LOTES de 4. Cada lote es una llamada corta al
             // servidor que apunta a sus 4 en la hoja ANTES de mandar los correos.
             const LOTE = 4;
@@ -11732,7 +11768,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             _dato('Páginas a traducir', _v('quotePagesToTranslate'));
             _dato('Tarifa', _b.savedQuoteRate || _b.savedQuotePricePerWord || _v('directTariffPerWord') || '');
             _dato('Importe', _b.savedQuoteTotal ? _b.savedQuoteTotal + ' €' : (_v('quoteAmountPages') || ''), true);
-            _dato('Plazo', (_b.savedQuoteDays || _v('quoteDays') || '') + ' días');
+            _dato('Plazo', (() => { const p = (_b.savedQuoteDays !== '' && _b.savedQuoteDays != null) ? _b.savedQuoteDays : _v('quoteDays'); return esPlazoEnElDia(p) ? 'en el día' : ((p || '') + ' días'); })());   // v3.10.67
             _dato('Recargo urgencia', _v('quoteUrgency') || _b.savedUrgency || '');
             if (cfg && cfg.method === 'provider' && cfg.providerName) {
                 _dato('Proveedor cotizado', cfg.providerName + (cfg.providerQuote ? ' · ' + cfg.providerQuote : ''));
@@ -12760,11 +12796,13 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         
         // Obtener plazo
         function getQuoteDays() {
-            // v3.10.58: un plazo de 0 (o negativo) no es un plazo: 1001-01-M salió
-            // con "Plazo aproximado: 0 días laborables" y entrega "hoy".
+            // v3.10.58: un plazo vacío o negativo no es un plazo (1001-01-M salió
+            // con "0 días laborables" por un campo sin rellenar).
+            // v3.10.67: un 0 escrito a propósito SÍ lo es: entrega en el día.
             const v = String(document.getElementById('quoteDays').value || '').trim();
+            if (v === '') return '';
             const n = parseInt(v, 10);
-            return (isNaN(n) || n <= 0) ? '' : v;
+            return (isNaN(n) || n < 0) ? '' : String(n);
         }
 
         // v3.7.63: el importe al cliente SIEMPRE en euros enteros (sin céntimos).
@@ -12942,6 +12980,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         function fechaEntrega(dias, ahora) {
             ahora = ahora || new Date();
             const d = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+            if (esPlazoEnElDia(dias)) return d;   // v3.10.67: entrega en el día = hoy
             const hm = String(calendarioWeb.horaCorte || '18:00').split(':');
             const corte = (parseInt(hm[0]) || 18) * 60 + (parseInt(hm[1]) || 0);
             if (ahora.getHours() * 60 + ahora.getMinutes() >= corte) d.setDate(d.getDate() + 1);
@@ -12963,20 +13002,30 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                           parseInt((document.getElementById('quoteTotalPages') || {}).value) || budgetData.pageCount || 0;
             const regla = reglaPlazoWeb(budgetData.sourceLang, budgetData.targetLang, pages);
             if (!regla) { if (hint) hint.style.display = 'none'; return null; }
-            const vacio = !String(el.value || '').trim() || !(parseInt(el.value) > 0);
-            if (vacio) { el.value = regla.dias; el.title = 'Plazo mínimo según la web (' + regla.desde + '-' + regla.hasta + ' págs.)'; }
+            // v3.10.67: solo se propone si el campo está VACÍO. Un 0 (entrega en el
+            // día) o cualquier plazo más corto que el de la web se respeta: el
+            // de la web es el estándar, no un mínimo.
+            const vacio = String(el.value || '').trim() === '';
+            if (vacio) { el.value = regla.dias; el.title = 'Plazo estándar según la web (' + regla.desde + '-' + regla.hasta + ' págs.)'; }
             if (hint) {
                 const fecha = fechaEntrega(regla.dias);
-                const actual = parseInt(el.value) || 0;
-                const corto = actual > 0 && actual < regla.dias;
+                const actualTxt = String(el.value || '').trim();
+                const actual = parseInt(actualTxt, 10);
+                const corto = actualTxt !== '' && !isNaN(actual) && actual >= 0 && actual < regla.dias;
                 hint.style.display = '';
-                hint.style.background = corto ? '#fef3c7' : '#ecfdf5';
-                hint.style.borderColor = corto ? '#fcd34d' : '#a7f3d0';
-                hint.style.color = corto ? '#92400e' : '#065f46';
-                hint.innerHTML = `📅 <b>Entrega mínima según la web:</b> ${regla.dias} día${regla.dias === 1 ? '' : 's'} laborable${regla.dias === 1 ? '' : 's'} → <b>${_fechaLarga(fecha)}</b>` +
+                hint.style.background = corto ? '#eff6ff' : '#ecfdf5';
+                hint.style.borderColor = corto ? '#bfdbfe' : '#a7f3d0';
+                hint.style.color = corto ? '#1e40af' : '#065f46';
+                let nota = '';
+                if (corto) {
+                    const fIndicado = fechaEntrega(actual);
+                    nota = `<br>⚡ <b>Plazo indicado: ${esPlazoEnElDia(actual) ? 'entrega en el día' : actual + ' día' + (actual === 1 ? '' : 's') + ' laborable' + (actual === 1 ? '' : 's')}</b> (${esPlazoEnElDia(actual) ? 'hoy, ' : ''}${_fechaLarga(fIndicado)}) — más corto que el estándar de la web; es tu decisión.`;
+                } else if (vacio) {
+                    nota = ' Propuesto en "Plazo"; puedes cambiarlo (0 = entrega en el día).';
+                }
+                hint.innerHTML = `📅 <b>Plazo estándar de la web:</b> ${regla.dias} día${regla.dias === 1 ? '' : 's'} laborable${regla.dias === 1 ? '' : 's'} → <b>${_fechaLarga(fecha)}</b>` +
                     `<br><span style="opacity:.85;">${escapeHtml(budgetData.sourceLang || '')} → ${escapeHtml(budgetData.targetLang || '')}, ${pages} págs. (regla ${regla.desde}-${regla.hasta}: ${regla.dias}) · pedido antes de las ${escapeHtml(calendarioWeb.horaCorte)} · ` +
-                    `${calendarioWeb.festivos.length ? calendarioWeb.festivos.length + ' festivo(s) en Calendario' : 'sin festivos'}.` +
-                    (corto ? ` <b>⚠️ El plazo indicado (${actual}) es menor que el mínimo de la web.</b>` : (vacio ? ' Propuesto en "Plazo"; puedes cambiarlo.' : '')) + `</span>`;
+                    `${calendarioWeb.festivos.length ? calendarioWeb.festivos.length + ' festivo(s) en Calendario' : 'sin festivos'}.${nota}</span>`;
             }
             return regla;
         }
@@ -13206,8 +13255,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const tgtLangEn = translateLanguageToEnglish(tgtLang);
             
             // Textos con singular/plural correctos
-            const daysTextEs = days === 'X' ? 'X días laborables' : pluralizeEs(days, 'día laborable', 'días laborables');
-            const daysTextEn = days === 'X' ? 'X working days' : pluralizeEn(days, 'working day', 'working days');
+            const daysTextEs = days === 'X' ? 'X días laborables' : textoPlazo(days, 'es');   // v3.10.67: 0 = "entrega en el día"
+            const daysTextEn = days === 'X' ? 'X working days' : textoPlazo(days, 'en');
             
             // Document text (singular/plural)
             const docTextEs = numDocs === 1 ? 'del documento enviado' : `de los ${numDocs} documentos enviados`;
@@ -13700,6 +13749,664 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             _estadoCargado = { email: (budgetData.clientEmail || '').trim(), whatsapp: (budgetData.clientWhatsApp || '').trim(),
                                comentariosProveedor: String(budgetData.providerComments === undefined ? _estadoCargado.comentariosProveedor : budgetData.providerComments || '') };
             return {};
+        }
+
+        // ============ v3.10.67: TRES PETICIONES DE JAVIER (20/10 – 03/11/2026) ============
+        // 1) El plazo 0 = entrega en el día. El plazo de la web deja de ser un
+        //    "mínimo" (ya no sobrescribe un 0 ni avisa en amarillo): es el plazo
+        //    estándar que propone cuando el campo está vacío. El mensaje al
+        //    cliente dice "entrega en el día" / "same day" con la fecha de hoy.
+        // 2) El botón Enviar del modal de tasación responde AL INSTANTE: ámbar
+        //    con spinner, Cancelar apagado, banda "Solicitud en cola", y el
+        //    modal se cierra solo. El trabajo se pone en cola antes de cualquier
+        //    espera (en modo local, la carpeta de Drive la espera el propio
+        //    trabajo), así los clics de más no pueden duplicar el envío.
+        // 3) Si hay recuento, el mail al traductor lo lleva: la casilla "Incluir
+        //    recuento" se marca sola al entrar en el paso 3 (o cuando termina
+        //    el recuento) y el bloque DETALLES lista palabras y páginas por
+        //    archivo. Sin recuento, al menos las páginas.
+        const PLAZO_EN_EL_DIA = '0';
+        function esPlazoEnElDia(v) { return v === 0 || String(v == null ? '' : v).trim() === PLAZO_EN_EL_DIA; }
+        function textoPlazo(v, lang) {
+            if (esPlazoEnElDia(v)) return lang === 'en' ? 'same day' : 'entrega en el día';
+            const n = parseInt(v, 10);
+            if (isNaN(n) || n < 0) return lang === 'en' ? 'X working days' : 'X días laborables';
+            return lang === 'en' ? pluralizeEn(n, 'working day', 'working days') : pluralizeEs(n, 'día laborable', 'días laborables');
+        }
+        // plazo tal como viene de la hoja (0 numérico o "0" = en el día; vacío = sin plazo)
+        function plazoDeHoja(v) { return esPlazoEnElDia(v) ? PLAZO_EN_EL_DIA : (v || ''); }
+
+        // ---------- 3) recuento en el mail al traductor ----------
+        let _casillaRecuentoManual = false;   // el usuario la ha tocado en este presupuesto: se respeta
+        function onCasillaRecuentoClick() {
+            toggleCheckbox('includeWordCount');
+            _casillaRecuentoManual = true;
+        }
+        function proponerCasillaRecuento() {
+            const el = document.getElementById('includeWordCount');
+            if (!el || _casillaRecuentoManual) return;
+            const hay = (parseInt(budgetData && budgetData.wordCount) || 0) > 0;
+            el.classList.toggle('checked', hay);
+        }
+        // Líneas del bloque DETALLES: volumen total y, con varios archivos, el detalle
+        function lineasVolumenProveedor(includeWords) {
+            const out = [];
+            const palabras = parseInt(budgetData.wordCount) || 0;
+            let inv = null;
+            try { inv = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null; } catch (e) { inv = null; }
+            const paginas = inv ? (inv.hayFiltros ? inv.aTraducir : inv.total) : (parseInt(budgetData.pageCount) || 0);
+            const pagTxt = n => n === 1 ? '1 página' : n + ' páginas';
+            if (includeWords && palabras > 0) {
+                out.push(`* Volumen: ${palabras === 1 ? '1 palabra' : palabras.toLocaleString('es-ES') + ' palabras'}${paginas > 0 ? ' (' + pagTxt(paginas) + ')' : ''}`);
+                const porArchivo = {};
+                (budgetData.fileAnalysis || []).forEach(a => { const n = a && (a.fileName || a.name); if (n) porArchivo[n] = a; });
+                const archivos = inv && inv.inventario ? inv.inventario : Object.keys(porArchivo).map(n => ({ nombre: n, paginas: porArchivo[n].pages || 0, aTraducir: porArchivo[n].pages || 0, filtro: '' }));
+                if (archivos.length > 1) {
+                    archivos.forEach(f => {
+                        const a = porArchivo[f.nombre];
+                        const w = a ? (parseInt(a.words) || 0) : null;
+                        const p = f.aTraducir || f.paginas || 0;
+                        const pags = p ? (p === 1 ? '1 pág.' : p + ' pág.') + (f.filtro && f.paginas && f.aTraducir !== f.paginas ? ' de ' + f.paginas : '') : '';
+                        out.push(`   - ${f.nombre}: ${w == null ? 'sin recuento' : (w === 1 ? '1 palabra' : w.toLocaleString('es-ES') + ' palabras')}${pags ? ' (' + pags + ')' : ''}`);
+                    });
+                }
+            } else if (paginas > 0) {
+                out.push(`* Extensión: ${pagTxt(paginas)}`);
+            }
+            return out;
+        }
+
+        // ---------- 2) botón Enviar del modal ----------
+        let _clicEnviarProveedores = false;
+        function estadoBotonEnviarProveedores(estado, texto) {
+            const btn = document.getElementById('providerSendBtn');
+            const cancel = document.querySelector('#providerPreviewModal .modal-footer .btn-secondary');
+            const band = document.getElementById('providerSendBand');
+            const body = document.querySelector('#providerPreviewModal .modal-body');
+            if (!btn) return;
+            if (estado === 'normal') {
+                btn.classList.remove('btn-enviando'); btn.classList.add('btn-success');
+                btn.disabled = false; btn.innerHTML = 'Enviar';
+                if (cancel) { cancel.disabled = false; cancel.style.opacity = ''; cancel.style.cursor = ''; }
+                if (band) { band.style.display = 'none'; band.innerHTML = ''; }
+                if (body) body.style.opacity = '';
+                return;
+            }
+            btn.classList.remove('btn-success'); btn.classList.add('btn-enviando');
+            btn.innerHTML = '<span class="spinner"></span> ' + escapeHtml(texto || 'Enviando…');
+            if (cancel) { cancel.disabled = true; cancel.style.opacity = '.45'; cancel.style.cursor = 'not-allowed'; }
+            if (body) body.style.opacity = '.55';
+            if (band) {
+                band.style.display = '';
+                band.innerHTML = estado === 'yaEnviando'
+                    ? '⏳ <b>Ya se está enviando</b> esta solicitud (mira el panel Proceso). No hace falta volver a pulsar.'
+                    : (estado === 'esperandoCarpeta'
+                        ? '📨 <b>Solicitud en cola.</b> Se enviará en cuanto la carpeta esté en Drive (panel Proceso); puedes seguir trabajando. Esta ventana se cierra sola.'
+                        : '📨 <b>Solicitud en cola.</b> Se envía en segundo plano (panel Proceso); puedes seguir trabajando. Esta ventana se cierra sola.');
+            }
+        }
+        function textoDestinatariosEnvio(providers) {
+            if (!providers || !providers.length) return 'Enviando…';
+            return providers.length === 1 ? 'Enviando a ' + providers[0].nombre + '…' : 'Enviando a ' + providers.length + ' traductores…';
+        }
+        async function sendProviderEmails() {
+            if (_clicEnviarProveedores) return;   // clics de más mientras se cierra el modal
+            if (trabajoEnvioDe(budgetData.id)) {
+                _clicEnviarProveedores = true;
+                estadoBotonEnviarProveedores('yaEnviando', 'Ya se está enviando…');
+                setTimeout(() => { closeProviderModal(); prodLogShow(); }, 1400);
+                return;
+            }
+            // v3.10.42: exactamente los que se enseñaron en "Destinatarios (N)"
+            const providers = (window._providersToSend || proveedoresSeleccionados()).filter(p => p && p.email);
+            if (!providers.length) {
+                const band = document.getElementById('providerSendBand');
+                if (band) { band.style.display = ''; band.style.background = '#fef2f2'; band.style.borderColor = '#fecaca'; band.style.color = '#991b1b'; band.innerHTML = '⚠️ No hay destinatarios con email: cierra y vuelve a marcar los traductores.'; }
+                return;
+            }
+            _clicEnviarProveedores = true;
+            const sinCarpeta = !budgetData.folderId && !!budgetData.id;
+            estadoBotonEnviarProveedores(sinCarpeta ? 'esperandoCarpeta' : 'enviando', sinCarpeta ? 'Esperando la carpeta en Drive…' : textoDestinatariosEnvio(providers));
+            const job = nuevoTrabajo('enviar', {
+                budgetId: budgetData.id, folderId: budgetData.folderId,
+                sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang,
+                customMessage: document.getElementById('providerMessageEdit').value,
+                additionalComments: document.getElementById('providerComments').value.trim(),
+                providers: providers.map(p => ({ nombre: p.nombre, email: p.email }))
+            });
+            if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
+            updateSelectedCount();
+            setTimeout(closeProviderModal, 1100);   // que se vea el cambio antes de cerrar
+            ejecutarTrabajoEnviar(job);   // sin await
+        }
+        function closeProviderModal() {
+            document.getElementById('providerPreviewModal').classList.remove('visible');
+            estadoBotonEnviarProveedores('normal');
+            const band = document.getElementById('providerSendBand');
+            if (band) { band.style.background = ''; band.style.borderColor = ''; band.style.color = ''; }
+            _clicEnviarProveedores = false;
+        }
+        // v3.8.0 (antes en sendProviderEmails): en modo local, los adjuntos del
+        // email salen de Drive, así que hay que esperar a que la carpeta exista.
+        // Ahora lo hace el trabajo, con el modal ya cerrado y el panel Proceso informando.
+        async function esperarCarpetaParaEnvio(job) {
+            const ctx = job.ctx;
+            if (ctx.folderId) return;
+            faseTrabajo(job, 'esperandoCarpeta', 'la carpeta aún no está en Drive');
+            prodLogStart(job.k('carpeta'), ctx.budgetId + ' · Esperando a que la carpeta esté en Drive para adjuntar los archivos');
+            // como resolveLocalFolderId (4 intentos, 8 s entre ellos), pero "Detener todo" lo corta
+            let r = null;
+            for (let i = 1; i <= 4 && !(r && r.folderId); i++) {
+                if (job.fase === 'detenido') throw _errorDetenido();
+                try { r = await apiPost({ action: 'resolveBudgetFolder', budgetId: ctx.budgetId }, { retry: false, timeoutMs: 25000 }); }
+                catch (e) { if (esErrorDeParada(e)) throw e; r = null; }
+                if (!(r && r.success && r.folderId)) { r = null; if (i < 4) await _esperaCancelable(8000); }
+            }
+            if (job.fase === 'detenido') throw _errorDetenido();
+            if (!(r && r.folderId)) {
+                prodLogError(job.k('carpeta'), 'la carpeta no ha aparecido en Drive');
+                throw new Error('La carpeta de ' + ctx.budgetId + ' aún no está en Drive, así que no se pueden adjuntar los archivos. Comprueba la sincronización de la carpeta local y vuelve a enviar.');
+            }
+            ctx.folderId = r.folderId;
+            prodLogDone(job.k('carpeta'), 'carpeta encontrada');
+            if (esAbierto(job)) {
+                budgetData.folderId = r.folderId;
+                budgetData.folderUrl = r.folderUrl || budgetData.folderUrl || '';
+                try { if (typeof updateHeaderButtons === 'function') updateHeaderButtons(); } catch (e) {}
+            }
+        }
+
+        // ============================================================================
+        // v3.10.68: FACTURAS DE PROVEEDOR
+        // Arrastras la factura del traductor (PDF o DOCX), la app la lee, busca
+        // cada pedido en WooCommerce (lo que pagó el cliente, sin IVA), calcula
+        // el margen y comprueba suma, IVA, nº repetido, pedidos ya pagados,
+        // IBAN, etc. Validar la registra en la hoja (pestañas FacturasProveedor /
+        // FacturasLineas) y te deja el PDF listo para arrastrarlo a Dougs;
+        // "No validar" prepara el email de corrección al proveedor (no se
+        // registra nada). El PDF no se guarda en Drive.
+        // ============================================================================
+        const FACT_UMBRAL_MARGEN_DEFECTO = 35;   // % por debajo del cual se avisa
+        let fact = null;              // la factura cargada (estado de la pantalla)
+        let _factHistorial = null;    // { facturas, lineas } de la hoja
+        let _factSeq = 0;
+
+        function factUmbral() { try { const n = parseInt(localStorage.getItem('tradutema_fact_umbral'), 10); return (n >= 0 && n <= 95) ? n : FACT_UMBRAL_MARGEN_DEFECTO; } catch (e) { return FACT_UMBRAL_MARGEN_DEFECTO; } }
+        function factSetUmbral(v) { const n = parseInt(v, 10); if (n >= 0 && n <= 95) { try { localStorage.setItem('tradutema_fact_umbral', String(n)); } catch (e) {} } if (fact && fact.lineas) { factEvaluar(); factRender(); } }
+        const factEur = v => (v == null || isNaN(v)) ? '—' : (Math.round(v * 100) / 100).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+        const factFecha = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : (iso || '—'); };
+        const factHoyIso = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+        const factNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9@. ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const factNum = v => { if (typeof v === 'number') return v; const s = String(v == null ? '' : v).replace(/[€\s]/g, ''); if (!s) return 0; const t = (s.indexOf(',') > -1 && s.indexOf('.') > -1) ? (s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '')) : s.replace(',', '.'); const n = parseFloat(t); return isNaN(n) ? 0 : n; };
+
+        function showFacturas() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('budgetListScreen').classList.add('hidden');
+            document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
+            document.getElementById('facturasScreen').classList.remove('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('homeBtn').style.display = 'flex';
+            document.querySelector('main.main').classList.add('ancha');   // la tabla no cabe en 700 px
+            const u = document.getElementById('factUmbral'); if (u) u.value = factUmbral();
+            factRender();
+            factCargarHistorial().then(() => factRenderHistorial()).catch(e => { const h = document.getElementById('factHistorialBody'); if (h) h.innerHTML = '<div style="color:#991b1b;">No se pudo leer el historial: ' + escapeHtml(e.message || String(e)) + '</div>'; });
+        }
+        function factSalir() { fact = null; factRender(); showHomeScreen(); }
+
+        // ---------- historial (hoja) ----------
+        async function factCargarHistorial(forzar) {
+            if (_factHistorial && !forzar) return _factHistorial;
+            const r = await apiPost({ action: 'getFacturasProveedor' }, { retry: true, attempts: 2, timeoutMs: 60000 });
+            if (!r || !r.success) throw new Error((r && r.error) || 'el servidor no devolvió el historial');
+            _factHistorial = { facturas: r.facturas || [], lineas: r.lineas || [] };
+            return _factHistorial;
+        }
+
+        // ---------- 1) archivo → PDF (DOCX se convierte en el servidor) → texto ----------
+        function factDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('over'); }
+        function factDragLeave(e) { e.currentTarget.classList.remove('over'); }
+        function factDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('over'); const f = e.dataTransfer && e.dataTransfer.files; if (f && f.length) factArchivoElegido(f); }
+        function factArchivoElegido(files) {
+            const f = files && files[0]; if (!f) return;
+            procesarFactura(f).catch(err => {
+                factEstado('❌ ' + ((err && err.message) || err), 'error');
+                if (fact) { fact.error = (err && err.message) || String(err); factRender(); }
+            });
+        }
+        function factEstado(msg, tipo) {
+            const el = document.getElementById('factEstadoLectura'); if (!el) return;
+            el.style.display = msg ? '' : 'none';
+            el.className = 'fact-estado ' + (tipo || '');
+            el.innerHTML = msg ? ((tipo === 'cargando' ? '<span class="spinner" style="border-top-color:#1d4ed8;"></span> ' : '') + escapeHtml(msg)) : '';
+        }
+        async function procesarFactura(file) {
+            const nombre = file.name || 'factura';
+            const esDocx = /\.docx?$/i.test(nombre);
+            if (!esDocx && !/\.pdf$/i.test(nombre) && file.type !== 'application/pdf') throw new Error('Solo PDF o DOCX (' + nombre + ')');
+            fact = { id: 'fact-' + Date.now() + '-' + (++_factSeq), archivo: { nombre: nombre, size: file.size, esDocx: esDocx }, fase: 'leyendo', lineas: [], checks: [], registrada: null };
+            factRender();
+            factEstado(esDocx ? 'Convirtiendo ' + nombre + ' a PDF (Drive)…' : 'Leyendo ' + nombre + '…', 'cargando');
+            const bytesOrig = new Uint8Array(await file.arrayBuffer());
+            let pdfBytes = bytesOrig, pdfNombre = nombre;
+            if (esDocx) {
+                const r = await apiPost({ action: 'convertirDocxAPdf', nombre: nombre, contenido: _bytesToB64(bytesOrig) }, { retry: false, timeoutMs: 120000 });
+                if (!r || !r.success || !r.contenido) throw new Error('No se pudo convertir el DOCX a PDF: ' + ((r && r.error) || 'sin respuesta'));
+                pdfBytes = _b64ToBytes(r.contenido); pdfNombre = r.nombre || nombre.replace(/\.docx?$/i, '.pdf');
+            }
+            fact.pdf = { nombre: pdfNombre, bytes: pdfBytes };
+            factEstado('Extrayendo el texto de ' + pdfNombre + '…', 'cargando');
+            const lectura = await factTextoDePdf(pdfBytes);
+            fact.texto = lectura.texto; fact.numPaginas = lectura.numPaginas;
+            let ext = null;
+            const key = navCountKey();
+            if (key) {
+                factEstado('Interpretando la factura con Claude…', 'cargando');
+                if ((fact.texto || '').replace(/\s+/g, '').length < 40) {
+                    const imgs = await factPaginasAImagenes(pdfBytes, 4);
+                    ext = await factExtraerConClaude(key, null, imgs);
+                } else {
+                    ext = await factExtraerConClaude(key, fact.texto, null);
+                }
+                fact.lecturaAproximada = false;
+            } else {
+                ext = factExtraerConRegex(fact.texto || '');
+                fact.lecturaAproximada = true;
+            }
+            await factCargarHistorial().catch(() => null);
+            factAplicarExtraccion(ext);
+            factEstado('Buscando los pedidos en WooCommerce…', 'cargando');
+            await factBuscarPedidos();
+            fact.fase = 'lista';
+            factEvaluar();
+            factEstado('', '');
+            factRender();
+        }
+        async function factTextoDePdf(bytes) {
+            const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+            const paginas = [];
+            for (let i = 1; i <= doc.numPages; i++) {
+                const page = await doc.getPage(i);
+                const tc = await page.getTextContent();
+                // agrupar por línea (misma altura) para que "REF. 92196 ... 30,00 €" quede junto
+                const filas = [];
+                tc.items.forEach(it => {
+                    if (!it.str) return;
+                    const y = Math.round(it.transform[5]);
+                    let f = filas.find(r => Math.abs(r.y - y) <= 2);
+                    if (!f) { f = { y: y, items: [] }; filas.push(f); }
+                    f.items.push({ x: it.transform[4], s: it.str });
+                });
+                filas.sort((a, b) => b.y - a.y);
+                paginas.push(filas.map(r => r.items.sort((a, b) => a.x - b.x).map(x => x.s).join(' ').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n'));
+                try { page.cleanup(); } catch (e) {}
+            }
+            const n = doc.numPages;
+            try { await doc.destroy(); } catch (e) {}
+            return { texto: paginas.join('\n\n'), numPaginas: n };
+        }
+        async function factPaginasAImagenes(bytes, max) {
+            const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+            const out = [];
+            for (let i = 1; i <= Math.min(doc.numPages, max || 4); i++) {
+                const page = await doc.getPage(i);
+                const vp0 = page.getViewport({ scale: 1 });
+                const vp = page.getViewport({ scale: NAV_COUNT.longSidePx / Math.max(vp0.width, vp0.height) });
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(vp.width)); canvas.height = Math.max(1, Math.round(vp.height));
+                const c2 = canvas.getContext('2d'); c2.fillStyle = '#fff'; c2.fillRect(0, 0, canvas.width, canvas.height);
+                await page.render({ canvasContext: c2, viewport: vp }).promise;
+                const img = await _canvasAJpegB64(canvas);
+                out.push({ mediaType: 'image/jpeg', data: img.data });
+                canvas.width = 1; canvas.height = 1;
+            }
+            try { await doc.destroy(); } catch (e) {}
+            return out;
+        }
+
+        // ---------- 2) estructura de la factura (Claude, o regex sin clave) ----------
+        const FACT_PROMPT = 'Extrae los datos de esta factura de un traductor (proveedor de Tradutema). Devuelve SOLO un JSON, sin comentarios ni ```:\n' +
+            '{"proveedor":{"nombre":"","nif":"","email":"","iban":""},"numero":"","fecha":"YYYY-MM-DD","moneda":"EUR",' +
+            '"lineas":[{"texto":"la línea tal cual","pedido":"","presupuesto":"","concepto":"","importe":0}],"base":0,"iva":0,"retencion":0,"total":0}\n' +
+            'Reglas: una entrada en "lineas" por cada concepto facturado. "pedido" = número de pedido web de Tradutema (5 o 6 dígitos; suele ir tras REF., Ref, Pedido, Order, nº, #). ' +
+            '"presupuesto" = referencia de presupuesto tipo 1012-04-W (4 dígitos, guion, 2 o 3 dígitos, guion, letra). Si una línea no trae ninguno de los dos, déjalos "". ' +
+            '"importe" = importe de la línea en número con punto decimal (sin símbolo). "base" = suma antes de impuestos; "iva" y "retencion" en euros (0 si no aparecen o son 0 %); "total" = importe final a pagar. ' +
+            '"iban" sin espacios si aparece. "numero" = número de la factura tal cual (p. ej. 77/2026 o 2026-4434). "fecha" = fecha de emisión en formato YYYY-MM-DD. Si un dato no aparece, "" o 0.';
+        async function factExtraerConClaude(key, texto, imagenes) {
+            const content = [];
+            if (imagenes) imagenes.forEach(im => content.push({ type: 'image', source: { type: 'base64', media_type: im.mediaType, data: im.data } }));
+            content.push({ type: 'text', text: FACT_PROMPT + (texto ? '\n\nTEXTO DE LA FACTURA:\n' + texto.slice(0, 20000) : '') });
+            const body = { model: NAV_COUNT.model, max_tokens: 4000, temperature: 0, messages: [{ role: 'user', content: content }] };
+            let ultimo = null;
+            for (let intento = 1; intento <= 3; intento++) {
+                if (intento > 1) await new Promise(r => setTimeout(r, 1500 * intento));
+                const resp = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: cabecerasClaude(key), body: JSON.stringify(body) });
+                const txt = await resp.text();
+                if (resp.status === 401 || resp.status === 403) throw new Error('Claude rechaza la clave configurada en Ajustes (HTTP ' + resp.status + ')');
+                if (resp.status !== 200) { ultimo = 'HTTP ' + resp.status; continue; }
+                try {
+                    const j = JSON.parse(txt);
+                    const raw = (j.content && j.content[0] && j.content[0].text) ? j.content[0].text.trim() : '';
+                    let parsed = null;
+                    try { parsed = JSON.parse(raw); } catch (e) { const m = raw.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
+                    if (parsed && Array.isArray(parsed.lineas)) return parsed;
+                    ultimo = 'respuesta sin JSON';
+                } catch (e) { ultimo = e.message; }
+            }
+            throw new Error('Claude no ha podido interpretar la factura (' + ultimo + ')');
+        }
+        function factExtraerConRegex(texto) {
+            const lineas = [];
+            const rePres = /\b(\d{4}-\d{2,3}-[WMF])\b/i, rePed = /\b(9\d{4}|\d{6})\b/, reImp = /(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})|\d+\.\d{2})\s*(?:€|EUR)?/g;
+            let total = 0, numero = '', fecha = '', iban = '', nif = '', pendiente = null;   // pendiente: línea con importe y sin referencia (la referencia puede venir en la línea siguiente)
+            texto.split('\n').forEach(l => {
+                const imps = [...l.matchAll(reImp)].map(m => factNum(m[1]));
+                if (/total/i.test(l) && imps.length) total = Math.max(total, imps[imps.length - 1]);
+                const mp = l.match(rePres), mo = l.match(rePed);
+                const esTotal = /total|iva|base|imponible|recibo de/i.test(l);
+                if ((mp || mo) && imps.length && !esTotal) { lineas.push({ texto: l, presupuesto: mp ? mp[1].toUpperCase() : '', pedido: mo ? mo[1] : '', concepto: l.replace(reImp, '').trim(), importe: imps[imps.length - 1] }); pendiente = null; }
+                else if ((mp || mo) && !imps.length && pendiente) { lineas.push({ texto: pendiente.texto + ' ' + l, presupuesto: mp ? mp[1].toUpperCase() : '', pedido: mo ? mo[1] : '', concepto: pendiente.concepto, importe: pendiente.importe }); pendiente = null; }
+                else if (imps.length && !esTotal && !/tel|nif|iban|cuenta|swift/i.test(l)) pendiente = { texto: l, concepto: l.replace(reImp, '').trim(), importe: imps[0] };
+                if (!numero) { const mn = l.match(/(?:factura|invoice)[^0-9\n]{0,25}?([A-Z]{0,3}[-_\/]?\d[\dA-Z\/_.-]{0,15})/i); if (mn && !/^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/.test(mn[1])) numero = mn[1].replace(/[.,:]$/, ''); }
+                if (!fecha) { const md = l.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/); if (md) fecha = md[3] + '-' + md[2].padStart(2, '0') + '-' + md[1].padStart(2, '0'); }
+                if (!iban) { const mi = l.replace(/\s/g, '').match(/[A-Z]{2}\d{2}[A-Z0-9]{10,30}/); if (mi && /^ES|^FR|^PT|^DE|^IT/.test(mi[0])) iban = mi[0]; }
+                if (!nif) { const mnif = l.match(/\b([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[A-HJ-NP-SUVW][0-9]{7}[0-9A-J])\b/); if (mnif) nif = mnif[1]; }
+            });
+            const base = lineas.reduce((s, l) => s + l.importe, 0);
+            return { proveedor: { nombre: (texto.split('\n').find(l => l.trim()) || '').trim(), nif: nif, email: '', iban: iban }, numero: numero, fecha: fecha, moneda: 'EUR', lineas: lineas, base: base, iva: 0, retencion: 0, total: total || base };
+        }
+        function factAplicarExtraccion(ext) {
+            const p = ext.proveedor || {};
+            fact.proveedorFactura = { nombre: String(p.nombre || '').trim(), nif: String(p.nif || '').trim(), email: String(p.email || '').trim(), iban: String(p.iban || '').replace(/\s/g, '').toUpperCase() };
+            fact.numero = String(ext.numero || '').trim();
+            fact.fecha = String(ext.fecha || '').trim();
+            fact.moneda = String(ext.moneda || 'EUR').toUpperCase();
+            fact.base = factNum(ext.base); fact.iva = factNum(ext.iva); fact.retencion = factNum(ext.retencion); fact.total = factNum(ext.total);
+            fact.lineas = (ext.lineas || []).map((l, i) => ({
+                clave: 'L' + (i + 1), texto: String(l.texto || ''), concepto: String(l.concepto || l.texto || '').trim(),
+                pedido: String(l.pedido || '').replace(/\D/g, ''), presupuesto: String(l.presupuesto || '').trim().toUpperCase(),
+                importe: factNum(l.importe), woo: null, estado: 'pendiente', avisos: []
+            }));
+            if (!fact.total && fact.lineas.length) fact.total = fact.lineas.reduce((s, l) => s + l.importe, 0);
+            // proveedor de la pestaña Traductores: por email, o por nombre
+            fact.proveedor = factEmparejarProveedor(fact.proveedorFactura);
+        }
+        function factProveedoresUnicos() {
+            const m = {};
+            (allProviders || []).forEach(p => { const k = factNorm(p.nombre); if (!k) return; if (!m[k]) m[k] = { nombre: p.nombre, email: p.email || '' }; else if (!m[k].email && p.email) m[k].email = p.email; });
+            return Object.values(m).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        }
+        function factEmparejarProveedor(pf) {
+            const lista = factProveedoresUnicos();
+            // por NIF o IBAN de una factura ya registrada (la pestaña Traductores suele
+            // llevar el nombre corto, "Marysol", y la factura el completo)
+            const hist = (_factHistorial && _factHistorial.facturas) || [];
+            const prev = hist.find(f => (pf.nif && factNorm(f.NIF) === factNorm(pf.nif)) || (pf.iban && String(f.IBAN || '').replace(/\s/g, '').toUpperCase() === pf.iban));
+            if (prev) { const p = lista.find(x => factNorm(x.nombre) === factNorm(prev.Proveedor)); if (p) return p; return { nombre: prev.Proveedor, email: '' }; }
+            const email = factNorm(pf.email);
+            if (email) { const porEmail = lista.find(p => factNorm(p.email) === email); if (porEmail) return porEmail; }
+            const nombre = factNorm(pf.nombre);
+            if (!nombre) return null;
+            const tokensFact = nombre.split(' ').filter(t => t.length > 2);
+            let mejor = null, mejorPuntos = 0;
+            lista.forEach(p => {
+                const tp = factNorm(p.nombre).split(' ').filter(t => t.length > 2);
+                const puntos = tp.filter(t => tokensFact.indexOf(t) > -1).length;
+                if (puntos > mejorPuntos) { mejorPuntos = puntos; mejor = p; }
+            });
+            return mejorPuntos ? mejor : null;
+        }
+        function factCambiarProveedor(nombre) {
+            const p = factProveedoresUnicos().find(x => x.nombre === nombre) || null;
+            fact.proveedor = p;
+            factBuscarPedidos().then(() => { factEvaluar(); factRender(); }).catch(() => { factEvaluar(); factRender(); });
+        }
+
+        // ---------- 3) pedidos en WooCommerce ----------
+        async function factBuscarPedidos() {
+            const lineas = fact.lineas.filter(l => l.pedido || l.presupuesto);
+            if (!lineas.length) return;
+            const r = await apiPost({ action: 'buscarPedidosFactura', lineas: lineas.map(l => ({ clave: l.clave, pedido: l.pedido, presupuesto: l.presupuesto })), proveedor: fact.proveedor ? fact.proveedor.nombre : '' }, { retry: true, attempts: 2, timeoutMs: 120000 });
+            if (!r || !r.success) throw new Error('No se pudieron consultar los pedidos: ' + ((r && r.error) || 'sin respuesta'));
+            (r.lineas || []).forEach(res => {
+                const l = fact.lineas.find(x => x.clave === res.clave); if (!l) return;
+                l.woo = res;
+                if (res.pedido && !l.pedido) l.pedido = res.pedido;
+                if (res.presupuesto && !l.presupuesto) l.presupuesto = res.presupuesto;
+            });
+        }
+
+        // ---------- 4) comprobaciones ----------
+        function factEvaluar() {
+            const checks = []; const add = (nivel, texto) => checks.push({ nivel: nivel, texto: texto });
+            const umbral = factUmbral();
+            const hist = _factHistorial || { facturas: [], lineas: [] };
+            const prov = fact.proveedor ? fact.proveedor.nombre : '';
+            // --- líneas: pedidos repetidos dentro de la factura se funden ---
+            const porPedido = {};
+            fact.lineas.forEach(l => { l.avisos = []; l.oculta = false; l.partes = null; const k = l.pedido || (l.presupuesto ? 'P:' + l.presupuesto : ''); if (!k) return; (porPedido[k] = porPedido[k] || []).push(l); });
+            Object.keys(porPedido).forEach(k => {
+                const ls = porPedido[k]; if (ls.length < 2) return;
+                const suma = ls.reduce((s, l) => s + l.importe, 0);
+                ls[0].partes = ls.map(l => l.importe); ls[0].importeTotal = suma;
+                for (let i = 1; i < ls.length; i++) ls[i].oculta = true;
+                add('warn', (ls[0].pedido || ls[0].presupuesto) + ' aparece en ' + ls.length + ' líneas (' + ls.map(l => factEur(l.importe).replace(' €', '')).join(' + ') + ' = ' + factEur(suma) + ')');
+            });
+            const visibles = fact.lineas.filter(l => !l.oculta);
+            const sumaLineas = fact.lineas.reduce((s, l) => s + l.importe, 0);
+            // --- suma, IVA, retención ---
+            const totalRef = fact.total || sumaLineas;
+            const difSuma = Math.abs(sumaLineas - (fact.base || totalRef));
+            if (fact.lineas.length && difSuma <= 0.011) add('ok', 'Suma de los conceptos = ' + (fact.base ? 'base' : 'total') + ' (' + factEur(sumaLineas) + ')');
+            else if (fact.lineas.length) add('err', 'La suma de los conceptos (' + factEur(sumaLineas) + ') no coincide con ' + (fact.base ? 'la base (' + factEur(fact.base) + ')' : 'el total (' + factEur(fact.total) + ')'));
+            if (fact.base && fact.total && Math.abs(fact.base + fact.iva - fact.retencion - fact.total) > 0.011) add('err', 'Base + IVA − retención (' + factEur(fact.base + fact.iva - fact.retencion) + ') no coincide con el total (' + factEur(fact.total) + ')');
+            if (fact.iva > 0.001) add('err', 'Lleva IVA (' + factEur(fact.iva) + '): no procede (proveedor español facturando a Tradutema EURL, inversión del sujeto pasivo)');
+            else add('ok', 'Sin IVA (inversión del sujeto pasivo)');
+            if (fact.retencion > 0.001) add('err', 'Lleva retención (' + factEur(fact.retencion) + '): no procede (Tradutema no es pagador en España)');
+            if (fact.moneda && fact.moneda !== 'EUR') add('err', 'Moneda ' + fact.moneda + ' (se esperaba EUR)');
+            // --- número y fecha de factura ---
+            const mismasProv = hist.facturas.filter(f => prov && factNorm(f.Proveedor) === factNorm(prov));
+            const repetida = fact.numero && mismasProv.find(f => factNorm(f.NumeroFactura) === factNorm(fact.numero));
+            if (repetida) add('err', 'El nº ' + fact.numero + ' ya se registró el ' + factFecha(repetida.FechaRegistro) + ' (transferencia ' + factFecha(repetida.FechaTransferencia) + ')');
+            else if (fact.numero) { const ult = mismasProv.slice().sort((a, b) => String(b.FechaFactura).localeCompare(String(a.FechaFactura)))[0]; add('ok', 'Nº ' + fact.numero + ' no registrado antes' + (ult ? ' (última: ' + ult.NumeroFactura + ', ' + factFecha(ult.FechaFactura) + ')' : '')); }
+            else add('warn', 'No se ha podido leer el número de factura');
+            if (fact.fecha) {
+                const hoy = factHoyIso();
+                if (fact.fecha > hoy) add('warn', 'Fecha de factura futura (' + factFecha(fact.fecha) + ')');
+                else if ((new Date(hoy) - new Date(fact.fecha)) / 86400000 > 90) add('warn', 'Factura de hace más de 90 días (' + factFecha(fact.fecha) + ')');
+            } else add('warn', 'No se ha podido leer la fecha de la factura');
+            // --- IBAN ---
+            const ibanAnt = mismasProv.map(f => String(f.IBAN || '').replace(/\s/g, '')).filter(Boolean).pop();
+            const ibanFact = fact.proveedorFactura.iban;
+            if (ibanFact && ibanAnt) add(ibanFact === ibanAnt ? 'ok' : 'err', ibanFact === ibanAnt ? 'IBAN igual que en la factura anterior' : 'El IBAN cambia respecto a la factura anterior (…' + ibanAnt.slice(-4) + ' → …' + ibanFact.slice(-4) + '): confírmalo con el proveedor por teléfono antes de pagar');
+            else if (ibanFact) add('info', 'Primera factura registrada de este proveedor: IBAN …' + ibanFact.slice(-4) + ' queda como referencia');
+            else add('warn', 'La factura no trae IBAN (o no se ha podido leer)');
+            if (!fact.proveedor) add('warn', 'No he encontrado a este proveedor en la pestaña Traductores: elígelo en el desplegable');
+            if (fact.lecturaAproximada) add('warn', 'Leída sin Claude (no hay clave en Ajustes): revisa las líneas con calma');
+            // --- cada línea ---
+            let sumCli = 0, sumProvVerif = 0, verificables = 0; const fechasPed = [];
+            visibles.forEach(l => {
+                const imp = l.importeTotal != null ? l.importeTotal : l.importe;
+                const w = l.woo || {};
+                l.estado = 'ok'; l.margen = null; l.pct = null; l.cliente = null;
+                const yaFact = hist.lineas.find(h => l.pedido && String(h.Pedido) === String(l.pedido));
+                if (!l.pedido && !l.presupuesto) { l.estado = 'warn'; l.avisos.push('sin nº de pedido ni referencia'); }
+                else if (yaFact) { l.estado = 'err'; l.avisos.push('ya facturado en la ' + yaFact.NumeroFactura + ' (' + factFecha(yaFact.FechaFactura) + ')'); add('err', 'Pedido ' + l.pedido + ' ya se pagó en la factura ' + yaFact.NumeroFactura + ' de ' + yaFact.Proveedor); }
+                else if (!w.encontrado) { l.estado = 'warn'; l.avisos.push('sin pedido en WooCommerce'); add('warn', (l.pedido || l.presupuesto) + ': no hay pedido con ese número en WooCommerce'); }
+                else {
+                    if (/cancel|refund|failed|trash/.test(w.estado || '')) { l.estado = 'err'; l.avisos.push('pedido ' + w.estado); add('err', 'Pedido ' + l.pedido + ' está en estado "' + w.estado + '"'); }
+                    l.cliente = w.neto; l.margen = Math.round((w.neto - imp) * 100) / 100; l.pct = w.neto > 0 ? Math.round(l.margen / w.neto * 100) : null;
+                    if (w.fecha) fechasPed.push(w.fecha);
+                    if (l.margen < 0) { if (l.estado !== 'err') l.estado = 'err'; l.avisos.push('margen negativo'); add('err', 'Pedido ' + l.pedido + ': el proveedor cobra más (' + factEur(imp) + ') de lo que pagó el cliente (' + factEur(w.neto) + ')'); }
+                    else if (l.pct != null && l.pct < umbral) { if (l.estado === 'ok') l.estado = 'warn'; l.avisos.push('margen ' + l.pct + ' % < ' + umbral + ' %'); add('warn', 'Pedido ' + l.pedido + ': margen ' + l.pct + ' % (umbral ' + umbral + ' %)'); }
+                    if (w.cotizacionProveedor != null && Math.abs(w.cotizacionProveedor - imp) > 0.011) { if (l.estado === 'ok') l.estado = 'warn'; l.avisos.push('cotizó ' + factEur(w.cotizacionProveedor)); add('warn', 'Pedido ' + l.pedido + ': cotizó ' + factEur(w.cotizacionProveedor) + ' en el presupuesto ' + l.presupuesto + ' y factura ' + factEur(imp)); }
+                    if (l.estado !== 'err') { sumCli += w.neto; sumProvVerif += imp; verificables++; }
+                }
+            });
+            if (fechasPed.length) { fechasPed.sort(); add('ok', 'Pedidos del ' + factFecha(fechasPed[0]) + ' al ' + factFecha(fechasPed[fechasPed.length - 1])); }
+            fact.checks = checks;
+            fact.totales = { proveedor: sumaLineas, cliente: sumCli, proveedorVerif: sumProvVerif, margen: Math.round((sumCli - sumProvVerif) * 100) / 100, pct: sumCli > 0 ? Math.round((sumCli - sumProvVerif) / sumCli * 100) : null, verificables: verificables, lineas: visibles.length,
+                             aPagar: fact.total || sumaLineas, sinErrores: Math.round((sumaLineas - visibles.filter(l => l.estado === 'err').reduce((s, l) => s + (l.importeTotal != null ? l.importeTotal : l.importe), 0)) * 100) / 100 };
+            const nErr = checks.filter(c => c.nivel === 'err').length, nWarn = checks.filter(c => c.nivel === 'warn').length;
+            fact.resultado = nErr ? { nivel: 'err', texto: '❌ ' + nErr + (nErr === 1 ? ' error: no validar sin corregir' : ' errores: no validar sin corregir') } : nWarn ? { nivel: 'warn', texto: '⚠️ Revisar ' + nWarn + (nWarn === 1 ? ' aviso antes de pagar' : ' avisos antes de pagar') } : { nivel: 'ok', texto: '✅ Todo correcto: se puede pagar' };
+        }
+
+        // ---------- 5) pintar ----------
+        function factRender() {
+            const panel = document.getElementById('factPanel'); if (!panel) return;
+            if (!fact) { panel.classList.add('hidden'); panel.innerHTML = ''; const d = document.getElementById('factDropNombre'); if (d) d.textContent = ''; return; }
+            panel.classList.remove('hidden');
+            const dn = document.getElementById('factDropNombre'); if (dn) dn.innerHTML = '<b>' + escapeHtml(fact.archivo.nombre) + '</b> (' + Math.round(fact.archivo.size / 1024) + ' KB)' + (fact.archivo.esDocx ? ' · convertida a PDF' : '') + (fact.fase === 'lista' ? ' · leída ✔' : '');
+            if (fact.fase !== 'lista') { panel.innerHTML = fact.error ? '<div style="color:#991b1b;padding:8px 0;">' + escapeHtml(fact.error) + '</div>' : ''; return; }
+            const pf = fact.proveedorFactura, t = fact.totales, chip = c => '<span class="fact-chip ' + c.nivel + '">' + escapeHtml(c.texto) + '</span>';
+            const provSel = '<select onchange="factCambiarProveedor(this.value)" style="display:inline-block;width:auto;max-width:360px;padding:4px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:.85rem;"><option value="">— sin asignar —</option>' +
+                factProveedoresUnicos().map(p => '<option value="' + escapeHtmlAttr(p.nombre) + '"' + (fact.proveedor && fact.proveedor.nombre === p.nombre ? ' selected' : '') + '>' + escapeHtml(p.nombre) + (p.email ? ' · ' + escapeHtml(p.email) : '') + '</option>').join('') + '</select>';
+            const resColor = fact.resultado.nivel === 'err' ? '#b91c1c' : fact.resultado.nivel === 'warn' ? '#b45309' : '#15803d';
+            let html = '<div class="fact-cab">' +
+                '<div><div style="font-size:1.1rem;font-weight:700;color:#0f172a;">' + escapeHtml(pf.nombre || '(proveedor sin nombre)') + ' <span style="font-weight:normal;color:#64748b;font-size:.9rem;">' + (pf.nif ? '· NIF ' + escapeHtml(pf.nif) + ' ' : '') + '· en Traductores: </span>' + provSel + '</div>' +
+                '<div style="color:#475569;margin-top:6px;">Factura <b>' + escapeHtml(fact.numero || '?') + '</b> · emitida el <b>' + factFecha(fact.fecha) + '</b> · ' + fact.lineas.length + ' línea' + (fact.lineas.length === 1 ? '' : 's') + ' · <b>Total ' + factEur(fact.total) + '</b> · IVA ' + factEur(fact.iva) + (fact.retencion ? ' · retención ' + factEur(fact.retencion) : '') + (pf.iban ? ' · IBAN ' + escapeHtml(pf.iban.slice(0, 4) + ' **** ' + pf.iban.slice(-4)) : '') + '</div></div>' +
+                '<div style="text-align:right;"><div style="font-size:.78rem;color:#64748b;font-weight:600;">RESULTADO</div><div style="font-size:1.05rem;font-weight:800;color:' + resColor + ';">' + escapeHtml(fact.resultado.texto) + '</div>' +
+                '<div style="font-size:.85rem;color:#475569;">a pagar según factura: <b>' + factEur(t.aPagar) + '</b>' + (t.sinErrores !== t.proveedor ? ' · sin las líneas en rojo: <b>' + factEur(t.sinErrores) + '</b>' : '') + '</div></div></div>';
+            html += '<div class="fact-chips">' + fact.checks.map(chip).join('') + '</div>';
+            html += '<table class="fact-tabla"><thead><tr><th>Pedido</th><th>Presupuesto</th><th>Fecha pedido</th><th class="r">Cliente pagó (sin IVA)</th><th class="r">Proveedor cobra</th><th class="r">Margen</th><th class="r">%</th><th>Estado</th></tr></thead><tbody>';
+            fact.lineas.filter(l => !l.oculta).forEach(l => {
+                const w = l.woo || {}; const imp = l.importeTotal != null ? l.importeTotal : l.importe;
+                const icon = l.estado === 'ok' ? '✔' : l.estado === 'warn' ? '⚠️' : '❌';
+                html += '<tr class="' + l.estado + '"><td><b>' + escapeHtml(l.pedido || '—') + '</b></td><td>' + escapeHtml(l.presupuesto || (w.referencia || '—')) + '</td><td>' + (w.fecha ? factFecha(w.fecha) : '—') + '</td>' +
+                    '<td class="r">' + (l.cliente != null ? factEur(l.cliente) : '—') + '</td><td class="r"><b>' + factEur(imp) + '</b>' + (l.partes ? ' <span style="color:#64748b;font-size:.8rem;">(' + l.partes.map(p => factEur(p).replace(' €', '')).join(' + ') + ')</span>' : '') + '</td>' +
+                    '<td class="r"' + (l.margen != null && l.margen < 0 ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + (l.margen != null ? factEur(l.margen) : '—') + '</td><td class="r" style="font-weight:600;color:' + (l.pct != null && l.pct < factUmbral() ? '#b45309' : '#15803d') + ';">' + (l.pct != null ? l.pct + ' %' : '—') + '</td>' +
+                    '<td style="color:' + (l.estado === 'ok' ? '#15803d' : l.estado === 'warn' ? '#b45309' : '#b91c1c') + ';">' + icon + ' ' + escapeHtml(l.avisos.length ? l.avisos.join(' · ') : 'correcto') + (w.cliente ? ' <span style="color:#94a3b8;font-size:.8rem;">' + escapeHtml(w.cliente) + '</span>' : '') + '</td></tr>';
+            });
+            html += '</tbody><tfoot><tr><td colspan="3">Totales (líneas verificables: ' + t.verificables + ' de ' + t.lineas + ')</td><td class="r">' + factEur(t.cliente) + '</td><td class="r">' + factEur(t.proveedor) + '</td><td class="r" style="color:#15803d;">' + factEur(t.margen) + '</td><td class="r" style="color:#15803d;">' + (t.pct != null ? t.pct + ' %' : '—') + '</td><td></td></tr></tfoot></table>';
+            if (fact.registrada) {
+                html += '<div class="fact-registrada">✅ Registrada el ' + factFecha(fact.registrada.fecha) + ' · transferencia ' + factFecha(fact.registrada.transferencia) + '. ' +
+                    '<a id="factDescarga" class="fact-pdf" draggable="true" href="' + fact.registrada.url + '" download="' + escapeHtmlAttr(fact.registrada.nombrePdf) + '" ondragstart="factDragPdf(event)" title="Arrástralo a Dougs (o a una carpeta) o haz clic para descargarlo">📎 ' + escapeHtml(fact.registrada.nombrePdf) + '</a> ← arrástralo a Dougs o haz clic para descargarlo' +
+                    (fact.registrada.local ? '<br><span style="color:#475569;font-size:.85rem;">También guardada en la carpeta local: ' + escapeHtml(fact.registrada.local) + '</span>' : '') + '</div>';
+            } else {
+                html += '<div class="fact-acciones">' +
+                    '<label style="font-size:.85rem;color:#475569;">Transferencia el <input type="date" id="factFechaTransf" value="' + (fact.fechaTransferencia || factHoyIso()) + '" onchange="fact.fechaTransferencia = this.value" style="padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:6px;"></label>' +
+                    '<button class="btn btn-primary" id="factBtnValidar" style="background:#15803d;" onclick="factValidar()">✅ Validar y registrar</button>' +
+                    '<button class="btn btn-primary" id="factBtnNoValidar" style="background:#b45309;" onclick="factAbrirEmail()">✖ No validar → escribir al proveedor</button>' +
+                    '<button class="btn btn-secondary" onclick="factSalir()">Descartar</button>' +
+                    '<span style="font-size:.82rem;color:#64748b;">Validar la anota en la hoja (pestañas FacturasProveedor / FacturasLineas) y te deja el PDF para arrastrarlo a Dougs. No se guarda en Drive.</span></div>';
+            }
+            panel.innerHTML = html;
+        }
+        function factDragPdf(e) {
+            // Chrome: arrastrar el enlace a una carpeta o al navegador crea el archivo (DownloadURL)
+            try { if (fact && fact.registrada) e.dataTransfer.setData('DownloadURL', 'application/pdf:' + fact.registrada.nombrePdf + ':' + (fact.registrada.dataUrl || fact.registrada.url)); } catch (err) {}
+        }
+
+        // ---------- 6) validar y registrar ----------
+        async function factValidar() {
+            if (!fact || fact.fase !== 'lista' || fact.registrada) return;
+            const nErr = fact.checks.filter(c => c.nivel === 'err').length;
+            if (nErr && !confirm('Hay ' + nErr + ' error' + (nErr === 1 ? '' : 'es') + ' marcado' + (nErr === 1 ? '' : 's') + ' en rojo. ¿Registrar la factura igualmente?')) return;
+            const btn = document.getElementById('factBtnValidar'); const btn2 = document.getElementById('factBtnNoValidar');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Registrando…'; } if (btn2) btn2.disabled = true;
+            const transf = (document.getElementById('factFechaTransf') || {}).value || fact.fechaTransferencia || factHoyIso();
+            const t = fact.totales, pf = fact.proveedorFactura, prov = fact.proveedor ? fact.proveedor.nombre : pf.nombre;
+            const factura = { FacturaId: fact.id, Proveedor: prov, NIF: pf.nif, NumeroFactura: fact.numero, FechaFactura: fact.fecha, FechaTransferencia: transf, FechaRegistro: factHoyIso(),
+                Total: fact.total, Base: fact.base || t.proveedor, IVA: fact.iva, Retencion: fact.retencion, Moneda: fact.moneda || 'EUR', IBAN: pf.iban, NumLineas: t.lineas,
+                ImporteCliente: t.cliente, Margen: t.margen, MargenPct: t.pct == null ? '' : t.pct, Avisos: fact.checks.filter(c => c.nivel !== 'ok').map(c => (c.nivel === 'err' ? '❌ ' : '⚠️ ') + c.texto).join(' | ').slice(0, 2000), Archivo: fact.pdf.nombre };
+            const lineas = fact.lineas.filter(l => !l.oculta).map(l => { const w = l.woo || {}; const imp = l.importeTotal != null ? l.importeTotal : l.importe; return {
+                Pedido: l.pedido, Presupuesto: l.presupuesto || w.referencia || '', FechaPedido: w.fecha || '', Concepto: (l.concepto || '').slice(0, 300), ImporteProveedor: imp,
+                ImporteCliente: l.cliente == null ? '' : l.cliente, Margen: l.margen == null ? '' : l.margen, MargenPct: l.pct == null ? '' : l.pct, Estado: l.estado + (l.avisos.length ? ': ' + l.avisos.join(' · ') : ''), Idiomas: w.idiomasPresupuesto || w.idiomas || '' }; });
+            try {
+                const r = await apiPost({ action: 'registrarFacturaProveedor', factura: factura, lineas: lineas }, { retry: true, attempts: 2, timeoutMs: 60000 });
+                if (!r || !r.success) throw new Error((r && r.error) || 'el servidor no confirmó el registro');
+                const nombrePdf = factNombrePdf(prov, fact.numero, fact.fecha);
+                const blob = new Blob([fact.pdf.bytes], { type: 'application/pdf' });
+                fact.registrada = { fecha: factHoyIso(), transferencia: transf, nombrePdf: nombrePdf, url: URL.createObjectURL(blob), dataUrl: 'data:application/pdf;base64,' + _bytesToB64(fact.pdf.bytes), local: '' };
+                try { fact.registrada.local = await factGuardarEnLocal(nombrePdf, fact.pdf.bytes); } catch (e) { fact.registrada.local = ''; }
+                if (_factHistorial) { _factHistorial.facturas.push(factura); lineas.forEach(l => _factHistorial.lineas.push(Object.assign({ FacturaId: fact.id, Proveedor: prov, NumeroFactura: fact.numero, FechaFactura: fact.fecha }, l))); }
+                factRender(); factRenderHistorial();
+                showStatus('✓ Factura ' + fact.numero + ' de ' + prov + ' registrada. Arrastra el PDF a Dougs.', 'success'); setTimeout(hideStatus, 6000);
+            } catch (e) {
+                if (btn) { btn.disabled = false; btn.innerHTML = '✅ Validar y registrar'; } if (btn2) btn2.disabled = false;
+                showStatus('❌ No se ha registrado: ' + ((e && e.message) || e), 'error'); setTimeout(hideStatus, 8000);
+            }
+        }
+        function factNombrePdf(prov, numero, fecha) {
+            const limpio = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+            return (fecha ? fecha.slice(0, 7) : factHoyIso().slice(0, 7)) + '_' + (limpio(prov) || 'proveedor') + '_factura_' + (limpio(numero) || 'sin_numero') + '.pdf';
+        }
+        // carpeta local (modo Local): <carpeta>/Facturas proveedores/<nombre>.pdf
+        async function factGuardarEnLocal(nombre, bytes) {
+            if (typeof localModeReady !== 'function') return '';
+            const raiz = await localModeReady(false); if (!raiz) return '';
+            const dir = await raiz.getDirectoryHandle('Facturas proveedores', { create: true });
+            const fh = await dir.getFileHandle(nombre, { create: true });
+            const w = await fh.createWritable(); await w.write(bytes); await w.close();
+            return raiz.name + '/Facturas proveedores/' + nombre;
+        }
+
+        // ---------- 7) no validar → email al proveedor ----------
+        function factSaludo(nombre) {
+            const t = String(nombre || '').trim().split(/\s+/)[0] || '';
+            return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : '';
+        }
+        function factTextoEmail() {
+            const pf = fact.proveedorFactura; const nombre = fact.proveedor ? fact.proveedor.nombre : pf.nombre;
+            const saludo = factSaludo(nombre);
+            const problemas = fact.checks.filter(c => c.nivel === 'err').map(c => c.texto)
+                .concat(fact.checks.filter(c => c.nivel === 'warn' && /aparece en|no hay pedido|cotizó/.test(c.texto)).map(c => c.texto));
+            let cuerpo = 'Hola ' + (saludo || '') + ':\n\nHe revisado tu factura ' + (fact.numero || '') + (fact.fecha ? ' del ' + factFecha(fact.fecha) : '') + ' y antes de pagarla necesito que corrijas lo siguiente:\n\n';
+            cuerpo += (problemas.length ? problemas : ['(describe aquí el error)']).map(p => '- ' + p.replace(/^Pedido /, 'Pedido ').replace(/ de [A-ZÁ-Úa-zá-ú ]+$/, '')).join('\n');
+            cuerpo += '\n\n¿Podrías enviarme la factura corregida? En cuanto la reciba hago la transferencia.\n\nGracias,\n\nJavier Pardo Furness\nTraductor Jurado Nº 2098\nCoordinador en Tradutema.com\ninfo@tradutema.com\n+34 670 91 78 60';
+            return cuerpo;
+        }
+        function factAbrirEmail() {
+            if (!fact || fact.fase !== 'lista') return;
+            const email = (fact.proveedor && fact.proveedor.email) || fact.proveedorFactura.email || '';
+            document.getElementById('factEmailPara').value = email;
+            document.getElementById('factEmailAsunto').value = 'Factura ' + (fact.numero || '') + ': corrección necesaria';
+            document.getElementById('factEmailCuerpo').value = factTextoEmail();
+            document.getElementById('factEmailAviso').textContent = email ? '' : '⚠️ No tengo el email de este proveedor en la pestaña Traductores: escríbelo arriba.';
+            factEstadoEmail('normal');
+            document.getElementById('factEmailModal').classList.add('visible');
+        }
+        function factCerrarEmail() { document.getElementById('factEmailModal').classList.remove('visible'); factEstadoEmail('normal'); }
+        let _factEnviando = false;
+        function factEstadoEmail(estado, texto) {
+            const btn = document.getElementById('factEmailEnviar'); const cancel = document.getElementById('factEmailCancelar'); if (!btn) return;
+            if (estado === 'normal') { btn.classList.remove('btn-enviando'); btn.classList.add('btn-success'); btn.innerHTML = 'Enviar'; btn.disabled = false; if (cancel) cancel.disabled = false; _factEnviando = false; return; }
+            btn.classList.remove('btn-success'); btn.classList.add('btn-enviando'); btn.innerHTML = '<span class="spinner"></span> ' + escapeHtml(texto || 'Enviando…'); if (cancel) cancel.disabled = true;
+        }
+        async function factEnviarEmail() {
+            if (_factEnviando) return;
+            const email = (document.getElementById('factEmailPara').value || '').trim();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { document.getElementById('factEmailAviso').textContent = '⚠️ Email no válido: ' + email; return; }
+            _factEnviando = true; factEstadoEmail('enviando', 'Enviando a ' + email + '…');
+            const sendId = 'fe-' + fact.id + '-' + Date.now();
+            try {
+                const r = await apiPost({ action: 'enviarEmailFacturaProveedor', email: email, asunto: document.getElementById('factEmailAsunto').value, cuerpo: document.getElementById('factEmailCuerpo').value, sendId: sendId }, { retry: true, attempts: 2, timeoutMs: 60000 });
+                if (!r || !r.success) throw new Error((r && r.error) || 'el servidor no confirmó el envío');
+                factEstadoEmail('enviando', '✓ Enviado');
+                fact.emailEnviado = { email: email, fecha: r.fechaEnvio || '' };
+                setTimeout(() => { factCerrarEmail(); showStatus('✓ Email enviado a ' + email + '. La factura NO se ha registrado.', 'success'); setTimeout(hideStatus, 6000); }, 900);
+            } catch (e) {
+                factEstadoEmail('normal');
+                document.getElementById('factEmailAviso').textContent = '❌ No se ha enviado: ' + ((e && e.message) || e);
+            }
+        }
+
+        // ---------- 8) historial ----------
+        function factRenderHistorial() {
+            const body = document.getElementById('factHistorialBody'); if (!body || !_factHistorial) return;
+            const sel = document.getElementById('factHistProv'); const filtro = sel ? sel.value : '';
+            const provs = [...new Set(_factHistorial.facturas.map(f => f.Proveedor).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+            if (sel) { const actual = sel.value; sel.innerHTML = '<option value="">Todos</option>' + provs.map(p => '<option' + (p === actual ? ' selected' : '') + '>' + escapeHtml(p) + '</option>').join(''); }
+            const fs = _factHistorial.facturas.filter(f => !filtro || f.Proveedor === filtro).sort((a, b) => String(b.FechaFactura).localeCompare(String(a.FechaFactura)));
+            if (!fs.length) { body.innerHTML = '<div style="color:#64748b;font-size:.9rem;">Todavía no hay facturas registradas' + (filtro ? ' de ' + escapeHtml(filtro) : '') + '.</div>'; return; }
+            const sum = k => fs.reduce((s, f) => s + (factNum(f[k]) || 0), 0);
+            const totProv = sum('Total'), totCli = sum('ImporteCliente'), totMar = sum('Margen');
+            const ls = _factHistorial.lineas.filter(l => !filtro || l.Proveedor === filtro);
+            const porIdioma = {}; ls.forEach(l => { const k = l.Idiomas || 'sin idiomas'; porIdioma[k] = (porIdioma[k] || 0) + (factNum(l.ImporteProveedor) || 0); });
+            const idiomas = Object.keys(porIdioma).sort((a, b) => porIdioma[b] - porIdioma[a]).slice(0, 4).map(k => escapeHtml(k) + ' ' + Math.round(porIdioma[k] / Math.max(1, totProv) * 100) + ' %').join(', ');
+            let html = '<div style="font-size:.88rem;color:#475569;margin-bottom:8px;"><b>' + escapeHtml(filtro || 'Todos') + '</b> · ' + fs.length + ' factura' + (fs.length === 1 ? '' : 's') + ' · ' + factEur(totProv) + ' pagados · cliente ' + factEur(totCli) + ' · margen ' + factEur(totMar) + (totCli ? ' (<b style="color:#15803d;">' + Math.round(totMar / totCli * 100) + ' %</b>)' : '') + (idiomas ? ' · ' + idiomas : '') + '</div>';
+            html += '<table class="fact-tabla"><thead><tr><th>Proveedor</th><th>Factura</th><th>Fecha</th><th class="r">Pedidos</th><th class="r">Total</th><th class="r">Cliente (sin IVA)</th><th class="r">Margen</th><th>Transferencia</th><th>Avisos</th></tr></thead><tbody>';
+            fs.forEach(f => { html += '<tr><td>' + escapeHtml(f.Proveedor) + '</td><td>' + escapeHtml(f.NumeroFactura) + '</td><td>' + factFecha(f.FechaFactura) + '</td><td class="r">' + escapeHtml(f.NumLineas) + '</td><td class="r">' + factEur(factNum(f.Total)) + '</td><td class="r">' + factEur(factNum(f.ImporteCliente)) + '</td><td class="r" style="color:#15803d;">' + factEur(factNum(f.Margen)) + (f.MargenPct !== '' ? ' · ' + escapeHtml(f.MargenPct) + ' %' : '') + '</td><td>' + factFecha(f.FechaTransferencia) + '</td><td style="font-size:.8rem;color:#64748b;" title="' + escapeHtmlAttr(f.Avisos || '') + '">' + (f.Avisos ? escapeHtml(String(f.Avisos).split(' | ').length + ' aviso(s)') : '') + '</td></tr>'; });
+            body.innerHTML = html + '</tbody></table>';
         }
 
         // Guardar datos del cliente en la hoja (sin enviar email)
