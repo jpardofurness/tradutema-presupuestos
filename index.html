@@ -1841,8 +1841,8 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.68';
-        const HTML_DATE = '07/11/2026';
+        const HTML_VERSION = '3.10.69';
+        const HTML_DATE = '09/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
@@ -14112,7 +14112,11 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 if (!nif) { const mnif = l.match(/\b([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[A-HJ-NP-SUVW][0-9]{7}[0-9A-J])\b/); if (mnif) nif = mnif[1]; }
             });
             const base = lineas.reduce((s, l) => s + l.importe, 0);
-            return { proveedor: { nombre: (texto.split('\n').find(l => l.trim()) || '').trim(), nif: nif, email: '', iban: iban }, numero: numero, fecha: fecha, moneda: 'EUR', lineas: lineas, base: base, iva: 0, retencion: 0, total: total || base };
+            // nombre del proveedor: primera línea corta sin dígitos que no sea Tradutema ni texto legal
+            // (en PDFs a dos columnas la línea trae también "Cliente: …": nos quedamos con lo de la izquierda)
+            const nombreProv = (texto.split('\n').slice(0, 40).map(l => l.trim().split(/\s{2,}|\b(?:cliente|fecha|factura|n[ºo°])\b/i)[0].trim())
+                .find(l => l.length >= 3 && l.length <= 60 && !/\d/.test(l) && /[a-záéíóúñ]/i.test(l) && !/factura|invoice|fecha|cliente|tradutema|pardo|reglamento|datos|iban|swift|concepto|descripci|importe|total|base|iva|^seg[uú]n|direcci|domicilio|calle|avda|avenida|plaza|^c\/|n[uú]mero|\bde$|^(?:el|la|los|las|de|del)\b/i.test(l)) || '').trim();
+            return { proveedor: { nombre: nombreProv, nif: nif, email: '', iban: iban }, numero: numero, fecha: fecha, moneda: 'EUR', lineas: lineas, base: base, iva: 0, retencion: 0, total: total || base };
         }
         function factAplicarExtraccion(ext) {
             const p = ext.proveedor || {};
@@ -14135,9 +14139,38 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             (allProviders || []).forEach(p => { const k = factNorm(p.nombre); if (!k) return; if (!m[k]) m[k] = { nombre: p.nombre, email: p.email || '' }; else if (!m[k].email && p.email) m[k].email = p.email; });
             return Object.values(m).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
         }
+        // v3.10.69: lo que eliges a mano en el desplegable se recuerda (NIF, IBAN,
+        // nombre y email de la factura → proveedor de Traductores), aunque no
+        // llegues a registrar la factura ("No validar"). Vive en este navegador;
+        // las facturas registradas además se emparejan por NIF/IBAN desde la hoja.
+        function factAliasLeer() { try { return JSON.parse(localStorage.getItem('tradutema_fact_alias') || '{}') || {}; } catch (e) { return {}; } }
+        function factAliasClaves(pf) {
+            const k = [];
+            if (pf.nif) k.push('nif:' + factNorm(pf.nif));
+            if (pf.iban) k.push('iban:' + String(pf.iban).replace(/\s/g, '').toUpperCase());
+            if (pf.email) k.push('email:' + factNorm(pf.email));
+            if (pf.nombre) k.push('nombre:' + factNorm(pf.nombre));
+            return k;
+        }
+        function factAliasGuardar(pf, nombreProveedor) {
+            if (!pf || !nombreProveedor) return;
+            const a = factAliasLeer();
+            factAliasClaves(pf).forEach(k => { a[k] = nombreProveedor; });
+            try { localStorage.setItem('tradutema_fact_alias', JSON.stringify(a)); } catch (e) {}
+        }
+        function factAliasOlvidar(pf) {
+            const a = factAliasLeer();
+            factAliasClaves(pf || {}).forEach(k => { delete a[k]; });
+            try { localStorage.setItem('tradutema_fact_alias', JSON.stringify(a)); } catch (e) {}
+        }
         function factEmparejarProveedor(pf) {
             const lista = factProveedoresUnicos();
-            // por NIF o IBAN de una factura ya registrada (la pestaña Traductores suele
+            // 1) lo que ya elegiste a mano para este NIF / IBAN / nombre / email
+            const alias = factAliasLeer();
+            for (const k of factAliasClaves(pf)) {
+                if (alias[k]) { const p = lista.find(x => factNorm(x.nombre) === factNorm(alias[k])); if (p) return p; }
+            }
+            // 2) por NIF o IBAN de una factura ya registrada (la pestaña Traductores suele
             // llevar el nombre corto, "Marysol", y la factura el completo)
             const hist = (_factHistorial && _factHistorial.facturas) || [];
             const prev = hist.find(f => (pf.nif && factNorm(f.NIF) === factNorm(pf.nif)) || (pf.iban && String(f.IBAN || '').replace(/\s/g, '').toUpperCase() === pf.iban));
@@ -14158,6 +14191,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         function factCambiarProveedor(nombre) {
             const p = factProveedoresUnicos().find(x => x.nombre === nombre) || null;
             fact.proveedor = p;
+            if (p) factAliasGuardar(fact.proveedorFactura, p.nombre); else factAliasOlvidar(fact.proveedorFactura);   // v3.10.69
             factBuscarPedidos().then(() => { factEvaluar(); factRender(); }).catch(() => { factEvaluar(); factRender(); });
         }
 
