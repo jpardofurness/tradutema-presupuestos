@@ -393,6 +393,15 @@
         .version-value { color: var(--tradutema-blue); font-weight: 500; }
         .version-value.error { color: var(--accent-red); }
         .version-value.ok { color: var(--accent-green); }
+        .version-value.warn { color: #b45309; }   /* v3.10.73: copia local */
+        /* v3.10.74: avisos dentro del editor de traductor */
+        .campo-error { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,0.15) !important; }
+        .editor-aviso { display: none; padding: 10px 20px; background: #fef2f2; border-top: 1px solid #fecaca; color: #991b1b; font-size: 0.88rem; line-height: 1.45; }
+        /* v3.10.75: sin recuento no hay .txt que adjuntar: casillas atenuadas e inertes */
+        .checkbox-row.sin-recuento { opacity: 0.55; }
+        .checkbox-row.sin-recuento .custom-checkbox { pointer-events: none; cursor: default; }
+        .version-reload { margin-left: 6px; cursor: pointer; color: var(--tradutema-blue); text-decoration: none; font-weight: 700; }
+        .version-reload:hover { text-decoration: underline; }
         .config-link { color: var(--tradutema-blue); text-decoration: none; font-size: 0.85rem; font-family: inherit; display: flex; align-items: center; gap: 4px; }
         .config-link:hover { text-decoration: underline; }
         
@@ -1362,13 +1371,13 @@
                 <span class="checkbox-label">Incluir recuento de palabras/páginas <span style="color:#94a3b8;font-weight:normal;">(se marca sola si hay recuento)</span></span>
             </div>
             <!-- v3.10.71: qué se adjunta además de los documentos (nunca el Excel con las tarifas) -->
-            <div class="checkbox-row" style="padding-top:4px;">
-                <div class="custom-checkbox checked" id="enviarExtracciones" onclick="toggleCheckbox('enviarExtracciones')"></div>
-                <span class="checkbox-label">Enviar extracciones <span style="color:#94a3b8;font-weight:normal;">(los .txt del texto extraído de cada archivo)</span></span>
+            <div class="checkbox-row" style="padding-top:4px;" id="fila_enviarExtracciones">
+                <div class="custom-checkbox checked" id="enviarExtracciones" onclick="onCasillaAdjuntoClick('enviarExtracciones')"></div>
+                <span class="checkbox-label">Enviar extracciones <span style="color:#94a3b8;font-weight:normal;" id="hint_enviarExtracciones">(los .txt del texto extraído de cada archivo)</span></span>
             </div>
-            <div class="checkbox-row" style="padding-top:4px;">
-                <div class="custom-checkbox checked" id="enviarRecuento" onclick="toggleCheckbox('enviarRecuento')"></div>
-                <span class="checkbox-label">Enviar recuento <span style="color:#94a3b8;font-weight:normal;">(_RECUENTO.txt sin la línea del método; el Excel con tarifas no se envía nunca)</span></span>
+            <div class="checkbox-row" style="padding-top:4px;" id="fila_enviarRecuento">
+                <div class="custom-checkbox checked" id="enviarRecuento" onclick="onCasillaAdjuntoClick('enviarRecuento')"></div>
+                <span class="checkbox-label">Enviar recuento <span style="color:#94a3b8;font-weight:normal;" id="hint_enviarRecuento">(_RECUENTO.txt sin la línea del método; el Excel con tarifas no se envía nunca)</span></span>
             </div>
             
             <div class="checkbox-row">
@@ -1838,9 +1847,10 @@
                     Lo que quites aquí se borra de la hoja al guardar.
                 </small>
             </div>
+            <div class="editor-aviso" id="editProviderAviso"></div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeEditProviderModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveProviderEditor()">💾 Guardar y volver</button>
+                <button class="btn btn-primary" id="editProviderGuardar" onclick="saveProviderEditor()">💾 Guardar y volver</button>
             </div>
         </div>
     </div>
@@ -1855,7 +1865,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.72';
+        const HTML_VERSION = '3.10.75';
         const HTML_DATE = '10/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
@@ -2730,6 +2740,8 @@
             if (includeWordCount) includeWordCount.classList.remove('checked');
             _casillaRecuentoManual = false;   // v3.10.67
             ['enviarExtracciones', 'enviarRecuento'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('checked'); });   // v3.10.71: por defecto, sí
+            _casillasAdjuntosManual = false; _casillasAdjuntosEstado = null;   // v3.10.75
+            if (typeof actualizarCasillasAdjuntos === 'function') actualizarCasillasAdjuntos();
             if (includeProposedRate) includeProposedRate.classList.remove('checked');
             if (proposedRateFields) proposedRateFields.classList.add('hidden');
             if (proposedTariff) proposedTariff.value = '';
@@ -5838,7 +5850,13 @@
         // Solo se bloquea con "Conectando..." la primera vez (sin caché).
         let _wooAutoSyncLanzado = false;   // evitar doble auto-sync (caché + refresco)
 
-        function applyLoadedData(data) {
+        // v3.10.73: la versión del API que se enseña puede venir de la copia local
+        // (arranque) o del servidor (refresco). Solo la del servidor manda.
+        let apiVersionOrigen = '';   // 'cache' | 'servidor' | 'fallo'
+        let bootCacheFecha = 0;
+        function applyLoadedData(data, origen) {
+            apiVersionOrigen = origen === 'cache' ? 'cache' : 'servidor';
+            if (origen === 'cache') bootCacheFecha = data._cachedAt || 0;
             allProviders = data.providers || [];
             allTariffs = data.tariffs || [];
             repintarListasDeTraductores();   // v3.10.72: si la pantalla de traductores o el paso 3 están a la vista
@@ -5926,7 +5944,7 @@
             }
             const data = JSON.parse(_txt);
             if (!data.success) throw new Error(data.error || 'Error desconocido');
-            try { localStorage.setItem('tradutema_boot_cache', JSON.stringify(data)); } catch (e) {}
+            try { localStorage.setItem('tradutema_boot_cache', JSON.stringify(Object.assign({}, data, { _cachedAt: Date.now() }))); } catch (e) {}   // v3.10.73: con fecha
             return data;
         }
 
@@ -5938,7 +5956,7 @@
                 if (raw) {
                     const cached = JSON.parse(raw);
                     if (cached && cached.success) {
-                        applyLoadedData(cached);
+                        applyLoadedData(cached, 'cache');
                         cacheAplicada = true;
                     }
                 }
@@ -5952,7 +5970,8 @@
                     .catch(err => {
                         console.warn('Refresco de catálogo en segundo plano falló (se usa la copia local):', err.message);
                         // v3.10.72: que se sepa que lo que ves puede estar desfasado
-                        showStatus('⚠️ No se ha podido actualizar el catálogo desde la hoja (' + err.message + '). Se usa la copia local; pulsa ⟳ en Traductores para reintentarlo.', 'warning');
+                        apiVersionOrigen = 'fallo'; updateVersionIndicator();   // v3.10.73
+                        showStatus('⚠️ No se ha podido actualizar el catálogo desde la hoja (' + err.message + '). Se usa la copia local; pulsa ⟳ para reintentarlo.', 'warning');
                         setTimeout(hideStatus, 9000);
                     });
                 return;
@@ -5989,10 +6008,13 @@
         function refrescarAvisoVersionApi() {
             const box = document.getElementById('apiVersionWarning');
             if (!box) return;
-            if (apiVersionInsuficiente()) {
+            // v3.10.73: el aviso rojo solo cuando la versión la ha dicho el SERVIDOR
+            // (la copia local puede ser de hace meses, como la del móvil)
+            if (apiVersionInsuficiente() && apiVersionOrigen === 'servidor') {
                 box.innerHTML = `⚠️ <b>El servidor ejecuta el Apps Script v${escapeHtml(apiVersion)}${apiDate ? ' (' + escapeHtml(apiDate) + ')' : ''}</b> ` +
                     `y esta pantalla (v${HTML_VERSION}) necesita la <b>v${API_MIN_VERSION} o superior</b>. Las funciones nuevas fallarán con «Acción no reconocida». ` +
-                    TEXTO_IMPLEMENTAR_API;
+                    TEXTO_IMPLEMENTAR_API +
+                    ` <br>Si en otro dispositivo sale la versión correcta, este navegador apunta a <b>otra implementación</b>: en Ajustes, pega la misma URL del Apps Script (termina en /exec) que usas allí.`;
                 box.style.display = '';
             } else {
                 box.style.display = 'none';
@@ -6009,16 +6031,25 @@
             }
             
             if (apiDisplay) {
-                apiDisplay.classList.remove('ok', 'error');
+                apiDisplay.classList.remove('ok', 'error', 'warn');
+                const reload = ' <a class="version-reload" href="javascript:void(0)" onclick="recargarCatalogo()" title="Volver a leer la hoja">⟳</a>';
+                const fechaCache = bootCacheFecha ? new Date(bootCacheFecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
                 if (error) {
-                    apiDisplay.textContent = 'Error de conexión';
+                    apiDisplay.innerHTML = 'Error de conexión' + reload;
                     apiDisplay.classList.add('error');
                 } else if (apiVersion && apiVersion !== '?') {
-                    if (apiVersionInsuficiente()) {
-                        apiDisplay.textContent = `v${apiVersion}${apiDate ? ' (' + apiDate + ')' : ''} — ⚠️ hace falta la v${API_MIN_VERSION} o superior`;
+                    // v3.10.73: mientras la versión venga de la copia local, no se juzga
+                    if (apiVersionOrigen === 'cache') {
+                        apiDisplay.innerHTML = `v${escapeHtml(apiVersion)} · copia local${fechaCache ? ' del ' + fechaCache : ''} · comprobando con la hoja…`;
+                        apiDisplay.classList.add('warn');
+                    } else if (apiVersionOrigen === 'fallo') {
+                        apiDisplay.innerHTML = `v${escapeHtml(apiVersion)} · copia local${fechaCache ? ' del ' + fechaCache : ''} · sin conexión con la hoja` + reload;
+                        apiDisplay.classList.add('warn');
+                    } else if (apiVersionInsuficiente()) {
+                        apiDisplay.innerHTML = `v${escapeHtml(apiVersion)}${apiDate ? ' (' + escapeHtml(apiDate) + ')' : ''} — ⚠️ hace falta la v${API_MIN_VERSION} o superior` + reload;
                         apiDisplay.classList.add('error');
                     } else {
-                        apiDisplay.textContent = `v${apiVersion}${apiDate ? ' (' + apiDate + ')' : ''}`;
+                        apiDisplay.innerHTML = `v${escapeHtml(apiVersion)}${apiDate ? ' (' + escapeHtml(apiDate) + ')' : ''}` + reload;
                         apiDisplay.classList.add('ok');
                     }
                 } else {
@@ -10787,6 +10818,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         // Abre el editor. clave = email en minusculas (ver claveProveedor).
         // resaltar = par que traia el usuario, para dejarlo visible arriba.
         function openProviderEditor(clave, origen) {
+            try { avisoEditorProveedor(''); botonGuardarEditor('normal'); } catch (e) {}   // v3.10.74
             const filas = allProviders.filter(p => claveProveedor(p) === clave);
             if (!filas.length) {
                 showStatus('No encuentro ese traductor', 'error');
@@ -10934,8 +10966,27 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         }
 
         // Guarda campos compartidos + la foto completa de combinaciones.
+        // v3.10.74: los avisos del editor se veían en la barra de estado de la
+        // página, DETRÁS del modal: "Guardar y volver" parecía no hacer nada
+        // (p. ej. con un email inválido). Ahora salen dentro del modal, con el
+        // campo en rojo, y el botón enseña que está guardando.
+        function avisoEditorProveedor(msg, campoId) {
+            const box = document.getElementById('editProviderAviso');
+            if (box) { box.innerHTML = msg ? '⚠️ ' + escapeHtml(msg) : ''; box.style.display = msg ? 'block' : 'none'; }
+            document.querySelectorAll('#editProviderModal .campo-error').forEach(el => el.classList.remove('campo-error'));
+            if (msg && campoId) {
+                const el = document.getElementById(campoId);
+                if (el) { el.classList.add('campo-error'); try { el.focus(); el.scrollIntoView({ block: 'center' }); } catch (e) {} el.addEventListener('input', () => { el.classList.remove('campo-error'); avisoEditorProveedor(''); }, { once: true }); }
+            }
+        }
+        function botonGuardarEditor(estado) {
+            const b = document.getElementById('editProviderGuardar'); if (!b) return;
+            if (estado === 'guardando') { b.disabled = true; b.innerHTML = '<span class="spinner"></span> Guardando…'; }
+            else { b.disabled = false; b.innerHTML = '💾 Guardar y volver'; }
+        }
         async function saveProviderEditor() {
             if (!editingProvider) return;
+            avisoEditorProveedor('');
             const tarifaMinima = document.getElementById('editTarifaMinima').value.trim();
             const comentarios = document.getElementById('editComentarios').value.trim();
             // v3.10.41: datos de contacto
@@ -10948,17 +10999,16 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 anio: document.getElementById('editProviderAnio').value.trim()
             };
             if (!contacto.nombre) {
-                showStatus('El nombre no puede quedar vacío', 'warning'); setTimeout(hideStatus, 3000); return;
+                avisoEditorProveedor('El nombre no puede quedar vacío.', 'editProviderName'); return;
             }
             if (!contacto.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contacto.email)) {
-                showStatus('El email no es válido, y es la clave del traductor', 'warning'); setTimeout(hideStatus, 3000); return;
+                avisoEditorProveedor('"' + contacto.email + '" no es un email válido (hace falta algo@dominio.com), y el email es la clave del traductor.', 'editProviderEmail'); return;
             }
             const emailCambia = contacto.email.toLowerCase() !== String(editingProvider.email || '').toLowerCase();
             if (emailCambia) {
                 const choca = allProviders.some(p => claveProveedor(p) === contacto.email.toLowerCase());
                 if (choca) {
-                    showStatus('Ya hay otro traductor con el email ' + contacto.email + '. Dos traductores no pueden compartir email.', 'warning');
-                    setTimeout(hideStatus, 5000); return;
+                    avisoEditorProveedor('Ya hay otro traductor con el email ' + contacto.email + '. Dos traductores no pueden compartir email.', 'editProviderEmail'); return;
                 }
                 if (!confirm('Vas a cambiar el email de ' + editingProvider.nombre + ' a ' + contacto.email + '.\n' +
                              'Es la clave del traductor: cambia en todas sus combinaciones. Los presupuestos antiguos ' +
@@ -10970,9 +11020,10 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 tarifaPalabra: String(p.tarifaPalabra || '').trim(),
                 orden: (p.orden === '' || p.orden == null) ? '' : parseInt(p.orden)
             }));
-            if (!pares.length) return;
+            if (!pares.length) { avisoEditorProveedor('Un traductor debe conservar al menos una combinación de idiomas. Para quitarlo entero usa Eliminar.'); return; }
 
             showStatus('Guardando...', 'loading');
+            botonGuardarEditor('guardando');
             try {
                 const data = await apiPost({
                     action: 'saveProviderFull',
@@ -11014,6 +11065,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     renderProviders();
                 }
 
+                botonGuardarEditor('normal');
                 closeEditProviderModal();
                 const partes = [];
                 if (data.added) partes.push(data.added + ' combinación(es) nueva(s)');
@@ -11021,8 +11073,10 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 showStatus('\u2713 Guardado' + (partes.length ? ' \u00b7 ' + partes.join(', ') : ''), 'success');
                 setTimeout(hideStatus, 3000);
             } catch (error) {
+                botonGuardarEditor('normal');
+                avisoEditorProveedor('No se ha guardado: ' + error.message);   // v3.10.74: dentro del modal (si sigue abierto)
                 showStatus('Error: ' + error.message, 'error');
-                setTimeout(hideStatus, 4000);
+                setTimeout(hideStatus, 6000);
             }
         }
 
@@ -11156,10 +11210,19 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         // v3.7.95: pinta el bloque de asunto/destinatarios/adjuntos del modal.
         // Extraído de previewProviderEmail para poder repintarlo cuando llega
         // la verificación de Drive en segundo plano.
+        // v3.10.75: nombre + email entre paréntesis, para comprobar a qué
+        // dirección se manda; sin email se avisa (el envío lo descarta).
+        function textoDestinatarioPreview(p) {
+            const nombre = escapeHtml((p && p.nombre) || '');
+            const email = String((p && p.email) || '').trim();
+            return email
+                ? nombre + ' <span style="color:#64748b;font-weight:normal;">(' + escapeHtml(email) + ')</span>'
+                : nombre + ' <span style="color:#b91c1c;font-weight:600;">(sin email: no se le enviará)</span>';
+        }
         function renderProviderPreviewInfo(providers, nota) {
             let recipientsHtml = `
                 <div><strong>Asunto:</strong> Nueva Tasación Traducción Jurada ${budgetData.sourceLang} > ${budgetData.targetLang} [${budgetData.id}]</div>
-                <div style="margin-top: 8px;"><strong>Destinatarios (${providers.length}):</strong> ${providers.map(p => p.nombre).join(', ')}</div>
+                <div style="margin-top: 8px;"><strong>Destinatarios (${providers.length}):</strong> ${providers.map(p => textoDestinatarioPreview(p)).join(', ')}</div>
                 ${providers.length === 1 ? '<div style="margin-top:4px;color:#b45309;font-size:0.82rem;">⚠️ Solo UN destinatario. Si querías varios, cierra y vuelve a marcarlos.</div>' : ''}
             `;
 
@@ -11180,12 +11243,16 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     : '';
                 const notaHtml = nota ? `<div style="font-size:0.78rem; color:#94a3b8; margin-top:2px;">${nota}</div>` : '';
                 // v3.10.71: extras opcionales (nunca el Excel con las tarifas)
+                // v3.10.75: solo si el presupuesto tiene recuento (sin él no hay .txt)
+                const hayRecuento = hayRecuentoParaAdjuntar();
                 const extras = [];
-                if (casillaMarcada('enviarExtracciones')) { const n = (budgetData.fileAnalysis || []).length || allFiles.length; extras.push('📝 extracciones en .txt' + (n ? ' (' + n + ')' : '')); }
-                if (casillaMarcada('enviarRecuento')) extras.push('📊 _RECUENTO.txt (sin la línea del método)');
+                if (hayRecuento && casillaMarcada('enviarExtracciones')) { const n = (budgetData.fileAnalysis || []).filter(a => a && a.fileName).length; extras.push('📝 extracciones en .txt' + (n ? ' (' + n + ')' : '')); }
+                if (hayRecuento && casillaMarcada('enviarRecuento')) extras.push('📊 _RECUENTO.txt (sin la línea del método)');
                 const extrasHtml = extras.length
                     ? `<div style="margin-top:4px; font-size:0.85rem; color:#475569; font-weight:normal;">+ ${extras.join(' · ')}</div>`
-                    : `<div style="margin-top:4px; font-size:0.82rem; color:#94a3b8; font-weight:normal;">sin extracciones ni recuento (casillas del paso 3)</div>`;
+                    : (hayRecuento
+                        ? `<div style="margin-top:4px; font-size:0.82rem; color:#94a3b8; font-weight:normal;">sin extracciones ni recuento (casillas del paso 3)</div>`
+                        : `<div style="margin-top:4px; font-size:0.82rem; color:#94a3b8; font-weight:normal;">sin extracciones ni recuento: este presupuesto no tiene recuento</div>`);
                 recipientsHtml += `
                     <div style="margin-top: 8px; color: #1e8449;">
                         <strong>📎 Adjuntos: ${allFiles.length} documento(s)</strong>${pendingNote}${zipNote}
@@ -13870,7 +13937,45 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             toggleCheckbox('includeWordCount');
             _casillaRecuentoManual = true;
         }
+        // v3.10.75: los .txt (extracciones y _RECUENTO.txt) los escribe el
+        // servidor AL HACER EL RECUENTO. Sin recuento no existen, pero la
+        // vista previa anunciaba "+ extracciones · _RECUENTO.txt" solo porque
+        // las casillas estaban marcadas por defecto. Ahora las casillas se
+        // atenúan y desmarcan cuando el presupuesto no tiene recuento, y se
+        // vuelven a activar (marcadas) en cuanto llega uno.
+        let _casillasAdjuntosManual = false;   // el usuario las ha tocado en este presupuesto
+        let _casillasAdjuntosEstado = null;    // true = con recuento, false = sin, null = sin pintar
+        const HINT_ADJUNTOS = {
+            enviarExtracciones: '(los .txt del texto extraído de cada archivo)',
+            enviarRecuento: '(_RECUENTO.txt sin la línea del método; el Excel con tarifas no se envía nunca)'
+        };
+        function hayRecuentoParaAdjuntar() {
+            if ((parseInt(budgetData && budgetData.wordCount) || 0) > 0) return true;
+            return ((budgetData && budgetData.fileAnalysis) || []).some(a => (parseInt(a && a.words) || 0) > 0);
+        }
+        function actualizarCasillasAdjuntos() {
+            const hay = hayRecuentoParaAdjuntar();
+            ['enviarExtracciones', 'enviarRecuento'].forEach(id => {
+                const cb = document.getElementById(id); if (!cb) return;
+                const fila = document.getElementById('fila_' + id), hint = document.getElementById('hint_' + id);
+                if (fila) fila.classList.toggle('sin-recuento', !hay);
+                if (!hay) {
+                    cb.classList.remove('checked');
+                    if (hint) hint.textContent = '— este presupuesto no tiene recuento: no hay nada que adjuntar (el recuento se hace en el paso 2)';
+                } else {
+                    if (hint) hint.textContent = HINT_ADJUNTOS[id];
+                    if (_casillasAdjuntosEstado !== true && !_casillasAdjuntosManual) cb.classList.add('checked');
+                }
+            });
+            _casillasAdjuntosEstado = hay;
+        }
+        function onCasillaAdjuntoClick(id) {
+            if (!hayRecuentoParaAdjuntar()) return;   // sin recuento la casilla es inerte
+            _casillasAdjuntosManual = true;
+            toggleCheckbox(id);
+        }
         function proponerCasillaRecuento() {
+            actualizarCasillasAdjuntos();   // v3.10.75
             const el = document.getElementById('includeWordCount');
             if (!el || _casillaRecuentoManual) return;
             const hay = (parseInt(budgetData && budgetData.wordCount) || 0) > 0;
