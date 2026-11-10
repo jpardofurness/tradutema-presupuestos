@@ -160,6 +160,10 @@
         .fact-tabla th { background: #f1f5f9; color: #475569; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 8px 10px; }
         .fact-tabla td { padding: 8px 10px; border-top: 1px solid #e5e7eb; }
         .fact-tabla th.r, .fact-tabla td.r { text-align: right; }
+        .fact-tabla th, .fact-tabla td { white-space: nowrap; }
+        .fact-tabla th.w, .fact-tabla td.w { white-space: normal; }
+        .fact-tabla.hist td.w { min-width: 160px; }
+        .fact-tabla th.r { text-align: right; }
         .fact-tabla tr.warn td { background: #fffbeb; }
         .fact-tabla tr.err td { background: #fef2f2; }
         .fact-tabla tfoot td { border-top: 2px solid #cbd5e1; font-weight: 700; background: #f8fafc; }
@@ -882,7 +886,8 @@
                         <input type="checkbox" id="consultSoloActivos" onchange="filterConsultProviders()"> Sólo activos
                     </label>
                     <span style="color: var(--text-secondary); font-size:0.85rem;" id="consultProviderCount">0</span>
-                    <button onclick="showAddProviderForm()" class="prov-btn-sm" style="margin-left:auto;background:var(--tradutema-blue,#2563eb);color:#fff;border:none;padding:8px 14px;font-size:0.85rem;">➕ Añadir traductor</button>
+                    <button onclick="recargarCatalogo()" id="btnRecargarCatalogo" class="prov-btn-sm" title="Vuelve a leer la pestaña Traductores de la hoja (si la has cambiado a mano)" style="margin-left:auto;background:#fff;color:var(--text-secondary);border:1.5px solid var(--border-color);padding:8px 12px;font-size:0.85rem;">⟳ Recargar de la hoja</button>
+                    <button onclick="showAddProviderForm()" class="prov-btn-sm" style="background:var(--tradutema-blue,#2563eb);color:#fff;border:none;padding:8px 14px;font-size:0.85rem;">➕ Añadir traductor</button>
                 </div>
 
                 <!-- v3.10.26: acciones sobre varios traductores a la vez -->
@@ -1355,6 +1360,15 @@
             <div class="checkbox-row">
                 <div class="custom-checkbox" id="includeWordCount" onclick="onCasillaRecuentoClick()"></div>
                 <span class="checkbox-label">Incluir recuento de palabras/páginas <span style="color:#94a3b8;font-weight:normal;">(se marca sola si hay recuento)</span></span>
+            </div>
+            <!-- v3.10.71: qué se adjunta además de los documentos (nunca el Excel con las tarifas) -->
+            <div class="checkbox-row" style="padding-top:4px;">
+                <div class="custom-checkbox checked" id="enviarExtracciones" onclick="toggleCheckbox('enviarExtracciones')"></div>
+                <span class="checkbox-label">Enviar extracciones <span style="color:#94a3b8;font-weight:normal;">(los .txt del texto extraído de cada archivo)</span></span>
+            </div>
+            <div class="checkbox-row" style="padding-top:4px;">
+                <div class="custom-checkbox checked" id="enviarRecuento" onclick="toggleCheckbox('enviarRecuento')"></div>
+                <span class="checkbox-label">Enviar recuento <span style="color:#94a3b8;font-weight:normal;">(_RECUENTO.txt sin la línea del método; el Excel con tarifas no se envía nunca)</span></span>
             </div>
             
             <div class="checkbox-row">
@@ -1841,13 +1855,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.69';
-        const HTML_DATE = '09/11/2026';
+        const HTML_VERSION = '3.10.72';
+        const HTML_DATE = '10/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.97';   // v3.10.68: facturas de proveedor (pedidos de WooCommerce, registro, DOCX→PDF, email)
+        const API_MIN_VERSION = '3.7.99';   // v3.10.72: editar traductor aunque el email ya se cambiara a mano en la hoja
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2715,6 +2729,7 @@
             const proposedTotal = document.getElementById('proposedTotal');
             if (includeWordCount) includeWordCount.classList.remove('checked');
             _casillaRecuentoManual = false;   // v3.10.67
+            ['enviarExtracciones', 'enviarRecuento'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('checked'); });   // v3.10.71: por defecto, sí
             if (includeProposedRate) includeProposedRate.classList.remove('checked');
             if (proposedRateFields) proposedRateFields.classList.add('hidden');
             if (proposedTariff) proposedTariff.value = '';
@@ -5826,6 +5841,7 @@
         function applyLoadedData(data) {
             allProviders = data.providers || [];
             allTariffs = data.tariffs || [];
+            repintarListasDeTraductores();   // v3.10.72: si la pantalla de traductores o el paso 3 están a la vista
             if (data.marginParams) marginParams = data.marginParams;
             apiVersion = data.version || '?';
             apiDate = data.versionDate || '';
@@ -5851,6 +5867,44 @@
             }
         }
 
+        // v3.10.72: el catálogo llega en segundo plano (o con ⟳); lo que esté
+        // pintado con la copia local se vuelve a pintar con los datos nuevos.
+        function repintarListasDeTraductores() {
+            try {
+                const consult = document.getElementById('providersConsultScreen');
+                if (consult && !consult.classList.contains('hidden') && typeof filterConsultProviders === 'function') {
+                    if (typeof populateConsultLanguages === 'function') populateConsultLanguages();
+                    filterConsultProviders();
+                }
+            } catch (e) {}
+            try {
+                const paso3 = document.getElementById('step4Card');
+                if (paso3 && !paso3.classList.contains('hidden') && typeof filterProviders === 'function' && budgetData && budgetData.sourceLang) {
+                    const sel = new Set(selectedProviders);
+                    filterProviders();
+                    selectedProviders = sel;
+                    if (typeof renderProviders === 'function') renderProviders();
+                }
+            } catch (e) {}
+        }
+        async function recargarCatalogo(silencioso) {
+            const btn = document.getElementById('btnRecargarCatalogo');
+            if (btn) { btn.disabled = true; btn.textContent = '⟳ Recargando…'; }
+            try {
+                const data = await fetchBootData();
+                applyLoadedData(data);
+                if (!silencioso) {
+                    const n = new Set((allProviders || []).map(p => claveProveedor(p))).size;
+                    showStatus('✓ Catálogo actualizado desde la hoja: ' + n + ' traductores', 'success'); setTimeout(hideStatus, 3000);
+                }
+                return true;
+            } catch (e) {
+                showStatus('❌ No se ha podido leer la hoja: ' + ((e && e.message) || e), 'error'); setTimeout(hideStatus, 6000);
+                return false;
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '⟳ Recargar de la hoja'; }
+            }
+        }
         async function fetchBootData() {
             // Descarga el catálogo con hasta 3 intentos. Devuelve el objeto o lanza.
             let _txt = '';
@@ -5895,7 +5949,12 @@
                 // molestos: si el refresco falla, se sigue con la copia local.
                 fetchBootData()
                     .then(data => applyLoadedData(data))
-                    .catch(err => console.warn('Refresco de catálogo en segundo plano falló (se usa la copia local):', err.message));
+                    .catch(err => {
+                        console.warn('Refresco de catálogo en segundo plano falló (se usa la copia local):', err.message);
+                        // v3.10.72: que se sepa que lo que ves puede estar desfasado
+                        showStatus('⚠️ No se ha podido actualizar el catálogo desde la hoja (' + err.message + '). Se usa la copia local; pulsa ⟳ en Traductores para reintentarlo.', 'warning');
+                        setTimeout(hideStatus, 9000);
+                    });
                 return;
             }
 
@@ -5924,7 +5983,7 @@
         function apiVersionInsuficiente() {
             return !!(apiVersion && apiVersion !== '?' && compararVersiones(apiVersion, API_MIN_VERSION) < 0);
         }
-        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_97.gs o posterior), ' +
+        const TEXTO_IMPLEMENTAR_API = 'En el editor de Apps Script: pega el código de la última versión (Codigo-v3_7_99.gs o posterior), ' +
             'luego <b>Implementar → Gestionar implementaciones → ✏️ (editar) → Versión: «Nueva versión» → Implementar</b>. ' +
             'Pegar el código sin crear una versión nueva no cambia lo que se ejecuta.';
         function refrescarAvisoVersionApi() {
@@ -10929,7 +10988,15 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     provincia: contacto.provincia,
                     anio: contacto.anio
                 });
-                if (!data.success) throw new Error(data.error || 'Error desconocido');
+                if (!data.success) {
+                    if (data.noEncontrado || /no encontrado/i.test(data.error || '')) {
+                        // v3.10.72: la hoja ha cambiado por detrás (p. ej. el email a mano): recargar y explicar
+                        closeEditProviderModal();
+                        const okRecarga = await recargarCatalogo(true);
+                        throw new Error('la hoja había cambiado respecto a la copia local' + (okRecarga ? ' (lista actualizada: vuelve a abrir el traductor e inténtalo de nuevo)' : '') + '. ' + (data.error || ''));
+                    }
+                    throw new Error(data.error || 'Error desconocido');
+                }
 
                 aplicarProveedorEnMemoria(editingProvider, tarifaMinima, comentarios, pares, contacto);
 
@@ -11005,6 +11072,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         function toggleCheckbox(id) {
             document.getElementById(id).classList.toggle('checked');
         }
+        function casillaMarcada(id) { const el = document.getElementById(id); return !!(el && el.classList.contains('checked')); }   // v3.10.71
 
         function toggleProposedRateFields() {
             const isChecked = document.getElementById('includeProposedRate').classList.contains('checked');
@@ -11111,11 +11179,20 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     ? ` <span style="color:#475569; font-weight:normal;">· se enviarán en un único ZIP (${budgetData.id}_documentos.zip)</span>`
                     : '';
                 const notaHtml = nota ? `<div style="font-size:0.78rem; color:#94a3b8; margin-top:2px;">${nota}</div>` : '';
+                // v3.10.71: extras opcionales (nunca el Excel con las tarifas)
+                const extras = [];
+                if (casillaMarcada('enviarExtracciones')) { const n = (budgetData.fileAnalysis || []).length || allFiles.length; extras.push('📝 extracciones en .txt' + (n ? ' (' + n + ')' : '')); }
+                if (casillaMarcada('enviarRecuento')) extras.push('📊 _RECUENTO.txt (sin la línea del método)');
+                const extrasHtml = extras.length
+                    ? `<div style="margin-top:4px; font-size:0.85rem; color:#475569; font-weight:normal;">+ ${extras.join(' · ')}</div>`
+                    : `<div style="margin-top:4px; font-size:0.82rem; color:#94a3b8; font-weight:normal;">sin extracciones ni recuento (casillas del paso 3)</div>`;
                 recipientsHtml += `
                     <div style="margin-top: 8px; color: #1e8449;">
-                        <strong>📎 Adjuntos: ${allFiles.length} archivo(s)</strong>${pendingNote}${zipNote}
+                        <strong>📎 Adjuntos: ${allFiles.length} documento(s)</strong>${pendingNote}${zipNote}
                         ${notaHtml}
                         <ul style="margin:6px 0 0 20px; padding:0; font-size:0.85rem; color:#475569; font-weight:normal;">${filesList}</ul>
+                        ${extrasHtml}
+                        <div style="margin-top:4px; font-size:0.78rem; color:#94a3b8; font-weight:normal;">Los _RECUENTO_*.xlsx (con tarifas al cliente), .docx de notas y archivos "_" no se envían nunca.</div>
                     </div>
                 `;
             } else {
@@ -11222,6 +11299,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         async function ejecutarTrabajoEnviar(job) {
             const ctx = job.ctx;
             const providers = ctx.providers || [];
+            let ultimosAdjuntos = null;   // v3.10.71: lo que el servidor dice haber adjuntado
             // v3.10.67: en modo local, la carpeta de Drive la espera el trabajo (antes
             // se esperaba con el modal abierto y sin ninguna señal)
             try { await esperarCarpetaParaEnvio(job); } catch (eCarpeta) {
@@ -11259,7 +11337,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                             sourceLang: ctx.sourceLang,
                             targetLang: ctx.targetLang,
                             customMessage: ctx.customMessage,
-                            additionalComments: li === 0 ? ctx.additionalComments : ''   // los comentarios, una vez
+                            additionalComments: li === 0 ? ctx.additionalComments : '',   // los comentarios, una vez
+                            enviarExtracciones: ctx.enviarExtracciones === true,   // v3.10.71
+                            enviarRecuento: ctx.enviarRecuento === true
                         }, { retry: false });
                     } catch (eLote) {
                         data = { success: false, error: (eLote && eLote.message) || 'sin respuesta' };
@@ -11272,6 +11352,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     (data.results || []).forEach(r => { if (r.success) ok++; else fallidos.push(r.provider + (r.error ? ' (' + r.error + ')' : '')); });
                     prodLogDone(job.k('lote' + li), (data.results || []).filter(r => r.success).length + ' correo(s) · ' + (data.fechaEnvio || ''));
                     enviados = enviados.concat(lote);
+                    if (data.adjuntos) ultimosAdjuntos = data.adjuntos;   // v3.10.71
                     // El servidor ya los ha apuntado: reflejarlo en memoria (si está abierto) o en las copias
                     if (esAbierto(job)) {
                         lote.forEach(p => {
@@ -11301,6 +11382,13 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 }
 
                 let texto = 'solicitud enviada a ' + ok + ' traductor(es): ' + enviados.map(p => p.nombre).join(', ');
+                if (ultimosAdjuntos) {   // v3.10.71
+                    const partes = [ultimosAdjuntos.documentos + ' documento' + (ultimosAdjuntos.documentos === 1 ? '' : 's')];
+                    if (ultimosAdjuntos.extracciones) partes.push(ultimosAdjuntos.extracciones + (ultimosAdjuntos.extracciones === 1 ? ' extracción' : ' extracciones'));
+                    if (ultimosAdjuntos.recuento) partes.push('recuento');
+                    texto += ' · adjuntos: ' + partes.join(' + ');
+                    if (ctx.enviarRecuento === true && !ultimosAdjuntos.recuento) texto += ' · ⚠️ no había _RECUENTO.txt en Drive';
+                }
                 if (fallidos.length) texto += ' · ⚠️ no salieron: ' + fallidos.join(' · ');
                 job.resultado = { texto: texto };
                 faseTrabajo(job, 'hecho');
@@ -13872,6 +13960,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang,
                 customMessage: document.getElementById('providerMessageEdit').value,
                 additionalComments: document.getElementById('providerComments').value.trim(),
+                enviarExtracciones: casillaMarcada('enviarExtracciones'),   // v3.10.71
+                enviarRecuento: casillaMarcada('enviarRecuento'),
                 providers: providers.map(p => ({ nombre: p.nombre, email: p.email }))
             });
             if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
@@ -14301,16 +14391,16 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 '<div style="text-align:right;"><div style="font-size:.78rem;color:#64748b;font-weight:600;">RESULTADO</div><div style="font-size:1.05rem;font-weight:800;color:' + resColor + ';">' + escapeHtml(fact.resultado.texto) + '</div>' +
                 '<div style="font-size:.85rem;color:#475569;">a pagar según factura: <b>' + factEur(t.aPagar) + '</b>' + (t.sinErrores !== t.proveedor ? ' · sin las líneas en rojo: <b>' + factEur(t.sinErrores) + '</b>' : '') + '</div></div></div>';
             html += '<div class="fact-chips">' + fact.checks.map(chip).join('') + '</div>';
-            html += '<table class="fact-tabla"><thead><tr><th>Pedido</th><th>Presupuesto</th><th>Fecha pedido</th><th class="r">Cliente pagó (sin IVA)</th><th class="r">Proveedor cobra</th><th class="r">Margen</th><th class="r">%</th><th>Estado</th></tr></thead><tbody>';
+            html += '<table class="fact-tabla"><thead><tr><th>Pedido</th><th>Presupuesto</th><th>Fecha pedido</th><th class="r">Cliente pagó (sin IVA)</th><th class="r">Proveedor cobra</th><th class="r">Margen</th><th class="r">%</th><th class="w">Estado</th></tr></thead><tbody>';
             fact.lineas.filter(l => !l.oculta).forEach(l => {
                 const w = l.woo || {}; const imp = l.importeTotal != null ? l.importeTotal : l.importe;
                 const icon = l.estado === 'ok' ? '✔' : l.estado === 'warn' ? '⚠️' : '❌';
                 html += '<tr class="' + l.estado + '"><td><b>' + escapeHtml(l.pedido || '—') + '</b></td><td>' + escapeHtml(l.presupuesto || (w.referencia || '—')) + '</td><td>' + (w.fecha ? factFecha(w.fecha) : '—') + '</td>' +
                     '<td class="r">' + (l.cliente != null ? factEur(l.cliente) : '—') + '</td><td class="r"><b>' + factEur(imp) + '</b>' + (l.partes ? ' <span style="color:#64748b;font-size:.8rem;">(' + l.partes.map(p => factEur(p).replace(' €', '')).join(' + ') + ')</span>' : '') + '</td>' +
                     '<td class="r"' + (l.margen != null && l.margen < 0 ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + (l.margen != null ? factEur(l.margen) : '—') + '</td><td class="r" style="font-weight:600;color:' + (l.pct != null && l.pct < factUmbral() ? '#b45309' : '#15803d') + ';">' + (l.pct != null ? l.pct + ' %' : '—') + '</td>' +
-                    '<td style="color:' + (l.estado === 'ok' ? '#15803d' : l.estado === 'warn' ? '#b45309' : '#b91c1c') + ';">' + icon + ' ' + escapeHtml(l.avisos.length ? l.avisos.join(' · ') : 'correcto') + (w.cliente ? ' <span style="color:#94a3b8;font-size:.8rem;">' + escapeHtml(w.cliente) + '</span>' : '') + '</td></tr>';
+                    '<td class="w" style="color:' + (l.estado === 'ok' ? '#15803d' : l.estado === 'warn' ? '#b45309' : '#b91c1c') + ';">' + icon + ' ' + escapeHtml(l.avisos.length ? l.avisos.join(' · ') : 'correcto') + (w.cliente ? ' <span style="color:#94a3b8;font-size:.8rem;">' + escapeHtml(w.cliente) + '</span>' : '') + '</td></tr>';
             });
-            html += '</tbody><tfoot><tr><td colspan="3">Totales (líneas verificables: ' + t.verificables + ' de ' + t.lineas + ')</td><td class="r">' + factEur(t.cliente) + '</td><td class="r">' + factEur(t.proveedor) + '</td><td class="r" style="color:#15803d;">' + factEur(t.margen) + '</td><td class="r" style="color:#15803d;">' + (t.pct != null ? t.pct + ' %' : '—') + '</td><td></td></tr></tfoot></table>';
+            html += '</tbody><tfoot><tr><td colspan="3" class="w">Totales (líneas verificables: ' + t.verificables + ' de ' + t.lineas + ')</td><td class="r">' + factEur(t.cliente) + '</td><td class="r">' + factEur(t.proveedor) + '</td><td class="r" style="color:#15803d;">' + factEur(t.margen) + '</td><td class="r" style="color:#15803d;">' + (t.pct != null ? t.pct + ' %' : '—') + '</td><td></td></tr></tfoot></table>';
             if (fact.registrada) {
                 html += '<div class="fact-registrada">✅ Registrada el ' + factFecha(fact.registrada.fecha) + ' · transferencia ' + factFecha(fact.registrada.transferencia) + '. ' +
                     '<a id="factDescarga" class="fact-pdf" draggable="true" href="' + fact.registrada.url + '" download="' + escapeHtmlAttr(fact.registrada.nombrePdf) + '" ondragstart="factDragPdf(event)" title="Arrástralo a Dougs (o a una carpeta) o haz clic para descargarlo">📎 ' + escapeHtml(fact.registrada.nombrePdf) + '</a> ← arrástralo a Dougs o haz clic para descargarlo' +
@@ -14438,8 +14528,15 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             const porIdioma = {}; ls.forEach(l => { const k = l.Idiomas || 'sin idiomas'; porIdioma[k] = (porIdioma[k] || 0) + (factNum(l.ImporteProveedor) || 0); });
             const idiomas = Object.keys(porIdioma).sort((a, b) => porIdioma[b] - porIdioma[a]).slice(0, 4).map(k => escapeHtml(k) + ' ' + Math.round(porIdioma[k] / Math.max(1, totProv) * 100) + ' %').join(', ');
             let html = '<div style="font-size:.88rem;color:#475569;margin-bottom:8px;"><b>' + escapeHtml(filtro || 'Todos') + '</b> · ' + fs.length + ' factura' + (fs.length === 1 ? '' : 's') + ' · ' + factEur(totProv) + ' pagados · cliente ' + factEur(totCli) + ' · margen ' + factEur(totMar) + (totCli ? ' (<b style="color:#15803d;">' + Math.round(totMar / totCli * 100) + ' %</b>)' : '') + (idiomas ? ' · ' + idiomas : '') + '</div>';
-            html += '<table class="fact-tabla"><thead><tr><th>Proveedor</th><th>Factura</th><th>Fecha</th><th class="r">Pedidos</th><th class="r">Total</th><th class="r">Cliente (sin IVA)</th><th class="r">Margen</th><th>Transferencia</th><th>Avisos</th></tr></thead><tbody>';
-            fs.forEach(f => { html += '<tr><td>' + escapeHtml(f.Proveedor) + '</td><td>' + escapeHtml(f.NumeroFactura) + '</td><td>' + factFecha(f.FechaFactura) + '</td><td class="r">' + escapeHtml(f.NumLineas) + '</td><td class="r">' + factEur(factNum(f.Total)) + '</td><td class="r">' + factEur(factNum(f.ImporteCliente)) + '</td><td class="r" style="color:#15803d;">' + factEur(factNum(f.Margen)) + (f.MargenPct !== '' ? ' · ' + escapeHtml(f.MargenPct) + ' %' : '') + '</td><td>' + factFecha(f.FechaTransferencia) + '</td><td style="font-size:.8rem;color:#64748b;" title="' + escapeHtmlAttr(f.Avisos || '') + '">' + (f.Avisos ? escapeHtml(String(f.Avisos).split(' | ').length + ' aviso(s)') : '') + '</td></tr>'; });
+            html += '<table class="fact-tabla hist"><thead><tr><th class="w">Proveedor</th><th>Factura</th><th>Fecha</th><th class="r">Pedidos</th><th class="r">Total</th><th class="r">Cliente (sin IVA)</th><th class="r">Margen</th><th class="r">%</th><th>Transferencia</th><th class="r">Avisos</th></tr></thead><tbody>';
+            fs.forEach(f => {
+                const cli = factNum(f.ImporteCliente), mar = factNum(f.Margen);
+                const verificable = cli > 0 || mar !== 0;   // 0 / 0 = ninguna línea se pudo cotejar
+                const nAv = f.Avisos ? String(f.Avisos).split(' | ').length : 0;
+                html += '<tr><td class="w">' + escapeHtml(f.Proveedor) + '</td><td>' + escapeHtml(f.NumeroFactura) + '</td><td>' + factFecha(f.FechaFactura) + '</td><td class="r">' + escapeHtml(f.NumLineas) + '</td><td class="r">' + factEur(factNum(f.Total)) + '</td>' +
+                    '<td class="r">' + (verificable ? factEur(cli) : '—') + '</td><td class="r" style="color:' + (mar < 0 ? '#b91c1c' : '#15803d') + ';">' + (verificable ? factEur(mar) : '—') + '</td><td class="r" style="color:' + (mar < 0 ? '#b91c1c' : '#15803d') + ';font-weight:600;">' + (verificable && f.MargenPct !== '' ? escapeHtml(f.MargenPct) + ' %' : '—') + '</td>' +
+                    '<td>' + factFecha(f.FechaTransferencia) + '</td><td class="r" style="font-size:.8rem;color:#64748b;" title="' + escapeHtmlAttr(f.Avisos || '') + '">' + (nAv ? nAv + (nAv === 1 ? ' aviso' : ' avisos') : '—') + '</td></tr>';
+            });
             body.innerHTML = html + '</tbody></table>';
         }
 
