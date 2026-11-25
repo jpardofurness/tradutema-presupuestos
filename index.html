@@ -400,6 +400,8 @@
         /* v3.10.75: sin recuento no hay .txt que adjuntar: casillas atenuadas e inertes */
         .checkbox-row.sin-recuento { opacity: 0.55; }
         .checkbox-row.sin-recuento .custom-checkbox { pointer-events: none; cursor: default; }
+        /* v3.10.76: presupuesto asignado al traductor propio (inglés↔español) */
+        .traductor-propio-aviso { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; line-height: 1.45; margin-bottom: 10px; }
         .version-reload { margin-left: 6px; cursor: pointer; color: var(--tradutema-blue); text-decoration: none; font-weight: 700; }
         .version-reload:hover { text-decoration: underline; }
         .config-link { color: var(--tradutema-blue); text-decoration: none; font-size: 0.85rem; font-family: inherit; display: flex; align-items: center; gap: 4px; }
@@ -1865,19 +1867,20 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.75';
-        const HTML_DATE = '10/11/2026';
+        const HTML_VERSION = '3.10.77';
+        const HTML_DATE = '25/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.99';   // v3.10.72: editar traductor aunque el email ya se cambiara a mano en la hoja
+        const API_MIN_VERSION = '3.7.100';   // v3.10.76: columna Q con el email del traductor designado (automático con un solo consultado o inglés↔español)
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
         let apiUrl = localStorage.getItem('tradutema_api_url') || '';
         let apiVersion = '?';
         let apiDate = '';
+        let traductorPropio = null;   // v3.10.76: {nombre, email} del traductor propio (lo manda el servidor 3.7.100)
         let allProviders = [];
         let allTariffs = [];
         let marginParams = {
@@ -1924,7 +1927,8 @@
             tariffPerWord: 0,
             tariffPerWordManual: null, // v3.10.47: tarifa €/pal editada a mano en paso 5
             contactedProviders: [],    // Traductores a los que se envió tasación
-            chosenProvider: null,      // Traductor elegido para el presupuesto
+            chosenProvider: null,      // Traductor elegido para el presupuesto (nombre)
+            chosenProviderEmail: '',   // v3.10.76: su email (lo que va en la columna Q)
             historialTraductores: {},  // Historial de envíos a traductores
             historialCliente: {},      // Historial de envíos al cliente
             fileSettings: {}           // v3.7.19: {nombreArchivo: {pagesFilter, instructions}}
@@ -2593,7 +2597,7 @@
                 wordCount: null, pageCount: null, fileAnalysis: [],
                 folderFiles: [],
                 tariffPerWord: 0, tariffPerWordManual: null,
-                contactedProviders: [], chosenProvider: null,
+                contactedProviders: [], chosenProvider: null, chosenProviderEmail: '',
                 historialTraductores: {}, historialCliente: {},
                 fileSettings: {}
             };
@@ -5150,13 +5154,13 @@
                 
                 // Mostrar traductores contactados y elegido CON HISTORIAL DE ENVÍOS
                 let traductoresHtml = '';
+                let chipsTraductores = '';   // v3.10.76
                 if (b.traductoresContactados) {
                     const traductores = splitProviderNames(b.traductoresContactados,
                         nombresConocidosDeProveedores(b.historialTraductores));   // v3.9.9
                     if (traductores.length > 0) {
-                        traductoresHtml = '<div class="budget-item-providers">';
                         traductores.forEach(t => {
-                            const isChosen = b.traductorElegido && t.trim() === b.traductorElegido.trim();
+                            const isChosen = esTraductorElegidoEnLista(b.traductorElegido, t);   // v3.10.76: Q puede ser el email
                             
                             // Buscar historial de envíos para este traductor
                             let envioInfo = '';
@@ -5169,11 +5173,13 @@
                                 }
                             }
                             
-                            traductoresHtml += `<span class="provider-tag ${isChosen ? 'chosen' : ''}">${t}${envioInfo}${isChosen ? ' ✓' : ''}</span>`;
+                            chipsTraductores += `<span class="provider-tag ${isChosen ? 'chosen' : ''}">${t}${envioInfo}${isChosen ? ' ✓' : ''}</span>`;
                         });
-                        traductoresHtml += '</div>';
                     }
                 }
+                // v3.10.76: inglés↔español sin consultas → asignado al traductor propio
+                if (esEmailPropio(b.traductorElegido)) chipsTraductores += `<span class="provider-tag chosen" title="Traductor designado: tú (inglés↔español sin traductores consultados)">👤 ${escapeHtml(nombreTraductorPropio())} ✓</span>`;
+                if (chipsTraductores) traductoresHtml = '<div class="budget-item-providers">' + chipsTraductores + '</div>';
                 
                 // Mostrar comentarios internos si existen (truncados con tooltip)
                 let notasHtml = '';
@@ -5634,7 +5640,7 @@
                     } else {
                         budgetData.contactedProviders = [];
                     }
-                    budgetData.chosenProvider = b.traductorElegido ? b.traductorElegido.trim() : null;
+                    aplicarTraductorElegido(b.traductorElegido);   // v3.10.76: email (o nombre antiguo) → {nombre, email}
                     
                     // Restaurar cotizaciones de proveedores (JSON)
                     if (b.cotizacionesProveedores) {
@@ -5863,6 +5869,7 @@
             if (data.marginParams) marginParams = data.marginParams;
             apiVersion = data.version || '?';
             apiDate = data.versionDate || '';
+            traductorPropio = (data.traductorPropio && data.traductorPropio.email) ? data.traductorPropio : null;   // v3.10.76
             aplicarTarifasWeb(data);   // v3.10.61: tramos, plazos y calendario de la hoja
             // v3.7.20: enlaces de configuración (Sheet, carpeta general Drive)
             window.configLinks = data.configLinks || {};
@@ -6561,7 +6568,7 @@
                 
                 // Mostrar sección de traductores contactados si hay proveedores
                 const contactedSection = document.getElementById('contactedProvidersSection');
-                if (budgetData.contactedProviders && budgetData.contactedProviders.length > 0) {
+                if (hayTraductorDesignado()) {   // v3.10.76: también con el traductor propio
                     contactedSection.classList.remove('hidden');
                     renderContactedProviders();
                 } else {
@@ -9436,6 +9443,7 @@
             _estadoCargado = { email: String((job.ctx && job.ctx.clientEmail) || '').trim(), whatsapp: String((job.ctx && job.ctx.clientWhatsApp) || '').trim(), comentariosProveedor: '' };   // v3.10.66
             budgetData.folderId = r.folderId || '';
             budgetData.folderUrl = r.folderUrl || '';
+            if (r.traductorElegido) aplicarTraductorElegido(r.traductorElegido);   // v3.10.76: inglés↔español → traductor propio
             if (!budgetData.estado) budgetData.estado = '0-Pendiente';
             uploadedFiles = [];
             const idDisplay = document.getElementById('budgetIdDisplay');
@@ -11428,6 +11436,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                             if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
                             budgetData.historialTraductores[p.nombre].push({ fecha: data.fechaEnvio, email: p.email });
                         });
+                        // v3.10.76: con un único consultado el servidor lo designa (Q = su
+                        // email); si ya hay varios y la designación era automática, la vacía
+                        if (data.traductorElegido && typeof data.traductorElegido === 'object') aplicarTraductorElegido(data.traductorElegido.email || '');
                         // v3.10.51: el backend pone "1-Tasación Solicitada" al registrar el lote
                         const est = budgetData.estado || '';
                         if (!est || est.startsWith('0')) {
@@ -11497,10 +11508,65 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         }
 
         // Renderizar traductores contactados con radio buttons
+        // ====== v3.10.76: TRADUCTOR DESIGNADO (columna Q = email) ======
+        // La hoja guarda ahora el EMAIL del traductor designado (las filas
+        // antiguas conservan el nombre; se entienden las dos cosas). El
+        // servidor lo rellena solo cuando se ha consultado a UN único traductor
+        // y, en los pares inglés↔español sin consultas, con el traductor propio.
+        function esEmailPropio(v) {
+            const e = String(v || '').trim().toLowerCase();
+            return !!(e && traductorPropio && String(traductorPropio.email || '').trim().toLowerCase() === e);
+        }
+        function nombreTraductorPropio() { return ((traductorPropio && traductorPropio.nombre) || 'Yo') + ' (yo)'; }
+        function proveedorPorEmail(email) {
+            const e = String(email || '').trim().toLowerCase();
+            if (!e) return null;
+            return (allProviders || []).find(p => String(p.email || '').trim().toLowerCase() === e) || null;
+        }
+        function emailDeProveedorPorNombre(nombre) {
+            const n = String(nombre || '').trim().toLowerCase();
+            if (!n) return '';
+            const p = (allProviders || []).find(p => String(p.nombre || '').trim().toLowerCase() === n);
+            return p ? String(p.email || '').trim() : '';
+        }
+        // Valor de la columna Q (email o nombre antiguo) → {nombre, email}
+        function resolverTraductorElegido(valorQ, contactados) {
+            const v = String(valorQ || '').trim();
+            if (!v) return { nombre: null, email: '' };
+            if (v.indexOf('@') > -1) {
+                if (esEmailPropio(v)) return { nombre: nombreTraductorPropio(), email: v };
+                const p = proveedorPorEmail(v) || (contactados || []).find(c => String(c.email || '').trim().toLowerCase() === v.toLowerCase());
+                return { nombre: p ? String(p.nombre).trim() : v, email: v };
+            }
+            const c = (contactados || []).find(c => String(c.nombre || '').trim() === v);
+            return { nombre: v, email: String((c && c.email) || '').trim() || emailDeProveedorPorNombre(v) };
+        }
+        function aplicarTraductorElegido(valorQ) {
+            const t = resolverTraductorElegido(valorQ, budgetData.contactedProviders);
+            budgetData.chosenProvider = t.nombre;
+            budgetData.chosenProviderEmail = t.email;
+        }
+        // Listado: ¿la columna Q (email o nombre) señala a este contactado?
+        function esTraductorElegidoEnLista(valorQ, nombre) {
+            const v = String(valorQ || '').trim(), n = String(nombre || '').trim();
+            if (!v || !n) return false;
+            if (v === n) return true;
+            if (v.indexOf('@') > -1) { const e = emailDeProveedorPorNombre(n); return !!e && e.toLowerCase() === v.toLowerCase(); }
+            return false;
+        }
+        function hayTraductorDesignado() {
+            return !!((budgetData.contactedProviders && budgetData.contactedProviders.length > 0) || esEmailPropio(budgetData.chosenProviderEmail));
+        }
+        function avisoTraductorPropioHtml() {
+            if (!esEmailPropio(budgetData.chosenProviderEmail)) return '';
+            return `<div class="traductor-propio-aviso">👤 <b>Traductor designado: ${escapeHtml(nombreTraductorPropio())}</b> · par inglés↔español sin traductores consultados; en la hoja (columna Q) va tu email. Si eliges a un traductor de la lista, lo sustituye.</div>`;
+        }
+
         function renderContactedProviders() {
             const container = document.getElementById('contactedProvidersList');
+            const propioHtml = avisoTraductorPropioHtml();   // v3.10.76
             if (!budgetData.contactedProviders || budgetData.contactedProviders.length === 0) {
-                container.innerHTML = '<div class="no-providers">No se han contactado traductores</div>';
+                container.innerHTML = propioHtml + '<div class="no-providers">No se han contactado traductores</div>';
                 return;
             }
             
@@ -11578,15 +11644,15 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     </div>
                 `;
             });
-            container.innerHTML = html;
+            container.innerHTML = propioHtml + html;
         }
-        
+
         // Función para actualizar historial de proveedores (llamada desde showCard)
         function renderProviderSendHistory() {
             // El historial ya se muestra en renderContactedProviders
             // Esta función se llama para re-renderizar si es necesario
             const contactedSection = document.getElementById('contactedProvidersSection');
-            if (budgetData.contactedProviders && budgetData.contactedProviders.length > 0) {
+            if (hayTraductorDesignado()) {   // v3.10.76: también con el traductor propio
                 contactedSection.classList.remove('hidden');
                 renderContactedProviders();
             }
@@ -11684,6 +11750,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         async function chooseProvider(idx) {
             const provider = budgetData.contactedProviders[idx];
             budgetData.chosenProvider = provider.nombre;
+            budgetData.chosenProviderEmail = String(provider.email || '').trim() || emailDeProveedorPorNombre(provider.nombre);   // v3.10.76
             
             // Actualizar UI
             renderContactedProviders();
@@ -11706,10 +11773,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     body: JSON.stringify({
                         action: 'saveChosenProvider',
                         budgetId: budgetData.id,
-                        chosenProvider: provider.nombre
+                        chosenProvider: provider.nombre,
+                        chosenProviderEmail: budgetData.chosenProviderEmail   // v3.10.76: es lo que va a la columna Q
                     })
                 });
-                showStatus('✓ Traductor elegido: ' + provider.nombre, 'success');
+                showStatus('✓ Traductor elegido: ' + provider.nombre + (budgetData.chosenProviderEmail ? ' (' + budgetData.chosenProviderEmail + ')' : ' — ⚠️ sin email en la hoja'), 'success');
                 setTimeout(hideStatus, 2000);
             } catch (error) {
                 console.log('Error guardando traductor elegido:', error);
@@ -12832,8 +12900,10 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const chosenName = budgetData.chosenProvider;
             let providerCost = 0;
             
-            document.getElementById('chosenProviderName').textContent = chosenName || 'Ninguno seleccionado';
-            
+            document.getElementById('chosenProviderName').textContent = chosenName
+                ? chosenName + ((budgetData.chosenProviderEmail && !esEmailPropio(budgetData.chosenProviderEmail)) ? ' (' + budgetData.chosenProviderEmail + ')' : '')   // v3.10.76
+                : 'Ninguno seleccionado';
+
             if (chosenName && budgetData.providerQuotes && budgetData.providerQuotes[chosenName]) {
                 const quote = budgetData.providerQuotes[chosenName];
                 providerCost = parseFloat(quote.tarifa) || 0;
@@ -13429,6 +13499,21 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 deliveryDateEs = 'la fecha indicada';
                 deliveryDateEn = 'the indicated date';
             }
+            // v3.10.77: el campo Plazo del pedido, explicado con un ejemplo con la fecha de hoy
+            const _hoy = new Date();
+            const hoyEs = _hoy.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+            const hoyEn = _hoy.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+            let plazoFraseEs, plazoFraseEn;
+            if (days === 'X' || isNaN(parseInt(days))) {
+                plazoFraseEs = 'En el campo Plazo, introduce la fecha y hora de entrega acordada.';
+                plazoFraseEn = 'In the Deadline field, enter the agreed delivery date and time.';
+            } else if (esPlazoEnElDia(days)) {
+                plazoFraseEs = `En el campo Plazo, introduce la fecha y hora de hoy, ${hoyEs} (entrega en el día).`;
+                plazoFraseEn = `In the Deadline field, enter today's date and time, ${hoyEn} (same-day delivery).`;
+            } else {
+                plazoFraseEs = `En el campo Plazo, introduce la fecha y hora: ${daysTextEs} tras la fecha de hoy (por ejemplo, si haces el pedido hoy, ${hoyEs}, la fecha sería el ${deliveryDateEs}).`;
+                plazoFraseEn = `In the Deadline field, enter the date and time: ${daysTextEn} after today's date (for example, if you place the order today, ${hoyEn}, the date would be ${deliveryDateEn}).`;
+            }
             
             // v3.7.35: bloque de información configurable con toggles.
             // Por defecto todos activados. Lee el estado de los checkboxes.
@@ -13517,9 +13602,8 @@ Plazo aproximado: ${daysTextEs}, si realiza el pedido ahora${urgencyText}.
 
 Para realizar el pedido:
 1. Haz clic en https://tradutema.com/cotizacion-personalizada/
-2. Selecciona los idiomas. En Referencia Cotización, introduce ${refId}. En Importe indica ${amount} EUR, indica Cómo quieres recibir la traducción, en plazo indica la fecha de ${deliveryDateEs} y Carga los documentos.
-3. Carrito situado arriba a la derecha de la página.
-4. Haz clic en AÑADIR AL CARRITO y ve al carrito para finalizar la compra.
+2. Selecciona los idiomas. En Referencia Cotización, introduce ${refId}. En Importe indica ${amount} EUR. Indica Cómo quieres recibir la traducción. ${plazoFraseEs}
+3. Haz clic en AÑADIR AL CARRITO y ve al carrito (arriba a la derecha de la página) para finalizar la compra.
 ${notaNombresEs}
 *El IVA se descontará automáticamente durante el pago si el cliente está establecido fuera de la UE, en Canarias, Ceuta o Melilla, o si es una empresa de la UE con NIF-IVA intracomunitario válido.
 ${pagesTextEs}
@@ -13544,9 +13628,8 @@ Estimated delivery: ${daysTextEn}, if you place the order now${urgencyTextEn}.
 
 To place your order:
 1. Click on https://tradutema.com/en/personalized-quote/
-2. Select the languages. In Quote Reference, enter ${refId}. In Amount enter ${amount} EUR, indicate how you want to receive the translation, in deadline enter the date ${deliveryDateEn} and upload the documents.
-3. Shopping cart located at the top right of the page.
-4. Click ADD TO CART and go to cart to complete your purchase.
+2. Select the languages. In Quote Reference, enter ${refId}. In Amount enter ${amount} EUR. Indicate how you want to receive the translation. ${plazoFraseEn}
+3. Click ADD TO CART and go to the cart (top right of the page) to complete your purchase.
 ${notaNombresEn}
 *VAT will be automatically deducted during payment if the client is established outside the EU, in the Canary Islands, Ceuta or Melilla, or if it is an EU company with a valid intra-community VAT number.
 ${pagesTextEn}
