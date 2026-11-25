@@ -1867,13 +1867,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.77';
+        const HTML_VERSION = '3.10.79';
         const HTML_DATE = '25/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.100';   // v3.10.76: columna Q con el email del traductor designado (automático con un solo consultado o inglés↔español)
+        const API_MIN_VERSION = '3.7.102';   // v3.10.79: columna Q nunca vacía: el traductor propio por defecto, y solo cambia al marcar uno como Elegido
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -5178,7 +5178,7 @@
                     }
                 }
                 // v3.10.76: inglés↔español sin consultas → asignado al traductor propio
-                if (esEmailPropio(b.traductorElegido)) chipsTraductores += `<span class="provider-tag chosen" title="Traductor designado: tú (inglés↔español sin traductores consultados)">👤 ${escapeHtml(nombreTraductorPropio())} ✓</span>`;
+                if (chipsTraductores && esEmailPropio(b.traductorElegido)) chipsTraductores += `<span class="provider-tag chosen" title="Traductor designado por defecto: tú (ninguno de los consultados está elegido)">👤 ${escapeHtml(nombreTraductorPropio())} ✓</span>`;   // v3.10.78: solo si hay consultados
                 if (chipsTraductores) traductoresHtml = '<div class="budget-item-providers">' + chipsTraductores + '</div>';
                 
                 // Mostrar comentarios internos si existen (truncados con tooltip)
@@ -11436,8 +11436,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                             if (!budgetData.historialTraductores[p.nombre]) budgetData.historialTraductores[p.nombre] = [];
                             budgetData.historialTraductores[p.nombre].push({ fecha: data.fechaEnvio, email: p.email });
                         });
-                        // v3.10.76: con un único consultado el servidor lo designa (Q = su
-                        // email); si ya hay varios y la designación era automática, la vacía
+                        // v3.10.79: consultar no designa a nadie; el servidor solo avisa si ha
+                        // tenido que rellenar una Q vacía con el traductor propio
                         if (data.traductorElegido && typeof data.traductorElegido === 'object') aplicarTraductorElegido(data.traductorElegido.email || '');
                         // v3.10.51: el backend pone "1-Tasación Solicitada" al registrar el lote
                         const est = budgetData.estado || '';
@@ -11509,10 +11509,10 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
 
         // Renderizar traductores contactados con radio buttons
         // ====== v3.10.76: TRADUCTOR DESIGNADO (columna Q = email) ======
-        // La hoja guarda ahora el EMAIL del traductor designado (las filas
-        // antiguas conservan el nombre; se entienden las dos cosas). El
-        // servidor lo rellena solo cuando se ha consultado a UN único traductor
-        // y, en los pares inglés↔español sin consultas, con el traductor propio.
+        // La hoja guarda el EMAIL del traductor elegido (las filas antiguas
+        // conservan el nombre; se entienden las dos cosas). v3.10.79: la Q nunca
+        // está vacía: lleva al traductor propio hasta que se marca a otro como
+        // Elegido; consultar a traductores no la cambia.
         function esEmailPropio(v) {
             const e = String(v || '').trim().toLowerCase();
             return !!(e && traductorPropio && String(traductorPropio.email || '').trim().toLowerCase() === e);
@@ -11554,12 +11554,15 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (v.indexOf('@') > -1) { const e = emailDeProveedorPorNombre(n); return !!e && e.toLowerCase() === v.toLowerCase(); }
             return false;
         }
+        // v3.10.78: la columna Q nunca está vacía: por defecto lleva al traductor
+        // propio. Eso es lo normal y no se anuncia; solo se avisa cuando HAY
+        // traductores consultados y ninguno está elegido (la Q sigue en el propio).
         function hayTraductorDesignado() {
-            return !!((budgetData.contactedProviders && budgetData.contactedProviders.length > 0) || esEmailPropio(budgetData.chosenProviderEmail));
+            return !!(budgetData.contactedProviders && budgetData.contactedProviders.length > 0);
         }
         function avisoTraductorPropioHtml() {
-            if (!esEmailPropio(budgetData.chosenProviderEmail)) return '';
-            return `<div class="traductor-propio-aviso">👤 <b>Traductor designado: ${escapeHtml(nombreTraductorPropio())}</b> · par inglés↔español sin traductores consultados; en la hoja (columna Q) va tu email. Si eliges a un traductor de la lista, lo sustituye.</div>`;
+            if (!esEmailPropio(budgetData.chosenProviderEmail) || !hayTraductorDesignado()) return '';
+            return `<div class="traductor-propio-aviso">👤 <b>Traductor designado por defecto: ${escapeHtml(nombreTraductorPropio())}</b> · ninguno de los consultados está elegido todavía (en la hoja, columna Q, va tu email). Elige uno de la lista para sustituirlo.</div>`;
         }
 
         function renderContactedProviders() {
