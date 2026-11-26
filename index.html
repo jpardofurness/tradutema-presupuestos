@@ -1867,13 +1867,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.80';
+        const HTML_VERSION = '3.10.81';
         const HTML_DATE = '26/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.103';   // v3.10.80: _RECUENTO.xlsx generado por el servidor (sin precios ni método) en lugar de _RECUENTO.txt y de la ficha con tarifas
+        const API_MIN_VERSION = '3.7.104';   // v3.10.81: páginas por archivo guardadas en los ajustes + getFileBase64 (botón 🔢 Actualizar archivos y páginas)
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -5690,6 +5690,10 @@
                     
                     // v3.7.19: restaurar ajustes por archivo (rango páginas + instrucciones)
                     budgetData.fileSettings = b.fileSettings || {};
+                    // v3.10.81: y las páginas físicas contadas con pdf.js (st.pages), que
+                    // mandan sobre el recuento del servidor (falla en PDF modernos)
+                    budgetData.pagesByFile = {};
+                    Object.keys(budgetData.fileSettings).forEach(n => { const p = parseInt((budgetData.fileSettings[n] || {}).pages, 10); if (p > 0) budgetData.pagesByFile[n] = p; });
                     aplicarAjustesManuales();   // v3.10.34
                     // v3.9.3: los filtros por archivo guardados mandan sobre el
                     // total de páginas también al retomar la cotización.
@@ -6771,89 +6775,141 @@
             };
         }
 
-        // ====== v3.9.4: RECONTAR PÁGINAS SIN CLAUDE ======
-        // Cuenta las páginas reales de cada PDF con pdf.js, en local, gratis y
-        // en segundo. Resuelve el caso de añadir archivos a un presupuesto ya
-        // creado cuando NO se quiere volver a lanzar el recuento de palabras.
-        // pdf.js entiende los PDF con object streams comprimidos, que es donde
-        // falla el parser de texto del backend.
-        async function actualizarArchivosYPaginas(silencioso) {
-            const fh = await handleLocalDelPresupuesto(!silencioso);   // v3.9.8
-            if (!fh) {
-                if (!silencioso) {
-                    showStatus('Recontar páginas necesita la carpeta local enlazada (botón 💻 Local).', 'warning');
-                    setTimeout(hideStatus, 5000);
-                }
-                return;
+        // ====== v3.9.4 → v3.10.81: ACTUALIZAR ARCHIVOS Y PÁGINAS (botón 🔢) ======
+        // Cuenta los documentos del presupuesto y sus páginas físicas con pdf.js
+        // sin contar palabras ni consumir Claude: en la carpeta local si está
+        // enlazada; si no, en Drive, bajando los PDF cuyas páginas el servidor
+        // no sabe contar (object streams comprimidos → 0). Después actualiza el
+        // presupuesto, guarda páginas y nº de archivos en la hoja (y las páginas
+        // de cada archivo en sus ajustes, para no perderlas al recargar) y
+        // rehace el _RECUENTO.xlsx. Lo usan el botón, "Solo subir" y
+        // "Actualizar desde Drive".
+        function esDocumentoDelPresupuesto(nombre) {
+            if (!nombre || nombre.charAt(0) === '_') return false;
+            return !/\.(txt|xlsx?|xlsm|csv|ods|docx?|zip)$/i.test(nombre);
+        }
+        async function contarPaginasPdf(datos) {
+            if (typeof pdfjsLib === 'undefined') throw new Error('pdf.js no está cargado');
+            const doc = await pdfjsLib.getDocument({ data: datos }).promise;
+            const n = doc.numPages;
+            try { doc.destroy(); } catch (e) {}
+            return n;
+        }
+        // Carpeta local: todos los documentos, páginas con pdf.js
+        // Si ya se conoce la lista de Drive, un documento que solo está en local
+        // aún no ha subido (Drive Desktop): se avisa y no se cuenta todavía.
+        async function inventarioLocalConPdfjs(fh) {
+            const porArchivo = {}, fallos = [], pendientesDrive = []; let n = 0;
+            const enDrive = new Set((budgetData.folderFiles || []).map(f => String(f.name || '').toLowerCase()).filter(Boolean));
+            for await (const [nombre, handle] of fh.entries()) {
+                if (handle.kind !== 'file' || !esDocumentoDelPresupuesto(nombre)) continue;
+                if (enDrive.size && !enDrive.has(nombre.toLowerCase())) { pendientesDrive.push(nombre); continue; }
+                n++;
+                if (!/\.pdf$/i.test(nombre)) { porArchivo[nombre] = 1; continue; }
+                try {
+                    const file = await handle.getFile();
+                    porArchivo[nombre] = await contarPaginasPdf(await file.arrayBuffer());
+                } catch (ePdf) { console.warn('No se pudieron contar las páginas de ' + nombre + ':', ePdf); fallos.push(nombre); }
             }
+            return { porArchivo, fallos, n, origen: 'local', pendientesDrive };
+        }
+        // Drive: lista fresca; los PDF que el servidor no sabe contar se bajan y
+        // se cuentan aquí (con las páginas ya conocidas por pdf.js no se baja nada)
+        async function inventarioDriveConPdfjs(forzar) {
+            const data = await apiPost({ action: 'listFolderFiles', folderId: budgetData.folderId }, { retry: false, timeoutMs: 60000 });
+            if (!data || !data.success || !Array.isArray(data.files)) throw new Error((data && data.error) || 'no se pudo leer la carpeta de Drive');
+            budgetData.folderFiles = data.files;
+            const porArchivo = {}, fallos = []; let n = 0;
+            for (const f of data.files) {
+                if (!esDocumentoDelPresupuesto(f.name)) continue;
+                n++;
+                if (!/\.pdf$/i.test(f.name)) { porArchivo[f.name] = parseInt(f.pages) || 1; continue; }
+                const conocidas = parseInt((budgetData.pagesByFile || {})[f.name]) || 0;
+                let p = (!forzar && conocidas > 0) ? conocidas : (parseInt(f.pages) || 0);
+                if (!p || forzar) {
+                    try {
+                        const r = await apiPost({ action: 'getFileBase64', fileId: f.id }, { retry: false, timeoutMs: 90000 });
+                        if (r && r.success && r.base64) p = await contarPaginasPdf(_b64ToBytes(r.base64));
+                        else if (!p) fallos.push(f.name + (r && r.error ? ' (' + r.error + ')' : ''));
+                    } catch (e) { if (!p) fallos.push(f.name); }
+                }
+                if (p > 0) porArchivo[f.name] = p;
+            }
+            return { porArchivo, fallos, n, origen: 'drive', pendientesDrive: [] };
+        }
+        // Aplica el inventario al presupuesto abierto (memoria + pantalla)
+        function aplicarInventarioDePaginas(inv) {
+            budgetData.pagesByFile = Object.assign({}, inv.porArchivo);
+            if (!budgetData.fileSettings) budgetData.fileSettings = {};
+            Object.keys(inv.porArchivo).forEach(nombre => {
+                budgetData.fileSettings[nombre] = Object.assign({}, budgetData.fileSettings[nombre] || {}, { pages: inv.porArchivo[nombre] });
+            });
+            (budgetData.folderFiles || []).forEach(f => { if (inv.porArchivo[f.name]) f.pages = inv.porArchivo[f.name]; });
+            const total = Object.keys(inv.porArchivo).reduce((s, k) => s + (parseInt(inv.porArchivo[k]) || 0), 0);
+            budgetData.pageCount = total;
+            budgetData.numArchivos = inv.n;
+            // v3.10.0: volcar el total al campo del paso 4 (lo lee el mensaje al cliente)
+            const _elTot = document.getElementById('quoteTotalPages');
+            if (_elTot) _elTot.value = total;
+            // Reflejarlo en el análisis existente sin tocar las palabras
+            (budgetData.fileAnalysis || []).forEach(a => { const p = inv.porArchivo[a.fileName]; if (p) a.pages = p; });
+            if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
+            if (typeof aplicarFiltrosAPaginas === 'function') aplicarFiltrosAPaginas();
+            if (typeof updateClientMessage === 'function' && !clientMessageEdited) updateClientMessage();
+            try { renderStep2Files(); } catch (e) {}
+            return total;
+        }
+        // Hoja (páginas, nº de archivos, ajustes con las páginas) + _RECUENTO.xlsx.
+        // El servidor rehace el Excel al guardar si cambian las páginas; si no
+        // cambió nada (o el Excel no existía), se pide explícitamente.
+        async function guardarPaginasYRecuentoXlsx() {
+            if (!budgetData.id) return null;
+            let fh = null; try { fh = await handleLocalDelPresupuesto(false); } catch (e) {}
+            const r = await apiPost({
+                action: 'updateBudgetBasicData', budgetId: budgetData.id,
+                pages: budgetData.pageCount, numArchivos: budgetData.numArchivos,
+                fileSettings: budgetData.fileSettings || {}, localMode: !!fh
+            }, { retry: false, timeoutMs: 60000 });
+            if (!r || !r.success) throw new Error((r && r.error) || 'el servidor no confirmó el guardado');
+            if (r.recuentoXlsxBase64 || r.recuentoGuardadoEn) { await escribirRecuentoXlsxLocal(fh, r); return r; }
+            return await regenerarRecuentoXlsx();
+        }
+        async function actualizarArchivosYPaginas(silencioso) {
+            if (!budgetData.id) { if (!silencioso) { showStatus('Abre o crea un presupuesto primero.', 'warning'); setTimeout(hideStatus, 3000); } return false; }
             const btn = document.getElementById('btnRecontarPaginas');
             const orig = btn ? btn.innerHTML : '';
-            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Contando...'; }
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Contando páginas…'; }
             try {
-                if (typeof pdfjsLib === 'undefined') throw new Error('pdf.js no está cargado');
-                const porArchivo = {};
-                let total = 0, n = 0, fallos = [];
-                for await (const [nombre, handle] of fh.entries()) {
-                    if (handle.kind !== 'file') continue;
-                    if (!nombre || nombre.charAt(0) === '_') continue;
-                    const lower = nombre.toLowerCase();
-                    if (lower.endsWith('.txt') || lower.endsWith('.xlsx') ||
-                        lower.endsWith('.docx') || lower.endsWith('.doc') || lower.endsWith('.zip')) continue;
-                    n++;
-                    if (!lower.endsWith('.pdf')) { porArchivo[nombre] = 1; total += 1; continue; }
-                    try {
-                        const file = await handle.getFile();
-                        const buf = await file.arrayBuffer();
-                        const doc = await pdfjsLib.getDocument({ data: buf }).promise;
-                        porArchivo[nombre] = doc.numPages;
-                        total += doc.numPages;
-                        try { doc.destroy(); } catch (e) {}
-                    } catch (ePdf) {
-                        console.warn('No se pudieron contar las páginas de ' + nombre + ':', ePdf);
-                        fallos.push(nombre);
-                    }
+                let fh = null;
+                try { fh = await handleLocalDelPresupuesto(!silencioso); } catch (e) {}
+                let inv;
+                if (fh) inv = await inventarioLocalConPdfjs(fh);
+                else if (budgetData.folderId) inv = await inventarioDriveConPdfjs(false);
+                else throw new Error('el presupuesto no tiene carpeta en Drive ni carpeta local enlazada');
+                if (inv.n === 0) {
+                    if (!silencioso) { showStatus('No se han encontrado documentos en la carpeta.', 'warning'); setTimeout(hideStatus, 4000); }
+                    return false;
                 }
-                if (n === 0) {
-                    if (!silencioso) {
-                        showStatus('No se han encontrado documentos en la carpeta local.', 'warning');
-                        setTimeout(hideStatus, 4000);
-                    }
-                    return;
+                const total = aplicarInventarioDePaginas(inv);
+                let guardado = '';
+                try { const r = await guardarPaginasYRecuentoXlsx(); guardado = ' · hoja' + (r && (r.guardadoEn === 'carpeta' || r.recuentoGuardadoEn === 'carpeta' || r.recuentoXlsxBase64) ? ' y _RECUENTO.xlsx' : '') + ' actualizados'; }
+                catch (eG) { guardado = ' · ⚠️ no se pudo guardar en la hoja: ' + ((eG && eG.message) || eG); }
+                const pend = (inv.pendientesDrive || []).length;
+                const msg = `✓ ${inv.n} archivo(s) · ${total} páginas` + (inv.origen === 'drive' ? ' (Drive)' : '') +
+                    (inv.fallos.length ? ` · no se pudieron leer: ${inv.fallos.join(', ')}` : '') + guardado +
+                    (pend ? ` · ${pend} archivo(s) de la carpeta local aún no está(n) en Drive (${inv.pendientesDrive.join(', ')}): cuando suba(n), pulsa "Actualizar desde Drive"` : '');
+                if (!silencioso || inv.fallos.length || pend || guardado.indexOf('⚠️') > -1) {
+                    showStatus(msg, (inv.fallos.length || pend || guardado.indexOf('⚠️') > -1) ? 'warning' : 'success');
+                    setTimeout(hideStatus, 7000);
                 }
-                budgetData.pagesByFile = porArchivo;
-                budgetData.pageCount = total;
-                budgetData.numArchivos = n;
-                // v3.10.0: volcar el total al campo del paso 4. Es lo que lee el
-                // mensaje al cliente; si no se actualiza aquí, el mensaje sigue
-                // enseñando el valor viejo que restauró la ficha de tarificación
-                // (en 0824-11-M: 22 páginas reales y "Páginas totales: 9").
-                const _elTot = document.getElementById('quoteTotalPages');
-                if (_elTot) _elTot.value = total;
-                // Reflejarlo en el análisis existente sin tocar las palabras
-                (budgetData.fileAnalysis || []).forEach(a => {
-                    const p = porArchivo[a.fileName];
-                    if (p) a.pages = p;
-                });
-                if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
-                if (typeof aplicarFiltrosAPaginas === 'function') aplicarFiltrosAPaginas();
-                if (typeof updateClientMessage === 'function' && !clientMessageEdited) updateClientMessage();
-                if (typeof renderFileList === 'function') { try { renderFileList(); } catch (e) {} }
-
-                const msg = `✓ ${n} archivo(s) · ${total} páginas` +
-                    (fallos.length ? ` · no se pudieron leer: ${fallos.join(', ')}` : '');
-                showStatus(msg, fallos.length ? 'warning' : 'success');
-                setTimeout(hideStatus, 6000);
-                if (typeof saveBudgetDataIfNeeded === 'function') {
-                    try { saveBudgetDataIfNeeded(); } catch (e) {}
-                }
+                return true;
             } catch (e) {
                 console.error('actualizarArchivosYPaginas:', e);
-                if (!silencioso) {
-                    showStatus('No se pudo recontar: ' + (e.message || e), 'error');
-                    setTimeout(hideStatus, 6000);
-                }
+                if (!silencioso) { showStatus('No se pudo actualizar: ' + (e.message || e), 'error'); setTimeout(hideStatus, 6000); }
+                return false;
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                try { updateStep2Buttons(); } catch (e) {}
             }
         }
 
@@ -7568,6 +7624,10 @@
                 await refreshFolderFilesFromDrive();
                 const ahora = (budgetData.folderFiles || []).length;
                 const nuevos = ahora - antes;
+                // v3.10.81: páginas de lo nuevo (pdf.js), hoja y Excel al día
+                if (nuevos !== 0 || (budgetData.folderFiles || []).some(f => esDocumentoDelPresupuesto(f.name) && !paginasDeArchivo(f.name, f.pages, null))) {
+                    try { await actualizarArchivosYPaginas(true); } catch (e) {}
+                }
                 showStatus(nuevos > 0
                     ? `✓ ${nuevos} archivo(s) nuevo(s) detectado(s) en la carpeta (${ahora} en total)`
                     : `Carpeta leída: ${ahora} archivo(s). Si acabas de copiarlos, espera a que Drive termine de sincronizar y vuelve a pulsar.`,
@@ -7600,7 +7660,7 @@
             const btnUploadOnly = _btnPaso2('uploadOnlyBtn', 'btn btn-secondary action-btn', 'flex:1;min-width:130px;order:10;', () => uploadOnlyFromFolder(), cont);
             const btnRecuento = _btnPaso2('btnRecontarPaginas', 'btn btn-secondary action-btn', 'flex:1;min-width:140px;order:20;', () => actualizarArchivosYPaginas(), cont);
             btnUploadOnly.title = 'Sube los documentos nuevos a Drive y actualiza el nº de páginas, sin contar palabras';
-            btnRecuento.title = 'Cuenta archivos y páginas reales con pdf.js. No consume Claude ni cambia el recuento de palabras.';
+            btnRecuento.title = 'Vuelve a contar los documentos y sus páginas (sin contar palabras), actualiza el presupuesto, la hoja y el _RECUENTO.xlsx';
             let linkSync = document.getElementById('syncDriveLink');
             if (!linkSync) {
                 linkSync = document.createElement('div');
@@ -7651,9 +7711,11 @@
             btnUploadOnly.style.display = hasPendingFiles ? '' : 'none';
             btnUploadOnly.disabled = !hasPendingFiles || enCurso;
             if (!enCurso) btnUploadOnly.innerHTML = '📤 Solo subir';
-            btnRecuento.style.display = (hasPendingFiles && hasAnalysis) ? '' : 'none';
-            btnRecuento.disabled = enCurso;
-            if (!enCurso && btnRecuento.innerHTML.indexOf('Contando') === -1) btnRecuento.innerHTML = '🔢 Recontar páginas';
+            // v3.10.81: siempre que haya presupuesto (antes solo con archivos pendientes Y recuento hecho)
+            btnRecuento.style.display = '';
+            btnRecuento.disabled = enCurso || hasPendingFiles;   // con pendientes, primero "Solo subir"
+            btnRecuento.title = hasPendingFiles ? 'Sube primero los archivos nuevos (📤 Solo subir): el recuento de páginas se hace solo' : 'Vuelve a contar los documentos y sus páginas (sin contar palabras), actualiza el presupuesto, la hoja y el _RECUENTO.xlsx';
+            if (!enCurso && btnRecuento.innerHTML.indexOf('Contando') === -1) btnRecuento.innerHTML = '🔢 Actualizar archivos y páginas';
             linkSync.style.display = '';
         }
 
@@ -7751,19 +7813,33 @@
                 if (typeof refreshWordCountSummary === 'function') refreshWordCountSummary();
             } catch(e) { /* no pasa nada */ }
 
-            // Persistir al Sheet si el presupuesto ya existe
-            if (budgetData.id && hadAnalysis) {
-                fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'updateBudgetBasicData',
-                        budgetId: budgetData.id,
-                        wordCount: newWords,
-                        pages: newPages,
-                        numArchivos: (budgetData.folderFiles || []).filter(f => f.name && !f.name.endsWith('.txt')).length
-                            + (uploadedFiles || []).length
-                    })
-                }).catch(e => console.warn('Persist after removal:', e));
+            // v3.10.81: el archivo quitado desaparece también de las páginas conocidas
+            if (budgetData.pagesByFile) delete budgetData.pagesByFile[removedName];
+            if (budgetData.fileSettings && budgetData.fileSettings[removedName]) delete budgetData.fileSettings[removedName];
+            if (!hadAnalysis) {
+                // sin recuento de palabras, las páginas salen del inventario de archivos
+                const inv = (typeof inventarioArchivos === 'function') ? inventarioArchivos() : [];
+                const tot = inv.reduce((s, x) => s + (parseInt(x.paginas) || 0), 0);
+                if (tot > 0 || !inv.length) budgetData.pageCount = tot;
+            }
+            // Persistir al Sheet si el presupuesto ya existe (v3.10.81: también sin
+            // recuento, y rehaciendo el _RECUENTO.xlsx)
+            if (budgetData.id) {
+                const req = {
+                    action: 'updateBudgetBasicData', budgetId: budgetData.id,
+                    pages: hadAnalysis ? newPages : budgetData.pageCount,
+                    numArchivos: (budgetData.folderFiles || []).filter(f => esDocumentoDelPresupuesto(f.name)).length + (uploadedFiles || []).length,
+                    fileSettings: budgetData.fileSettings || {}
+                };
+                if (hadAnalysis) req.wordCount = newWords;
+                (async () => {
+                    try {
+                        let fh = null; try { fh = await handleLocalDelPresupuesto(false); } catch (e) {}
+                        req.localMode = !!fh;
+                        const r = await apiPost(req, { retry: false, timeoutMs: 60000 });
+                        if (r && r.success) { if (r.recuentoXlsxBase64) await escribirRecuentoXlsxLocal(fh, r); if (!r.recuentoGuardadoEn && !r.recuentoXlsxBase64) await regenerarRecuentoXlsx().catch(() => {}); }
+                    } catch (e) { console.warn('Persist after removal:', e); }
+                })();
             }
         }
 
@@ -7858,18 +7934,27 @@
                         });
                     if (uploadData.success) {
                         if (!budgetData.folderFiles) budgetData.folderFiles = [];
-                        (uploadData.uploaded || []).forEach(f => budgetData.folderFiles.push(f));
+                        if (!budgetData.pagesByFile) budgetData.pagesByFile = {};
+                        (uploadData.uploaded || []).forEach(f => {
+                            // v3.10.81: las páginas contadas con pdf.js al elegir el archivo
+                            // no se pierden al subirlo (antes la lista quedaba en "—")
+                            const src = filesToUpload.find(x => x.name === f.name);
+                            const pg = src ? (parseInt(src.pages) || 0) : 0;
+                            if (pg > 0) { f.pages = pg; budgetData.pagesByFile[f.name] = pg; }
+                            budgetData.folderFiles.push(f);
+                        });
                         // v3.7.19: trasladar settings de archivos pendientes a budgetData.fileSettings
                         // para que persistan ahora que están en Drive
                         if (!budgetData.fileSettings) budgetData.fileSettings = {};
                         let _ajustesTrasladados = 0;
                         filesToUpload.forEach(uf => {
-                            if (uf.pagesFilter || uf.instructions) {
+                            const pg = parseInt(uf.pages) || 0;
+                            if (uf.pagesFilter || uf.instructions || pg > 0) {
                                 // v3.10.59: conservar los ✎ manuales que ya hubiera
                                 budgetData.fileSettings[uf.name] = Object.assign({}, budgetData.fileSettings[uf.name] || {}, {
                                     pagesFilter: uf.pagesFilter || '',
                                     instructions: uf.instructions || ''
-                                });
+                                }, pg > 0 ? { pages: pg } : {});   // v3.10.81: páginas físicas, para la hoja y el Excel
                                 _ajustesTrasladados++;
                             }
                         });
@@ -7925,8 +8010,11 @@
                     recomputePageCountFromDrive();
                     // Regenerar el presupuesto con el nuevo nº de páginas
                     refreshQuoteAfterFileChange();
-                    showStatus('✓ Archivos subidos y presupuesto actualizado', 'success');
-                    setTimeout(hideStatus, 2500);
+                    // v3.10.81: y a la hoja (páginas, nº de archivos) + _RECUENTO.xlsx
+                    let _g = '';
+                    try { await guardarPaginasYRecuentoXlsx(); _g = ' · hoja y _RECUENTO.xlsx actualizados'; } catch (eG) { _g = ' · ⚠️ no se pudo actualizar la hoja: ' + (eG && eG.message || eG); }
+                    showStatus('✓ Archivos subidos y presupuesto actualizado' + _g, _g.indexOf('⚠️') > -1 ? 'warning' : 'success');
+                    setTimeout(hideStatus, 4000);
                 } else {
                     showStatus('No se pudieron subir los archivos. Reintenta.', 'error');
                     setTimeout(hideStatus, 3000);
@@ -7944,13 +8032,12 @@
         // archivos fuente presentes en Drive (folderFiles). Usa el nº de páginas
         // detectado al subir (pages) si está disponible.
         function recomputePageCountFromDrive() {
-            const source = (budgetData.folderFiles || []).filter(f =>
-                f.mimeType !== 'text/plain' && (f.name || '').charAt(0) !== '_'
-            );
+            const source = (budgetData.folderFiles || []).filter(f => esDocumentoDelPresupuesto(f.name));
             let pages = 0;
-            source.forEach(f => { pages += (f.pages || 1); });
+            source.forEach(f => { pages += (paginasDeArchivo(f.name, f.pages, null) || 1); });   // v3.10.81: fuente única (pdf.js > servidor)
             if (pages > 0) budgetData.pageCount = pages;
             budgetData.fileCount = source.length;
+            budgetData.numArchivos = source.length;
         }
 
         // v3.7.44: tras un cambio de archivos (subida o reanálisis), actualiza el
