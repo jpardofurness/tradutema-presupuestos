@@ -638,7 +638,7 @@
                 <button id="hdrBtnLocalFolder" onclick="openLocalFolder()" title="Abrir la carpeta local del presupuesto en el Explorador (y copiar la ruta)" style="display:none;background:#0ea5e9;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">💻 Local</button>
                 <!-- v3.7.34: botón Guardar siempre visible para persistir datos editados del presupuesto -->
                 <button id="hdrBtnSave" onclick="saveCurrentBudget()" title="Guardar todo lo editado: idiomas, contacto, notas, comentarios a traductores, tarifa, plazo y mensaje al cliente" style="display:none;background:#f59e0b;color:white;border:0;border-radius:5px;padding:6px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;">💾 Guardar</button>
-                <button id="hdrBtnRecuento" onclick="abrirRecuentoExcel()" title="Descargar el recuento de palabras en Excel (desglose por archivo e idiomas)" style="display:none;background:#16a34a;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Recuento</button>
+                <button id="hdrBtnRecuento" onclick="abrirRecuentoExcel()" title="Descargar _RECUENTO.xlsx (archivos, páginas y palabras; sin precios: es el mismo que reciben los traductores)" style="display:none;background:#16a34a;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Recuento</button>
                 <button id="hdrBtnSheet" onclick="openSpreadsheet()" title="Abrir Google Sheet de parámetros (Presupuestos, Tarifas, Proveedores, etc.)" style="background:#137333;color:white;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.85rem;">📊 Sheet</button>
                 <button class="delete-btn" id="deleteBudgetBtn" onclick="confirmDeleteBudgetFromHeader()" title="Eliminar presupuesto y carpeta" style="display: none;">🗑️</button>
             </div>
@@ -1379,7 +1379,7 @@
             </div>
             <div class="checkbox-row" style="padding-top:4px;" id="fila_enviarRecuento">
                 <div class="custom-checkbox checked" id="enviarRecuento" onclick="onCasillaAdjuntoClick('enviarRecuento')"></div>
-                <span class="checkbox-label">Enviar recuento <span style="color:#94a3b8;font-weight:normal;" id="hint_enviarRecuento">(_RECUENTO.txt sin la línea del método; el Excel con tarifas no se envía nunca)</span></span>
+                <span class="checkbox-label">Enviar recuento <span style="color:#94a3b8;font-weight:normal;" id="hint_enviarRecuento">(_RECUENTO.xlsx: archivos, páginas y palabras; sin precios)</span></span>
             </div>
             
             <div class="checkbox-row">
@@ -1867,13 +1867,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.79';
-        const HTML_DATE = '25/11/2026';
+        const HTML_VERSION = '3.10.80';
+        const HTML_DATE = '26/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.102';   // v3.10.79: columna Q nunca vacía: el traductor propio por defecto, y solo cambia al marcar uno como Elegido
+        const API_MIN_VERSION = '3.7.103';   // v3.10.80: _RECUENTO.xlsx generado por el servidor (sin precios ni método) en lugar de _RECUENTO.txt y de la ficha con tarifas
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2312,13 +2312,9 @@
             if (hdrLocal) hdrLocal.style.display = budgetData.id ? '' : 'none';
             // v3.7.34: botón Guardar visible siempre que haya un presupuesto cargado
             if (hdrSave) hdrSave.style.display = budgetData.id ? '' : 'none';
-            // v3.8.9: el Excel de recuento solo tiene sentido si hay análisis
+            // v3.10.80: el _RECUENTO.xlsx existe desde que hay archivos (con o sin recuento)
             const hdrRec = document.getElementById('hdrBtnRecuento');
-            if (hdrRec) {
-                const hayAnalisis = !!(budgetData.id &&
-                    Array.isArray(budgetData.fileAnalysis) && budgetData.fileAnalysis.length > 0);
-                hdrRec.style.display = hayAnalisis ? '' : 'none';
-            }
+            if (hdrRec) hdrRec.style.display = budgetData.id ? '' : 'none';
         }
 
         // v3.7.24: actualizar el banner de resumen persistente con los totales
@@ -6321,6 +6317,11 @@
                 // reanalizar, el dato moría en el navegador.
                 fileSettings: budgetData.fileSettings || {}
             };
+            // v3.10.80: si cambian los ajustes ⚙, el servidor rehace el _RECUENTO.xlsx;
+            // en modo local sin carpeta en Drive lo manda en base64
+            let _fhLocalGuardar = null;
+            try { _fhLocalGuardar = await handleLocalDelPresupuesto(false); } catch (e) {}
+            req.localMode = !!_fhLocalGuardar;
             if (budgetData.providerComments !== undefined) req.providerComments = String(budgetData.providerComments || '');
             if (vac.email) req.borrarEmail = true;
             if (vac.whatsapp) req.borrarWhatsApp = true;
@@ -6329,6 +6330,7 @@
                 const result = await apiPost(req, { retry: true, attempts: 2, timeoutMs: 45000 });
                 if (!result || !result.success) throw new Error((result && result.error) || 'el servidor no confirmó el guardado');
                 console.log('Datos básicos guardados:', result);
+                if (result.recuentoXlsxBase64 && idFlujo === budgetData.id) escribirRecuentoXlsxLocal(_fhLocalGuardar, result).catch(() => {});   // v3.10.80
                 // copia local + listado: lo que el servidor acaba de escribir
                 const aplicaNuevo = (typeof servidorAnteriorA === 'function') ? !servidorAnteriorA('3.7.95') : true;
                 const campos = { origen: req.sourceLang || undefined, destino: req.targetLang || undefined, canal: req.channel || undefined,
@@ -8378,7 +8380,6 @@
                     hideStatus();
                     completedSteps.add(5);
                     updateProgressSteps();
-                    try { versionarRecuentoAlEnviar('Email'); } catch (e) {}   // v3.9.2
                     showSuccess('¡Presupuesto enviado!', `Email enviado a ${ctx.clientEmail}`, true);
                 }
                 anotarEnvioClienteEnCopias(ctx.budgetId, ctx.clientEmail, fecha);
@@ -9420,11 +9421,15 @@
                        (s.manualPages !== '' && s.manualPages !== undefined && s.manualPages !== null);
             });
         }
-        async function guardarAjustesArchivos(job, fs, motivo) {
+        async function guardarAjustesArchivos(job, fs, motivo, opts) {
             if (!job || !job.budgetId || !fs || !Object.keys(fs).length) return false;
             try {
-                const r = await apiPost({ action: 'updateBudgetBasicData', budgetId: job.budgetId, fileSettings: fs }, { retry: false, timeoutMs: 40000 });
+                const fhL = await handleLocalDeTrabajo(job);
+                const req = { action: 'updateBudgetBasicData', budgetId: job.budgetId, fileSettings: fs, localMode: !!fhL };
+                if (opts && opts.sinRecuentoXlsx) req.sinRecuentoXlsx = true;   // v3.10.80: al crear, el Excel lo genera la subida
+                const r = await apiPost(req, { retry: false, timeoutMs: 60000 });
                 if (!(r && r.success)) prodLogError(job.k('ajustes'), `${job.budgetId} · ajustes por archivo (⚙) no guardados: ` + ((r && r.error) || 'sin éxito'));
+                else await escribirRecuentoXlsxLocal(fhL, r);   // v3.10.80: si cambian los ajustes, el servidor rehace el Excel
                 return !!(r && r.success);
             } catch (e) {
                 prodLogError(job.k('ajustes'), `${job.budgetId} · ajustes por archivo (⚙) no guardados` + (motivo ? ' (' + motivo + ')' : '') + ': ' + ((e && e.message) || e));
@@ -9605,7 +9610,7 @@
                 // v3.10.59: ajustes ⚙ de los archivos pendientes → fileSettings y hoja
                 // (se guarda sin esperar; se espera al final del trabajo)
                 const ajustesArchivos = fusionarAjustesDePendientes(job, files);
-                const pGuardarAjustes = Object.keys(ajustesArchivos).length ? guardarAjustesArchivos(job, ajustesArchivos, 'al crear') : null;
+                const pGuardarAjustes = Object.keys(ajustesArchivos).length ? guardarAjustesArchivos(job, ajustesArchivos, 'al crear', { sinRecuentoXlsx: true }) : null;
 
                 // ----- archivos: disco local (Drive Desktop los sube) o Apps Script -----
                 let directUploadResults = null;
@@ -9667,6 +9672,9 @@
                     }
                 }
                 stageTimings.t_promiseAllEnd = performance.now();
+                // v3.10.80: _RECUENTO.xlsx (archivos y páginas) desde el primer momento;
+                // el recuento, si lo hay, lo regenera después con las palabras
+                if (directUploadResults && directUploadResults.subidos > 0) await generarRecuentoXlsxTrasSubida(job, files, folderResult, pGuardarAjustes);
 
                 // lista de archivos de la carpeta (reconstruida en local; la real llega después)
                 if (folderResult.uploadedFiles) {
@@ -9746,15 +9754,17 @@
                     faseTrabajo(job, 'guardando');
                     const servidorGuardo = !!(claudeResult.savedByServer || claudeResult._recovered);
                     if (esAbierto(job)) {
-                        showBgBanner('loading', servidorGuardo ? '💾 Guardando ficha del recuento...' : '💾 Guardando análisis (TXTs + _RECUENTO)...', false);
+                        showBgBanner('loading', servidorGuardo ? '💾 Guardando el recuento...' : '💾 Guardando análisis (TXTs + _RECUENTO.xlsx)...', false);
                         showGlobalAnalysisBanner('loading', `⏳ ${job.budgetId} · Guardando análisis...`);
                     }
-                    prodLogStart(job.k('save'), `${job.budgetId} · ` + (servidorGuardo ? 'Ficha del recuento' : 'Guardando recuento + TXTs'));
+                    prodLogStart(job.k('save'), `${job.budgetId} · ` + (servidorGuardo ? 'Recuento guardado por el servidor' : 'Guardando recuento + TXTs'));
                     stageTimings.t_saveResultsStart = performance.now();
                     try {
                         let _txtLocal = false, _excelLocal = false;
                         if (!servidorGuardo) _txtLocal = await escribirTxtsLocalesDeRecuento(job, res, ctx.sourceLang);
-                        _excelLocal = await escribirExcelLocalDeRecuento(job, res, initialFileSettings);
+                        // v3.10.80: el _RECUENTO.xlsx lo genera el servidor; en modo local sin
+                        // carpeta en Drive llega en base64 y se escribe aquí
+                        if (servidorGuardo) _excelLocal = await escribirRecuentoXlsxLocal(await handleLocalDeTrabajo(job), claudeResult);
                         if (!servidorGuardo) {
                             const _fhLocal = await handleLocalDeTrabajo(job);
                             const saveData = await apiPost({
@@ -9763,12 +9773,13 @@
                                 sourceLang: ctx.sourceLang, fileSettings: initialFileSettings, countId: pr.countId
                             });
                             if (!saveData.success) { console.warn('saveWordCountResults: el backend reportó fallo', saveData); prodLogError(job.k('save'), saveData.error || 'el backend reportó fallo'); }
-                            else prodLogDone(job.k('save'), 'OK' + (_txtLocal ? ' · TXT en local' : '') + (_excelLocal ? ' · ficha Excel en local' : ''));
+                            else { _excelLocal = await escribirRecuentoXlsxLocal(_fhLocal, saveData); prodLogDone(job.k('save'), 'OK' + (_txtLocal ? ' · TXT en local' : '') + (_excelLocal ? ' · _RECUENTO.xlsx en local' : '')); }
                             if (saveData._timings && saveData._timings.totalMs) stageTimings.backendSaveResultsMs = saveData._timings.totalMs;
                         } else {
                             prodLogDone(job.k('save'), 'hoja' +
                                 (claudeResult.txtsInDrive ? ' + TXT en Drive' : (claudeResult.txtsPendientes ? ' · TXT en espera de la carpeta' : '')) +
-                                ' (por el servidor)' + (_excelLocal ? ' · ficha Excel en local' : ''));
+                                (claudeResult.recuentoGuardadoEn === 'carpeta' ? ' + _RECUENTO.xlsx en Drive' : '') +
+                                ' (por el servidor)' + (_excelLocal ? ' · _RECUENTO.xlsx en local' : ''));
                             // v3.10.59: el servidor guarda los ajustes derivados de los
                             // archivos (sin los recuentos manuales ✎): reponerlos
                             if (hayAjustesManuales(initialFileSettings)) await guardarAjustesArchivos(job, initialFileSettings, 'tras el recuento');
@@ -10445,31 +10456,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             return { ok: true, res: res, countId: countId, perdida: false };
         }
 
-        // Ficha Excel _RECUENTO_<id>.xlsx en la carpeta local (si la hay). Los
-        // TXT y _RECUENTO.txt los escribe el servidor en Drive; Drive Desktop
-        // los baja. Nunca se escribe con un análisis vacío.
-        async function escribirExcelLocalDeRecuento(job, res, fileSettingsExtra) {
-            if (!res || !Array.isArray(res.analysis) || res.analysis.length === 0) return false;
-            const fh = await handleLocalDeTrabajo(job);
-            if (!fh) return false;
-            try {
-                const bExcel = esAbierto(job)
-                    ? Object.assign({}, budgetData, { fileAnalysis: res.analysis, fileSettings: Object.assign({}, budgetData.fileSettings || {}, fileSettingsExtra || {}), wordCount: res.totalWords, pageCount: res.totalPages, countMethodUsed: res.countMethodUsed })
-                    : presupuestoDelTrabajo(job, res);
-                // v3.10.58: con tope de tiempo; si ExcelJS (CDN) no carga, el
-                // recuento se aplica igual y solo falta la ficha.
-                const wb = await Promise.race([
-                    construirRecuentoWorkbook({ budget: bExcel }),
-                    new Promise((_, rej) => setTimeout(() => rej(new Error('ficha Excel: tiempo agotado (45 s)')), 45000))
-                ]);
-                const buffer = await wb.xlsx.writeBuffer();
-                await writeLocalBinaryFile(fh, nombreRecuentoExcel(null, job.budgetId),
-                    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-                return true;
-            } catch (eX) { console.warn('Ficha Excel local:', eX); return false; }
-        }
-        // TXT + _RECUENTO.txt en local: SOLO cuando el servidor no los ha
-        // escrito él (Apps Script anterior a 3.7.90, que devuelve el texto).
+        // (v3.10.80: la ficha Excel local con la cotización y las tarifas,
+        // _RECUENTO_<id>.xlsx, desaparece: el único Excel es el _RECUENTO.xlsx
+        // del servidor, sin precios, válido para los traductores.)
+        // TXT por archivo en local: SOLO cuando el servidor no los ha escrito
+        // él (Apps Script anterior a 3.7.90, que devuelve el texto).
         async function escribirTxtsLocalesDeRecuento(job, res, sourceLang) {
             if (!res || !Array.isArray(res.analysis) || res.analysis.length === 0) return false;
             const fh = await handleLocalDeTrabajo(job);
@@ -10478,12 +10469,6 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 for (const item of res.analysis) {
                     if (item.extractedText) await writeLocalTextFile(fh, item.fileName + '.txt', item.extractedText);
                 }
-                let tsv = 'Presupuesto\t' + job.budgetId + '\nIdioma origen\t' + sourceLang +
-                    '\nMetodo de recuento\t' + countMethodLabel(res.countMethodUsed || countMethod(), sourceLang) +
-                    '\nFecha\t' + new Date().toLocaleString('es-ES') + '\n\nArchivo\tPalabras\n';
-                res.analysis.forEach(f => { tsv += f.fileName + '\t' + f.words + '\n'; });
-                tsv += 'TOTAL\t' + res.totalWords + '\n';
-                await writeLocalTextFile(fh, '_RECUENTO.txt', tsv);
                 return true;
             } catch (eTxt) { console.warn('TXTs locales:', eTxt); return false; }
         }
@@ -10600,9 +10585,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                             sourceLang: ctx.sourceLang, fileSettings: ctx.fileSettings || {}, countId: pr.countId
                         });
                         if (!saveData.success) prodLogError(job.k('save'), saveData.error || 'el backend reportó fallo');
+                        else await escribirRecuentoXlsxLocal(fhL, saveData);   // v3.10.80
                     } catch (eS) { prodLogError(job.k('save'), (eS && eS.message) || 'fallo al guardar'); }
+                } else {
+                    try { await escribirRecuentoXlsxLocal(await handleLocalDeTrabajo(job), data); } catch (eLoc) { console.warn('_RECUENTO.xlsx local:', eLoc); }   // v3.10.80
                 }
-                try { await escribirExcelLocalDeRecuento(job, res, null); } catch (eLoc) { console.warn('Copia local del recuento:', eLoc); }
                 aplicarResultadoRecuento(job, res, { prefijo: data._recovered ? '✓ Recuento recuperado de la hoja · ' : '✓ Análisis completado · ', metodo: true, refrescarPresupuesto: true });
                 if (esAbierto(job) && !opts.desdeCreacion && (res.failedPages || []).length === 0 && res.totalWords > 0 && !formatOtrosIdiomas(res.otrosIdiomas)) {
                     showSuccess(`Análisis completado · ${res.totalWords} palabras · ${res.totalPages} páginas`, ctx.budgetId);
@@ -11255,7 +11242,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 const hayRecuento = hayRecuentoParaAdjuntar();
                 const extras = [];
                 if (hayRecuento && casillaMarcada('enviarExtracciones')) { const n = (budgetData.fileAnalysis || []).filter(a => a && a.fileName).length; extras.push('📝 extracciones en .txt' + (n ? ' (' + n + ')' : '')); }
-                if (hayRecuento && casillaMarcada('enviarRecuento')) extras.push('📊 _RECUENTO.txt (sin la línea del método)');
+                if (hayRecuento && casillaMarcada('enviarRecuento')) extras.push('📊 _RECUENTO.xlsx');
                 const extrasHtml = extras.length
                     ? `<div style="margin-top:4px; font-size:0.85rem; color:#475569; font-weight:normal;">+ ${extras.join(' · ')}</div>`
                     : (hayRecuento
@@ -11267,7 +11254,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                         ${notaHtml}
                         <ul style="margin:6px 0 0 20px; padding:0; font-size:0.85rem; color:#475569; font-weight:normal;">${filesList}</ul>
                         ${extrasHtml}
-                        <div style="margin-top:4px; font-size:0.78rem; color:#94a3b8; font-weight:normal;">Los _RECUENTO_*.xlsx (con tarifas al cliente), .docx de notas y archivos "_" no se envían nunca.</div>
+                        <div style="margin-top:4px; font-size:0.78rem; color:#94a3b8; font-weight:normal;">Los .docx de notas y los archivos "_" (salvo _RECUENTO.xlsx) no se envían nunca.</div>
                     </div>
                 `;
             } else {
@@ -11465,7 +11452,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     if (ultimosAdjuntos.extracciones) partes.push(ultimosAdjuntos.extracciones + (ultimosAdjuntos.extracciones === 1 ? ' extracción' : ' extracciones'));
                     if (ultimosAdjuntos.recuento) partes.push('recuento');
                     texto += ' · adjuntos: ' + partes.join(' + ');
-                    if (ctx.enviarRecuento === true && !ultimosAdjuntos.recuento) texto += ' · ⚠️ no había _RECUENTO.txt en Drive';
+                    if (ctx.enviarRecuento === true && !ultimosAdjuntos.recuento) texto += ' · ⚠️ no se pudo adjuntar _RECUENTO.xlsx';
                 }
                 if (fallidos.length) texto += ' · ⚠️ no salieron: ' + fallidos.join(' · ');
                 job.resultado = { texto: texto };
@@ -11852,461 +11839,97 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             updateClientMessage();
         }
 
-        // ====== v3.8.9: RECUENTO EN EXCEL (bajo demanda) ======
-        // Se genera al pulsar el botón, no en cada análisis: cero coste en el
-        // camino crítico. Un único generador para modo local y modo Drive,
-        // alimentado por budgetData.fileAnalysis (que al retomar una cotización
-        // viene de la hoja, así que también funciona con presupuestos antiguos).
-        // ExcelJS y no SheetJS porque la versión gratuita de SheetJS no aplica
-        // estilos de celda: sin ella el Excel saldría en blanco y negro.
-        let _exceljsPromise = null;
-        function loadExcelJs() {
-            if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
-            if (_exceljsPromise) return _exceljsPromise;
-            _exceljsPromise = new Promise((resolve, reject) => {
-                const sc = document.createElement('script');
-                sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
-                sc.onload = () => window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error('ExcelJS no se cargó'));
-                sc.onerror = () => reject(new Error('No se pudo descargar ExcelJS (¿sin conexión?)'));
-                document.head.appendChild(sc);
-            });
-            return _exceljsPromise;
-        }
+        // ====== v3.10.80: _RECUENTO.xlsx (lo genera el Apps Script 3.7.103) ======
+        // Un solo Excel por presupuesto, sin precios ni mención al método: el
+        // mismo que se adjunta a los traductores con "Enviar recuento". Lo
+        // genera el servidor al subir los archivos (archivos y páginas), en cada
+        // recuento (con las palabras) y al cambiar los ajustes ⚙ de los archivos.
+        // Si la carpeta ya está en Drive lo deja allí (Drive Desktop lo baja); si
+        // no (modo local recién creado), llega en base64 y se escribe aquí.
+        // Hasta la 3.10.79 el navegador generaba con ExcelJS una ficha
+        // _RECUENTO_<id>.xlsx con la cotización y las tarifas: eliminada.
+        const RECUENTO_XLSX_NOMBRE = '_RECUENTO.xlsx';
+        const RECUENTO_XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-        const XL_AZUL = 'FF1E5AA8';      // cabeceras
-        const XL_AZUL_CLARO = 'FFEFF6FF';
-        const XL_GRIS = 'FFF1F5F9';
-        const XL_AMBAR = 'FFFEF3C7';
-
-        function _xlTituloFila(ws, fila, texto, ancho) {
-            const c = ws.getCell(fila, 1);
-            c.value = texto;
-            c.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
-            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AZUL } };
-            c.alignment = { vertical: 'middle' };
-            ws.mergeCells(fila, 1, fila, ancho);
-            ws.getRow(fila).height = 22;
-        }
-
-        function _xlCabecera(ws, fila, valores) {
-            valores.forEach((v, i) => {
-                const c = ws.getCell(fila, i + 1);
-                c.value = v;
-                c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AZUL } };
-                c.alignment = { vertical: 'middle', wrapText: true };
-                c.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
-            });
-            ws.getRow(fila).height = 20;
-        }
-
-        // v3.9.0: el Excel deja de ser solo un recuento y pasa a ser la FICHA
-        // COMPLETA de la cotización: es el documento que se consulta meses
-        // después, cuando el pedido llega sin las condiciones que se pactaron
-        // al presupuestar (ej. "de este PDF de 4 páginas solo se traduce la 1").
-        async function construirRecuentoWorkbook(opts) {
-            opts = opts || {};
-            // v3.10.54: puede construirse para un presupuesto que NO está abierto
-            // (trabajo terminado en segundo plano): opts.budget en lugar del global
-            const _b = opts.budget || budgetData;
-            const ExcelJS = await loadExcelJs();
-            const wb = new ExcelJS.Workbook();
-            wb.creator = 'Tradutema QUOTES';
-            wb.created = new Date();
-
-            const settings = _b.fileSettings || {};
-            const archivos = (_b.fileAnalysis || []).map(f => {
-                const nombre = f.fileName || f.name || '';
-                const st = settings[nombre] || {};
-                return {
-                    nombre: nombre,
-                    palabras: parseInt(f.words) || 0,
-                    paginas: parseInt(f.pages) || 0,          // páginas contabilizadas
-                    paginasTotal: parseInt(f.totalPages || f.pagesTotal) || null,
-                    filtro: (st.pagesFilter || '').trim(),
-                    instrucciones: (st.instructions || '').trim(),
-                    otros: f.otrosIdiomas || {}
-                };
-            });
-            const totalPal = archivos.reduce((s, f) => s + f.palabras, 0);
-            const totalPag = archivos.reduce((s, f) => s + f.paginas, 0);
-
-            const otrosGlobal = {};
-            archivos.forEach(f => {
-                Object.keys(f.otros || {}).forEach(k => {
-                    otrosGlobal[k] = (otrosGlobal[k] || 0) + (f.otros[k] || 0);
-                });
-            });
-            const totalOtros = Object.keys(otrosGlobal).reduce((s, k) => s + otrosGlobal[k], 0);
-
-            const hayFiltros = archivos.some(f => f.filtro || f.instrucciones);
-
-            // ══════════ Hoja 1: Cotización ══════════
-            const wc = wb.addWorksheet('Cotización', {
-                pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
-            });
-            wc.columns = [{ width: 30 }, { width: 78 }];
-            _xlTituloFila(wc, 1, 'COTIZACIÓN ' + (_b.id || '') +
-                (opts.esEnvio ? '  ·  VERSIÓN v' + opts.version + ' (ENVIADA AL CLIENTE)' : '  ·  estado actual'), 2);
-
-            let fc = 3;
-            const _dato = (etiqueta, valor, destacar) => {
-                const a = wc.getCell(fc, 1), b = wc.getCell(fc, 2);
-                a.value = etiqueta;
-                a.font = { bold: true, color: { argb: 'FF475569' } };
-                a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_GRIS } };
-                a.alignment = { vertical: 'top' };
-                b.value = (valor === null || valor === undefined || valor === '') ? '—' : valor;
-                b.alignment = { wrapText: true, vertical: 'top' };
-                if (destacar) b.font = { bold: true };
-                fc++;
-            };
-            const _seccion = (texto) => {
-                fc++;
-                const c = wc.getCell(fc, 1);
-                c.value = texto;
-                c.font = { bold: true, size: 11, color: { argb: XL_AZUL } };
-                c.border = { bottom: { style: 'thin', color: { argb: XL_AZUL } } };
-                wc.mergeCells(fc, 1, fc, 2);
-                fc++;
-            };
-
-            _dato('Presupuesto', _b.id || '');
-            if (opts.esEnvio) {
-                _dato('Versión', 'v' + opts.version + ' — enviada por ' + (opts.canal || 'cliente'), true);
-                _dato('Enviada el', new Date().toLocaleString('es-ES'), true);
-            } else {
-                _dato('Versión', 'Estado actual (no es una copia enviada)');
-            }
-            _dato('Estado', _b.estado || '');
-            _dato('Idiomas', (_b.sourceLang || '') + ' → ' + (_b.targetLang || ''), true);
-            _dato('Contacto', _b.clientEmail || _b.clientWhatsApp || '');
-            _dato('Nº de pedido', _b.numeroPedido || '(sin pedido asociado)');
-            _dato('Generado el', new Date().toLocaleString('es-ES'));
-
-            _seccion('PRECIO');
-            const cfg = _b.quoteConfig || null;
-            _dato('Método de cálculo', (cfg && (CALC_METHOD_LABELS[cfg.method] || CALC_METHOD_LABELS_LEGACY[cfg.method])) || CALC_METHOD_LABELS[currentCalcMethod] || '');
-            _dato('Palabras contabilizadas', totalPal, true);
-            _dato('Páginas contabilizadas', totalPag, true);
-            const _v = id => { const e = document.getElementById(id); return e ? e.value : ''; };
-            _dato('Páginas totales (al cliente)', _v('quoteTotalPages'));
-            _dato('Páginas a traducir', _v('quotePagesToTranslate'));
-            _dato('Tarifa', _b.savedQuoteRate || _b.savedQuotePricePerWord || _v('directTariffPerWord') || '');
-            _dato('Importe', _b.savedQuoteTotal ? _b.savedQuoteTotal + ' €' : (_v('quoteAmountPages') || ''), true);
-            _dato('Plazo', (() => { const p = (_b.savedQuoteDays !== '' && _b.savedQuoteDays != null) ? _b.savedQuoteDays : _v('quoteDays'); return esPlazoEnElDia(p) ? 'en el día' : ((p || '') + ' días'); })());   // v3.10.67
-            _dato('Recargo urgencia', _v('quoteUrgency') || _b.savedUrgency || '');
-            if (cfg && cfg.method === 'provider' && cfg.providerName) {
-                _dato('Proveedor cotizado', cfg.providerName + (cfg.providerQuote ? ' · ' + cfg.providerQuote : ''));
-            }
-
-            _seccion('CONDICIONES ACORDADAS  ⚠ leer antes de producir');
-            _dato('Notas e instrucciones', (document.getElementById('internalComments') || {}).value || _b.internalComments || '');
-            _dato('Comentarios a proveedores', (document.getElementById('providerComments') || {}).value || '');
-            if (hayFiltros) {
-                _dato('Restricciones por archivo', 'SÍ — ver la columna "Páginas a traducir" en la hoja Recuento');
-                const av = wc.getCell(fc, 1);
-                av.value = '⚠ Esta cotización NO cubre los documentos completos: hay archivos de los que solo se presupuestaron algunas páginas. Revisa el detalle antes de traducir.';
-                av.alignment = { wrapText: true, vertical: 'top' };
-                av.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AMBAR } };
-                av.font = { bold: true, color: { argb: 'FF78350F' } };
-                wc.mergeCells(fc, 1, fc + 1, 2);
-                wc.getRow(fc).height = 28;
-                fc += 3;
-            } else {
-                _dato('Restricciones por archivo', 'No — se presupuestaron los documentos completos');
-            }
-            if (totalOtros > 0) {
-                _dato('Otros idiomas NO incluidos',
-                    'Aprox. ' + totalOtros.toLocaleString('es-ES') + ' palabras en ' +
-                    Object.keys(otrosGlobal).filter(k => otrosGlobal[k] > 0).join(', ') +
-                    ' quedan FUERA de este presupuesto.');
-            }
-
-            _seccion('MENSAJE ENVIADO AL CLIENTE');
-            _dato('Texto', (document.getElementById('clientMessage') || {}).value || _b.savedClientMessage || '');
-
-            // ══════════ Hoja 2: Recuento ══════════
-            const ws = wb.addWorksheet('Recuento', {
-                views: [{ state: 'frozen', ySplit: 8 }],
-                pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
-            });
-            ws.columns = [
-                { width: 46 }, { width: 10 }, { width: 12 }, { width: 15 }, { width: 28 }, { width: 34 }
-            ];
-
-            _xlTituloFila(ws, 1, 'RECUENTO DE PALABRAS · ' + (_b.id || '') +
-                (opts.esEnvio ? '  ·  v' + opts.version : ''), 6);
-            const meta = [
-                ['Presupuesto', _b.id || ''],
-                ['Idiomas', (_b.sourceLang || '') + ' → ' + (_b.targetLang || '')],
-                ['Método de recuento', countMethodLabel(_b.countMethodUsed || countMethod(), _b.sourceLang)],
-                ['Fecha', new Date().toLocaleString('es-ES')],
-                ['Contacto', _b.clientEmail || '']
-            ];
-            meta.forEach((par, i) => {
-                const fila = 2 + i;
-                const a = ws.getCell(fila, 1), b = ws.getCell(fila, 2);
-                a.value = par[0];
-                a.font = { bold: true, color: { argb: 'FF475569' } };
-                a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_GRIS } };
-                b.value = par[1];
-                ws.mergeCells(fila, 2, fila, 6);
-            });
-
-            _xlCabecera(ws, 8, ['Archivo', 'Palabras', 'Págs. contab.', 'Págs. a traducir',
-                                'Instrucciones para este archivo', 'Otros idiomas (no contabilizados)']);
-
-            let fila = 9;
-            archivos.forEach((f, idx) => {
-                const r = ws.getRow(fila);
-                r.getCell(1).value = f.nombre;
-                r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-                r.getCell(2).value = f.palabras;
-                r.getCell(2).numFmt = '#,##0';
-                r.getCell(3).value = f.paginas;
-                r.getCell(4).value = f.filtro ? ('Solo ' + f.filtro) : 'Todas';
-                r.getCell(4).alignment = { vertical: 'top' };
-                r.getCell(5).value = f.instrucciones;
-                r.getCell(5).alignment = { wrapText: true, vertical: 'top' };
-                const txtOtros = Object.keys(f.otros || {})
-                    .filter(k => f.otros[k] > 0)
-                    .sort((a, b) => f.otros[b] - f.otros[a])
-                    .map(k => `${k}: ~${f.otros[k]}`)
-                    .join(', ');
-                r.getCell(6).value = txtOtros;
-                r.getCell(6).alignment = { wrapText: true, vertical: 'top' };
-                // Resaltar en ámbar los archivos que NO se traducen enteros
-                if (f.filtro) {
-                    for (let c = 1; c <= 6; c++) {
-                        r.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AMBAR } };
-                    }
-                    r.getCell(4).font = { bold: true, color: { argb: 'FF78350F' } };
-                } else if (idx % 2 === 1) {
-                    for (let c = 1; c <= 6; c++) {
-                        r.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AZUL_CLARO } };
-                    }
-                }
-                fila++;
-            });
-
-            const rt = ws.getRow(fila);
-            rt.getCell(1).value = 'TOTAL';
-            rt.getCell(2).value = totalPal;
-            rt.getCell(2).numFmt = '#,##0';
-            rt.getCell(3).value = totalPag;
-            for (let c = 1; c <= 6; c++) {
-                rt.getCell(c).font = { bold: true };
-                rt.getCell(c).border = { top: { style: 'medium', color: { argb: XL_AZUL } } };
-            }
-            fila += 2;
-
-            if (totalOtros > 0) {
-                const ra = ws.getCell(fila, 1);
-                ra.value = 'El total de arriba cuenta SOLO las palabras en ' + (_b.sourceLang || 'el idioma origen') +
-                           '. El documento contiene además unas ' + totalOtros.toLocaleString('es-ES') +
-                           ' palabras en otros idiomas, que NO están incluidas en este recuento ni en el precio.';
-                ra.alignment = { wrapText: true, vertical: 'top' };
-                ra.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_AMBAR } };
-                ra.font = { color: { argb: 'FF78350F' } };
-                ws.mergeCells(fila, 1, fila + 1, 6);
-                ws.getRow(fila).height = 30;
-                fila += 3;
-
-                _xlCabecera(ws, fila, ['Idioma detectado', 'Palabras aprox.', '', '', '', '']);
-                fila++;
-                Object.keys(otrosGlobal)
-                    .filter(k => otrosGlobal[k] > 0)
-                    .sort((a, b) => otrosGlobal[b] - otrosGlobal[a])
-                    .forEach(k => {
-                        ws.getCell(fila, 1).value = k;
-                        ws.getCell(fila, 2).value = otrosGlobal[k];
-                        ws.getCell(fila, 2).numFmt = '#,##0';
-                        fila++;
-                    });
-                const rn = ws.getCell(fila, 1);
-                rn.value = 'Cifras aproximadas: las estima el modelo sin transcribir ese texto. Sirven para decidir, no para facturar.';
-                rn.font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
-                ws.mergeCells(fila, 1, fila, 6);
-            }
-
-            return wb;
-        }
-
-        function nombreRecuentoExcel(version, id) {
-            const base = '_RECUENTO_' + (id || budgetData.id || 'presupuesto');
-            return version ? (base + '_v' + version + '.xlsx') : (base + '.xlsx');
-        }
-
-        // ====== v3.9.2: VERSIONADO POR ENVÍO ======
-        // El archivo sin sufijo es el ESTADO ACTUAL: se reescribe con cada
-        // análisis y cada guardado. Los _v1, _v2... son fotos de lo que
-        // REALMENTE se mandó al cliente y no se tocan nunca más: si se
-        // reescribieran, el rastro no serviría de nada.
-        //
-        // El número se deduce leyendo la carpeta, no de un contador guardado:
-        // si borras o mueves archivos a mano, la numeración sigue siendo
-        // coherente con lo que hay en disco.
-        async function siguienteVersionRecuento(folderHandle) {
-            const base = '_RECUENTO_' + (budgetData.id || 'presupuesto') + '_v';
-            let max = 0;
+        // Escribe el Excel en la carpeta local SOLO si el servidor no pudo
+        // dejarlo en Drive (si está en Drive, Drive Desktop lo baja y escribirlo
+        // también aquí acabaría en dos copias).
+        async function escribirRecuentoXlsxLocal(fh, r) {
+            if (!fh || !r || !r.recuentoXlsxBase64) return false;
+            if (r.recuentoGuardadoEn === 'carpeta' || r.guardadoEn === 'carpeta') return false;
             try {
-                for await (const [nombre] of folderHandle.entries()) {
-                    if (!nombre.startsWith(base) || !nombre.endsWith('.xlsx')) continue;
-                    const n = parseInt(nombre.slice(base.length, -5), 10);
-                    if (!isNaN(n) && n > max) max = n;
-                }
-            } catch (e) {
-                console.warn('No se pudo listar la carpeta para versionar:', e);
-            }
-            return max + 1;
-        }
-
-        // Huella del contenido presupuestado. Sirve para no crear una versión
-        // nueva cuando el mismo presupuesto se manda por dos canales seguidos
-        // (copiar a WhatsApp y luego a Email es UN envío, no dos).
-        function huellaCotizacion() {
-            const _v = id => { const e = document.getElementById(id); return e ? String(e.value || '') : ''; };
-            return [
-                budgetData.wordCount || 0,
-                budgetData.pageCount || 0,
-                _v('quoteTotalPages'), _v('quotePagesToTranslate'),
-                _v('quoteDays'), _v('quoteUrgency'),
-                getQuoteAmount ? (getQuoteAmount() || '') : '',
-                currentCalcMethod || '',
-                (document.getElementById('clientMessageEdit') || {}).value || '',
-                (document.getElementById('internalComments') || {}).value || '',
-                JSON.stringify(budgetData.fileSettings || {})
-            ].join('¦');
-        }
-
-        function _claveVersion() { return 'tradutema_recuento_ver_' + (budgetData.id || ''); }
-
-        function leerUltimaVersion() {
-            try { return JSON.parse(localStorage.getItem(_claveVersion()) || 'null'); } catch (e) { return null; }
-        }
-        function guardarUltimaVersion(obj) {
-            try { localStorage.setItem(_claveVersion(), JSON.stringify(obj)); } catch (e) {}
-        }
-
-        // Llamado al enviar o copiar el presupuesto al cliente. No bloquea: el
-        // usuario ya tiene su mensaje en el portapapeles o enviado.
-        async function versionarRecuentoAlEnviar(canal) {
-            try {
-                if (!budgetData.id) return;
-                if (!Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) return;
-                const fh = await handleLocalDelPresupuesto(false);   // v3.9.8
-                if (!fh) {
-                    console.log('Recuento: sin carpeta local para ' + budgetData.id +
-                                ' — no se versiona (canal: ' + canal + ').');
-                    return;
-                }
-
-                const huella = huellaCotizacion();
-                const ultima = leerUltimaVersion();
-                if (ultima && ultima.huella === huella) {
-                    console.log('Recuento: la cotización no ha cambiado desde la v' + ultima.n +
-                                ' — no se crea versión nueva (canal: ' + canal + ')');
-                    return;
-                }
-
-                const n = await siguienteVersionRecuento(fh);
-                const wb = await construirRecuentoWorkbook({ version: n, canal: canal, esEnvio: true });
-                const buffer = await wb.xlsx.writeBuffer();
-                const blob = new Blob([buffer], {
-                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                });
-                await writeLocalBinaryFile(fh, nombreRecuentoExcel(n), blob);
-                guardarUltimaVersion({ n: n, huella: huella, fecha: new Date().toISOString(), canal: canal });
-                console.log('Recuento: creada versión v' + n + ' (' + canal + ')');
-                showStatus('📊 Guardada la versión v' + n + ' del presupuesto en la carpeta', 'success');
-                setTimeout(hideStatus, 3500);
-            } catch (e) {
-                console.warn('No se pudo versionar la ficha Excel:', e);
-            }
-        }
-
-        // v3.9.1: escribe la ficha en la carpeta local del presupuesto, en
-        // silencio. PRODUCTION ya tiene un enlace a esa carpeta, así que con
-        // dejar el archivo ahí queda consultable desde la otra aplicación sin
-        // ninguna integración nueva. Nunca interrumpe: si falla, solo avisa por
-        // consola — no es aceptable que un fallo escribiendo un informe rompa
-        // el guardado del presupuesto.
-        async function escribirRecuentoExcelLocal(motivo) {
-            try {
-                if (!budgetData.id) return false;
-                if (!Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) return false;
-                const fh = await handleLocalDelPresupuesto(false);   // v3.9.8
-                if (!fh) {
-                    console.log('Ficha Excel: sin carpeta local para ' + budgetData.id +
-                                ' — no se escribe (' + (motivo || '') + ').');
-                    return false;
-                }
-                const wb = await construirRecuentoWorkbook();
-                const buffer = await wb.xlsx.writeBuffer();
-                const blob = new Blob([buffer], {
-                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                });
-                await writeLocalBinaryFile(fh, nombreRecuentoExcel(), blob);
-                console.log('Ficha Excel actualizada en la carpeta local (' + (motivo || '') + ')');
+                const bytes = _b64ToBytes(r.recuentoXlsxBase64);
+                if (!bytes || !bytes.length) return false;
+                await writeLocalBinaryFile(fh, RECUENTO_XLSX_NOMBRE, new Blob([bytes], { type: RECUENTO_XLSX_MIME }));
                 return true;
-            } catch (e) {
-                console.warn('No se pudo escribir la ficha Excel en local:', e);
-                return false;
-            }
+            } catch (e) { console.warn('_RECUENTO.xlsx local:', e); return false; }
         }
 
-        // Botón 📊: genera y entrega el Excel. En modo local lo escribe también
-        // en la carpeta del presupuesto, para que quede junto a los TXT.
-        async function abrirRecuentoExcel() {
-            if (!budgetData.id || !Array.isArray(budgetData.fileAnalysis) || budgetData.fileAnalysis.length === 0) {
-                showStatus('Este presupuesto todavía no tiene recuento. Analiza los documentos primero.', 'warning');
-                setTimeout(hideStatus, 4000);
-                return;
-            }
-            const btn = document.getElementById('hdrBtnRecuento');
-            const original = btn ? btn.innerHTML : '';
-            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generando...'; }
+        // Documentos del presupuesto abierto con sus páginas, para el Excel
+        function archivosParaRecuento(lista) {
+            const out = (lista || budgetData.folderFiles || [])
+                .filter(f => f && f.name && !/^_|\.(txt|xlsx?|xlsm|csv|ods|docx?)$/i.test(f.name))
+                .map(f => ({ nombre: f.name, paginas: parseInt(f.pages) || 0 }));
+            return out.length ? out : null;
+        }
+
+        // Tras subir (o escribir en local) los archivos de un presupuesto nuevo
+        async function generarRecuentoXlsxTrasSubida(job, files, folderResult, pGuardarAjustes) {
+            if (!job || !job.budgetId || !files || !files.length) return false;
+            try { if (pGuardarAjustes) await pGuardarAjustes; } catch (e) {}
+            const k = job.k('recuento-xlsx');
+            prodLogStart(k, `${job.budgetId} · _RECUENTO.xlsx (archivos y páginas)`);
             try {
-                const wb = await construirRecuentoWorkbook();
-                const buffer = await wb.xlsx.writeBuffer();
-                const blob = new Blob([buffer], {
-                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                });
-                const nombre = nombreRecuentoExcel();
+                const fh = (job.bg && job.bg.localFolderHandle) || null;
+                const r = await apiPost({
+                    action: 'generarRecuento', budgetId: job.budgetId,
+                    folderId: job.folderId || (folderResult && folderResult.folderId) || '',
+                    archivos: files.map(f => ({ nombre: f.name, paginas: parseInt(f.pages) || 0 })),
+                    base64: !!fh
+                }, { retry: false, timeoutMs: 60000 });
+                if (!r || !r.success) { prodLogError(k, (r && r.error) || 'sin respuesta'); return false; }
+                const local = await escribirRecuentoXlsxLocal(fh, r);
+                prodLogDone(k, (r.guardadoEn === 'carpeta' ? 'en Drive' : 'sin carpeta en Drive todavía') + (local ? ' · copia local' : '') + ' · ' + (r.archivos || 0) + ' archivo(s)');
+                return true;
+            } catch (e) { prodLogError(k, (e && e.message) || String(e)); return false; }
+        }
 
-                // Modo local: dejarlo también en la carpeta del presupuesto
-                let guardadoLocal = false;
-                const _fhExcel = await handleLocalDelPresupuesto(true);   // v3.9.8
-                if (_fhExcel && typeof writeLocalBinaryFile === 'function') {
-                    try {
-                        await writeLocalBinaryFile(_fhExcel, nombre, blob);
-                        guardadoLocal = true;
-                    } catch (eLoc) {
-                        console.warn('No se pudo escribir el Excel en la carpeta local:', eLoc);
-                    }
-                }
+        // A petición (botón 📊): rehace el Excel del presupuesto abierto y lo devuelve
+        async function regenerarRecuentoXlsx(opts) {
+            if (!budgetData.id) return null;
+            let fh = null;
+            try { fh = await handleLocalDelPresupuesto(false); } catch (e) {}
+            const r = await apiPost({
+                action: 'generarRecuento', budgetId: budgetData.id, folderId: budgetData.folderId || '',
+                archivos: archivosParaRecuento(), base64: !!fh || !!(opts && opts.base64)
+            }, { retry: false, timeoutMs: 60000 });
+            if (!r || !r.success) throw new Error((r && r.error) || 'sin respuesta del servidor');
+            await escribirRecuentoXlsxLocal(fh, r);
+            return r;
+        }
 
-                const url = URL.createObjectURL(blob);
+        // Botón 📊 Recuento de la cabecera: descarga el _RECUENTO.xlsx (y lo
+        // actualiza en Drive de paso). Funciona también sin recuento de palabras.
+        async function abrirRecuentoExcel() {
+            if (!budgetData.id) { showStatus('Abre un presupuesto primero.', 'warning'); setTimeout(hideStatus, 3000); return; }
+            const btn = document.getElementById('hdrBtnRecuento');
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Recuento'; }
+            try {
+                const r = await regenerarRecuentoXlsx({ base64: true });
+                const bytes = _b64ToBytes(r.recuentoXlsxBase64 || '');
+                if (!bytes || !bytes.length) throw new Error('el servidor no devolvió el Excel');
+                const url = URL.createObjectURL(new Blob([bytes], { type: RECUENTO_XLSX_MIME }));
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = nombre;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                setTimeout(() => URL.revokeObjectURL(url), 4000);
-
-                showStatus(guardadoLocal
-                    ? `✓ ${nombre} descargado y guardado en la carpeta del presupuesto`
-                    : `✓ ${nombre} descargado`, 'success');
-                setTimeout(hideStatus, 4000);
+                a.href = url; a.download = '_RECUENTO_' + budgetData.id + '.xlsx';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                showStatus('📊 _RECUENTO_' + budgetData.id + '.xlsx descargado' + (r.guardadoEn === 'carpeta' ? ' y actualizado en Drive' : '') +
+                    (r.conPalabras ? '' : ' · sin recuento de palabras: solo archivos y páginas'), 'success');
+                setTimeout(hideStatus, 5000);
             } catch (e) {
-                console.error('Excel de recuento:', e);
-                showStatus('No se pudo generar el Excel: ' + (e.message || e), 'error');
+                showStatus('No se pudo generar el Excel del recuento: ' + ((e && e.message) || e), 'error');
                 setTimeout(hideStatus, 6000);
-            } finally {
-                if (btn) { btn.disabled = false; btn.innerHTML = original; }
-            }
+            } finally { if (btn) { btn.disabled = false; btn.textContent = '📊 Recuento'; } }
         }
 
         // ====== v3.8.8: DESGLOSE DE OTROS IDIOMAS ======
@@ -14033,7 +13656,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
         let _casillasAdjuntosEstado = null;    // true = con recuento, false = sin, null = sin pintar
         const HINT_ADJUNTOS = {
             enviarExtracciones: '(los .txt del texto extraído de cada archivo)',
-            enviarRecuento: '(_RECUENTO.txt sin la línea del método; el Excel con tarifas no se envía nunca)'
+            enviarRecuento: '(_RECUENTO.xlsx: archivos, páginas y palabras; sin precios)'
         };
         function hayRecuentoParaAdjuntar() {
             if ((parseInt(budgetData && budgetData.wordCount) || 0) > 0) return true;
@@ -14797,10 +14420,6 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 // v3.10.66: datos básicos (contacto, notas, comentarios) + ficha
                 // y mensaje al cliente, no solo lo del paso 4
                 const res = await guardarPresupuesto();
-                // v3.9.1: la ficha Excel se regenera con cada guardado, así que
-                // lo que consulte PRODUCTION siempre refleja la última versión
-                // de la cotización (tarifa, plazo, condiciones, mensaje).
-                escribirRecuentoExcelLocal('guardado');
                 if (btn) {
                     btn.innerHTML = '✓ Guardado';
                     btn.style.background = '#16a34a';
@@ -14910,7 +14529,6 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 // portapapeles y se puede pegar; el guardado va en 2º plano.
                 showStatus('✓ Copiado (WhatsApp) — ya puedes pegarlo · guardando estado en segundo plano...', 'success');
                 _saveClientCopyBackground('whatsapp', whatsapp, 'WhatsApp', 'whatsapp');
-                versionarRecuentoAlEnviar('WhatsApp');   // v3.9.2
             } catch (error) {
                 console.error('Error en copyForWhatsApp:', error);
                 showStatus('Error: ' + error.message, 'error');
@@ -14931,7 +14549,6 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 // v3.7.98: feedback inmediato + guardado en 2º plano
                 showStatus('✓ Copiado (Email) — ya puedes pegarlo · guardando estado en segundo plano...', 'success');
                 _saveClientCopyBackground('email_copiado', email, 'Email', 'email_copiado');
-                versionarRecuentoAlEnviar('Email (copiado)');   // v3.9.2
             } catch (error) {
                 console.error('Error en copyForEmail:', error);
                 showStatus('Error: ' + error.message, 'error');
