@@ -1932,7 +1932,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.87';
+        const HTML_VERSION = '3.10.88';
         const HTML_DATE = '27/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
@@ -8948,18 +8948,32 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
         // los cortes de Apps Script. En el móvil (sin File System Access API)
         // todo sigue por Drive como siempre, sin configurar nada.
         const LOCAL_DB = 'tradutema_local';
+        // v3.10.88: caso real 27/11/2026. Tras un cierre forzado de Chrome, indexedDB.open()
+        // no contestaba (ni éxito ni error). Como «Crear carpeta» espera a leer ahí la
+        // carpeta local ANTES de hacer nada, los dos botones del paso 2 "no hacían nada"
+        // y Ajustes se quedaba en "comprobando permiso…". Ahora toda lectura del
+        // almacén y del permiso tiene un plazo: si no contesta, se sigue por Drive y se dice.
+        const LOCAL_TIMEOUT_MS = 4000;
+        let _localFalloMotivo = '';   // último motivo por el que el modo local no estuvo disponible
+        function conPlazo(promesa, ms, mensaje) {
+            let t;
+            const plazo = new Promise((_, rej) => { t = setTimeout(() => rej(new Error(mensaje)), ms); });
+            return Promise.race([promesa, plazo]).finally(() => clearTimeout(t));
+        }
 
         function localModeSupported() {
             return typeof window.showDirectoryPicker === 'function';
         }
 
         function _localDb() {
-            return new Promise((res, rej) => {
-                const rq = indexedDB.open(LOCAL_DB, 1);
+            return conPlazo(new Promise((res, rej) => {
+                let rq;
+                try { rq = indexedDB.open(LOCAL_DB, 1); } catch (e) { rej(e); return; }
                 rq.onupgradeneeded = () => rq.result.createObjectStore('handles');
                 rq.onsuccess = () => res(rq.result);
-                rq.onerror = () => rej(rq.error);
-            });
+                rq.onerror = () => rej(rq.error || new Error('IndexedDB: error al abrir'));
+                rq.onblocked = () => rej(new Error('el almacén del navegador está bloqueado por otra pestaña de la app'));
+            }), LOCAL_TIMEOUT_MS, 'el almacén del navegador (IndexedDB) no responde');
         }
 
         async function saveLocalDirHandle(handle) {
@@ -8974,13 +8988,19 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
         async function getLocalDirHandle() {
             try {
                 const db = await _localDb();
-                return await new Promise((res, rej) => {
+                const h = await conPlazo(new Promise((res, rej) => {
                     const tx = db.transaction('handles', 'readonly');
                     const rq = tx.objectStore('handles').get('presupuestosDir');
                     rq.onsuccess = () => res(rq.result || null);
-                    rq.onerror = () => rej(rq.error);
-                });
-            } catch (e) { return null; }
+                    rq.onerror = () => rej(rq.error || new Error('IndexedDB: error al leer'));
+                }), LOCAL_TIMEOUT_MS, 'el almacén del navegador (IndexedDB) no responde al leer');
+                _localFalloMotivo = '';
+                return h;
+            } catch (e) {
+                _localFalloMotivo = (e && e.message) || String(e);
+                console.warn('Modo local no disponible:', _localFalloMotivo);
+                return null;
+            }
         }
 
         // ¿Está el modo local operativo AHORA? (soportado + carpeta elegida + permiso)
@@ -8989,12 +9009,21 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
             const handle = await getLocalDirHandle();
             if (!handle) return null;
             try {
-                let perm = await handle.queryPermission({ mode: 'readwrite' });
+                let perm = await conPlazo(handle.queryPermission({ mode: 'readwrite' }), LOCAL_TIMEOUT_MS, 'Chrome no responde al consultar el permiso de la carpeta local');
                 if (perm !== 'granted' && interactivo) {
+                    // v3.10.88: Chrome lo pregunta en una burbuja junto a la barra de direcciones; que se sepa
+                    try { showStatus('📂 Chrome pide permiso para usar la carpeta local «' + escapeHtml(handle.name || '') + '»: acéptalo en la burbuja junto a la barra de direcciones', 'warning'); } catch (e) {}
                     perm = await handle.requestPermission({ mode: 'readwrite' });
+                    try { hideStatus(); } catch (e) {}
                 }
+                _localFalloMotivo = perm === 'granted' ? '' : 'sin permiso de Chrome para la carpeta local';
                 return perm === 'granted' ? handle : null;
-            } catch (e) { return null; }
+            } catch (e) {
+                _localFalloMotivo = (e && e.message) || String(e);
+                console.warn('Modo local no disponible:', _localFalloMotivo);
+                try { hideStatus(); } catch (e2) {}
+                return null;
+            }
         }
 
         async function chooseLocalFolder() {
@@ -9034,12 +9063,12 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
         async function estadoModoLocal() {
             if (!localModeSupported()) return { estado: 'nosoportado', nombre: '' };
             const handle = await getLocalDirHandle();
-            if (!handle) return { estado: 'sinconfigurar', nombre: '' };
+            if (!handle) return _localFalloMotivo ? { estado: 'error', nombre: '', motivo: _localFalloMotivo } : { estado: 'sinconfigurar', nombre: '' };
             try {
-                const perm = await handle.queryPermission({ mode: 'readwrite' });
+                const perm = await conPlazo(handle.queryPermission({ mode: 'readwrite' }), LOCAL_TIMEOUT_MS, 'Chrome no responde al consultar el permiso de la carpeta local');
                 return { estado: perm === 'granted' ? 'activo' : 'sinpermiso', nombre: handle.name || '' };
             } catch (e) {
-                return { estado: 'sinpermiso', nombre: handle.name || '' };
+                return { estado: 'error', nombre: handle.name || '', motivo: (e && e.message) || String(e) };
             }
         }
 
@@ -9100,7 +9129,12 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
             }
             el.innerHTML = '⏳ comprobando permiso de <b>' + escapeHtml(name) + '</b>…';
             estadoModoLocal().then(s => {
-                if (s.estado === 'activo') {
+                if (s.estado === 'error') {   // v3.10.88
+                    el.innerHTML = '⚠️ Configurada (<b>' + escapeHtml(name) + '</b>) pero <b>no se puede comprobar</b>: ' + escapeHtml(s.motivo || '') + '. ' +
+                        'Mientras tanto los presupuestos se crean en Drive. Suele arreglarse cerrando todas las pestañas de la app y reiniciando Chrome. ' +
+                        '<a href="#" onclick="updateLocalModeUI(); return false;"><b>Reintentar</b></a> · ' +
+                        '<a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>';
+                } else if (s.estado === 'activo') {
                     el.innerHTML = '✓ Activo · carpeta: <b>' + escapeHtml(s.nombre) + '</b> · <a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>';
                 } else {
                     el.innerHTML = '⚠️ Configurada (<b>' + escapeHtml(name) + '</b>) pero <b>sin permiso en esta sesión</b>: se usaría Drive. ' +
@@ -9827,6 +9861,15 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
 
         // ============ CREAR CARPETA (+ CONTAR) COMO TRABAJO ============
         async function createFolderAndContinue(withAnalysis = true) {
+            try { return await _createFolderAndContinue(withAnalysis); }
+            catch (e) {   // v3.10.88: nunca mudo
+                console.error('createFolderAndContinue:', e);
+                try { prodLogStart('crear-fallo', 'Crear carpeta'); prodLogError('crear-fallo', (e && e.message) || String(e)); } catch (e2) {}
+                showStatus('❌ No se ha podido empezar a crear la carpeta: ' + escapeHtml((e && e.message) || String(e)), 'error');
+                setTimeout(hideStatus, 10000);
+            }
+        }
+        async function _createFolderAndContinue(withAnalysis = true) {
             if (withAnalysis && uploadedFiles.length === 0) {
                 showStatus('Adjunta al menos un archivo para contar palabras (o usa "Crear carpeta")', 'warning');
                 setTimeout(hideStatus, 4000);
@@ -9844,8 +9887,25 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
             budgetData.pageCount = totalPages;
 
             // v3.10.38: el permiso de la carpeta local se resuelve AQUÍ, en el clic
-            const localHandle = await localModeReady(true);
-            const localConfigurada = !!(await getLocalDirHandle());
+            // v3.10.88: con plazo y a la vista (antes, si el almacén del navegador no contestaba,
+            // el botón se quedaba esperando para siempre sin decir nada)
+            let localHandle = null, localConfigurada = false;
+            const _nombreLocal = (function () { try { return localStorage.getItem('tradutema_local_dir_name') || ''; } catch (e) { return ''; } })();
+            try {
+                if (_nombreLocal && localModeSupported()) showStatus('📂 Comprobando la carpeta local «' + escapeHtml(_nombreLocal) + '»…', 'loading');
+                localHandle = await localModeReady(true);
+                // configurada = hay handle, o hay nombre guardado y un motivo (sin permiso / almacén caído); sin segunda lectura
+                localConfigurada = !!localHandle || (!!_nombreLocal && !!_localFalloMotivo);
+                if (_nombreLocal && localModeSupported()) hideStatus();
+            } catch (e) {
+                localHandle = null; localConfigurada = !!_nombreLocal;
+                _localFalloMotivo = (e && e.message) || String(e);
+            }
+            if (_nombreLocal && !localHandle && _localFalloMotivo && !/sin permiso/.test(_localFalloMotivo)) {
+                showStatus('⚠️ Modo local no disponible (' + escapeHtml(_localFalloMotivo) + '): este presupuesto se crea en Drive por Apps Script. ' +
+                           'Suele arreglarse cerrando todas las pestañas de la app y reiniciando Chrome.', 'warning');
+                setTimeout(hideStatus, 10000);
+            }
 
             const ctx = {
                 withAnalysis: withAnalysis,
@@ -9891,7 +9951,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
             try {
                 const totalPages = ctx.totalPages || files.reduce((sum, f) => sum + (f.pages || 1), 0);
                 const _localHandle = ctx.localHandle || null;
-                if (ctx.localConfigurada && !_localHandle && esAbierto(job)) {
+                if (ctx.localConfigurada && !_localHandle && esAbierto(job) && /sin permiso/.test(_localFalloMotivo || 'sin permiso')) {
                     showStatus('⚠️ La carpeta local está configurada pero sin permiso: este presupuesto se crea en Drive por Apps Script. ' +
                                'Para el próximo, pulsa "Reactivar carpeta local" en el paso 2.', 'warning');
                     setTimeout(hideStatus, 9000);
