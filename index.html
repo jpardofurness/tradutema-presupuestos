@@ -1062,7 +1062,7 @@
 
                 <!-- v3.7.57: formulario de alta -->
                 <div id="addProviderForm" class="hidden" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin-bottom:16px;background:#f8fafc;">
-                    <div style="font-weight:600;margin-bottom:12px;color:#0c4a6e;">➕ Nuevo traductor</div>
+                    <div style="font-weight:600;margin-bottom:12px;color:#0c4a6e;">➕ Nuevo traductor <span class="ib" data-tip="Si el email ya existe, el mínimo y los comentarios se heredan del traductor. Para añadirle más combinaciones de idiomas, mejor usa ✏️ Editar en su ficha." onclick="ibToggle(event)">i</span></div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                         <div><label style="font-size:0.8rem;color:#475569;">Nombre</label><input type="text" id="addProvNombre" class="form-control" placeholder="APELLIDOS, Nombre"></div>
                         <div><label style="font-size:0.8rem;color:#475569;">Email (id único)</label><input type="email" id="addProvEmail" class="form-control" placeholder="email@dominio.com"></div>
@@ -1072,7 +1072,6 @@
                         <div><label style="font-size:0.8rem;color:#475569;">Tarifa por palabra (€)</label><input type="text" id="addProvPalabra" class="form-control" placeholder="Ej: 0.08"></div>
                         <div style="grid-column:1 / -1;"><label style="font-size:0.8rem;color:#475569;">Comentarios</label><textarea id="addProvComentarios" class="form-control" rows="2" placeholder="Notas sobre el traductor..."></textarea></div>
                     </div>
-                    <small style="color:#64748b;font-size:11px;display:block;margin-top:6px;">Si el email ya existe, el mínimo y los comentarios se heredan del traductor. Para añadirle más combinaciones de idiomas, mejor usa ✏️ Editar en su ficha.</small>
                     <div style="display:flex;gap:8px;margin-top:12px;">
                         <button onclick="submitAddProvider()" class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;padding:8px 16px;">Guardar</button>
                         <button onclick="document.getElementById('addProviderForm').classList.add('hidden')" class="prov-btn-sm" style="background:#e2e8f0;color:#475569;border:none;padding:8px 16px;">Cancelar</button>
@@ -1586,7 +1585,7 @@
             <div class="contacted-providers-section hidden" id="contactedProvidersSection">
                 <div class="section-subtitle">
                     📋 Traductores contactados
-                    <span class="section-hint">(cotización recibida · elige el traductor)</span>
+                    <span class="ib" data-tip="Anota la cotización y el plazo que te ha dado cada traductor y marca con el círculo al que eliges: su email va a la columna Q de la hoja y su cotización sirve para el método «Cotización proveedor + margen»." onclick="ibToggle(event)">i</span>
                 </div>
                 <div class="contacted-list" id="contactedProvidersList"></div>
                 <!-- v3.10.49: retirado el bloque "Añadir como contactado / Recuperar desde Gmail"
@@ -1660,8 +1659,7 @@
                 <div class="pc-line">
                     <span>Nº palabras:</span>
                     <input type="number" id="quoteWordCount" min="0" value="0" onchange="onWordCountEdit()" style="width: 90px;">
-                    <span class="pc-dim" id="wordCountHint">(del recuento · o escríbelo a mano)</span>
-                    <span class="ib" data-tip="Un número escrito a mano vale para el presupuesto, la hoja y el _RECUENTO.xlsx. Un recuento posterior lo sustituye." onclick="ibToggle(event)">i</span>
+                    <span class="ib" id="wordCountHint" data-tip="Del recuento, o escríbelo a mano: valdrá para el presupuesto, la hoja y el _RECUENTO.xlsx." onclick="ibToggle(event)">i</span>
                     <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:#1e3a8a;margin-left:auto;">
                         <input type="checkbox" id="wordsMargen" onchange="onWordsMargenChange()" style="width:16px;height:16px;cursor:pointer;margin:0;"> Añadir margen
                         <span class="ib" data-tip="Tarifa del proveedor por palabra × palabras + margen sugerido. Sin marcar: tarifa cliente por palabra (hoja Tarifas, columna E) × palabras." onclick="ibToggle(event)">i</span>
@@ -1673,7 +1671,7 @@
                     <div class="pc-line">
                         <span>Tarifa cliente por palabra (IVA inc.):</span>
                         <input type="number" id="directTariffPerWord" step="0.001" min="0" style="width:80px;" onchange="recalculateFromDirect()">
-                        <span class="pc-dim" id="directTariffHint">(de hoja Tarifas, editable)</span>
+                        <span class="ib" id="directTariffHint" data-tip="Tarifa cliente por palabra (IVA incluido) de la hoja Tarifas, columna E. Puedes cambiarla aquí para este presupuesto." onclick="ibToggle(event)">i</span>
                         <span>→ Total cliente (IVA inc.):</span>
                         <input type="number" id="quoteAmountDirect" class="pc-tarifa" step="0.01" min="0" placeholder="0.00" onchange="updateClientMessage()">
                     </div>
@@ -1689,7 +1687,7 @@
                     <button type="button" class="btn btn-secondary btn-sm" id="referenceRateRestoreBtn"
                             onclick="restoreReferenceRate()" style="display:none; padding: 2px 8px;"
                             title="Volver a la tarifa de la hoja Tarifas">↺ hoja</button>
-                    <span class="pc-dim" id="referenceRateHint">(€/palabra, de hoja Tarifas)</span>
+                    <span class="ib" id="referenceRateHint" data-tip="Tarifa del proveedor por palabra, de la hoja Tarifas. Editable para este presupuesto." onclick="ibToggle(event)">i</span>
                     <span>Coste proveedor (sin IVA): <b id="providerCostDisplay">-</b></span>
                 </div>
                 <div class="pc-line">
@@ -1890,13 +1888,8 @@
                     <textarea id="editComentarios" class="form-control" rows="2" placeholder="Notas sobre este traductor..."></textarea>
                 </div>
 
-                <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:6px;">Combinaciones de idiomas — la tarifa por palabra y el orden son de cada par</div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:6px;">Combinaciones de idiomas <span class="ib" data-tip="La tarifa por palabra y el orden son de cada par. Los idiomas salen del catálogo de la hoja Tarifas. Cada dirección es una combinación aparte: Inglés → Español y Español → Inglés pueden tener tarifas distintas. Lo que quites aquí se borra de la hoja al guardar." onclick="ibToggle(event)">i</span></div>
                 <div id="editPairsBox" style="border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden;"></div>
-                <small style="color:#64748b;font-size:11px;display:block;margin-top:6px;">
-                    Los idiomas salen del catálogo de la hoja Tarifas. Cada dirección es una combinación
-                    aparte: Inglés → Español y Español → Inglés pueden tener tarifas distintas.
-                    Lo que quites aquí se borra de la hoja al guardar.
-                </small>
             </div>
             <div class="editor-aviso" id="editProviderAviso"></div>
             <div class="modal-footer">
@@ -1916,7 +1909,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.85';
+        const HTML_VERSION = '3.10.86';
         const HTML_DATE = '27/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
@@ -7609,7 +7602,7 @@
             html += htmlCabeceraArchivos();   // v3.10.60
             const _inventario = _inventarioPorNombre();   // v3.10.60: páginas a contar por archivo
             if (driveFiles.length > 0) {
-                html += '<div class="folder-files-note">📁 Archivos en Drive (puedes eliminar o añadir más):</div>';
+                html += '<div class="folder-files-note">📁 Archivos en Drive' + ib('Puedes eliminar o añadir más. Si copias archivos a mano en la carpeta de Drive, pulsa «Actualizar desde Drive».') + '</div>';   // v3.10.86
                 // v3.7.24: indexar análisis por nombre para mostrar palabras/páginas
                 const analysisByName = {};
                 (budgetData.fileAnalysis || []).forEach(a => {
@@ -7651,7 +7644,7 @@
             // 2) Archivos pendientes de subir
             if (pendingFiles.length > 0) {
                 if (driveFiles.length > 0) {
-                    html += '<div class="folder-files-note" style="margin-top:10px;color:#7c3aed;">⏳ Pendientes de subir (pulsa "Solo subir a Drive" para subirlos sin analizar, o "Subir y Analizar"):</div>';
+                    html += '<div class="folder-files-note" style="margin-top:10px;color:#7c3aed;">⏳ Pendientes de subir' + ib('Pulsa «Solo subir a Drive» para subirlos sin analizar, o «Subir y Analizar» para subirlos y contar las palabras.') + '</div>';   // v3.10.86
                 }
                 pendingFiles.forEach((f, i) => {
                     totalSize += f.size;
@@ -7828,8 +7821,8 @@
                 linkSync = document.createElement('div');
                 linkSync.id = 'syncDriveLink';
                 linkSync.style.cssText = 'font-size:0.8rem;color:#64748b;margin-top:8px;text-align:center;';
-                linkSync.innerHTML = '<a href="#" onclick="actualizarDesdeDrive(this); return false;" style="color:#2563eb;font-weight:600;">🔄 Actualizar desde Drive</a> ' +
-                    '<span>(si copiaste archivos a mano en la carpeta)</span>';
+                linkSync.innerHTML = '<a href="#" onclick="actualizarDesdeDrive(this); return false;" style="color:#2563eb;font-weight:600;">🔄 Actualizar desde Drive</a>' +
+                    ib('Vuelve a leer la carpeta de Drive: para cuando copias archivos a mano en ella (o los borras desde Drive).');   // v3.10.86
                 cont.parentNode.insertBefore(linkSync, cont.nextSibling);
             }
 
@@ -12272,9 +12265,15 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (!hint) return;
             const n = parseInt((document.getElementById('quoteWordCount') || {}).value, 10) || 0;
             const delRecuento = (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.words) || 0), 0);
-            if (n <= 0) hint.textContent = '(sin recuento: escríbelo a mano y valdrá para el presupuesto y la hoja)';
-            else if (budgetData.wordCountManualTotal || (delRecuento > 0 && n !== delRecuento) || delRecuento === 0) hint.textContent = '(escrito a mano: vale para el presupuesto, la hoja y el _RECUENTO.xlsx)';
-            else hint.textContent = '(del recuento)';
+            // v3.10.86: la pista va en el ⓘ; el campo se marca en ámbar cuando el número es manual
+            const esManual = n > 0 && (budgetData.wordCountManualTotal || (delRecuento > 0 && n !== delRecuento) || delRecuento === 0);
+            let tip;
+            if (n <= 0) tip = 'Sin recuento. Escribe el número de palabras a mano: valdrá para el presupuesto, la hoja y el _RECUENTO.xlsx.';
+            else if (esManual) tip = 'Escrito a mano: vale para el presupuesto, la hoja y el _RECUENTO.xlsx. Un recuento posterior lo sustituye.';
+            else tip = 'Del recuento de palabras. Si lo cambias a mano, el nuevo número vale para el presupuesto, la hoja y el _RECUENTO.xlsx.';
+            hint.setAttribute('data-tip', tip);
+            const inp = document.getElementById('quoteWordCount');
+            if (inp) inp.style.borderColor = esManual ? '#f59e0b' : '';
         }
         // v3.10.61: solo para mostrar fichas antiguas guardadas con el método retirado
         const CALC_METHOD_LABELS_LEGACY = { historical: '📊 Según tipo de documento (histórico, retirado)' };
@@ -12711,16 +12710,17 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 input.value = rate > 0 ? String(Math.round(rate * 1000) / 1000) : '';
             }
             const par = (budgetData.sourceLang || '?') + ' → ' + (budgetData.targetLang || '?');
+            // v3.10.86: la pista va en el ⓘ
             if (esManual) {
-                hint.textContent = sheet > 0
-                    ? `(editada a mano · hoja Tarifas: ${sheet.toFixed(3)} €)`
-                    : '(editada a mano · sin tarifa en hoja Tarifas)';
+                hint.setAttribute('data-tip', sheet > 0
+                    ? `Editada a mano para este presupuesto. En la hoja Tarifas (${par}) es ${sheet.toFixed(3)} €/palabra: pulsa ↺ hoja para volver a ella.`
+                    : 'Editada a mano para este presupuesto (la hoja Tarifas no tiene tarifa de proveedor para este par).');
                 input.style.borderColor = 'var(--warning, #f59e0b)';
             } else if (sheet > 0) {
-                hint.textContent = `(de hoja Tarifas · ${par})`;
+                hint.setAttribute('data-tip', `Tarifa del proveedor por palabra, de la hoja Tarifas (${par}). Puedes cambiarla aquí para este presupuesto.`);
                 input.style.borderColor = '';
             } else {
-                hint.textContent = '(no definida en hoja Tarifas · escríbela aquí)';
+                hint.setAttribute('data-tip', `No hay tarifa de proveedor por palabra para ${par} en la hoja Tarifas: escríbela aquí o añádela en la hoja.`);
                 input.style.borderColor = '';
             }
             if (btn) btn.style.display = (esManual && sheet > 0) ? '' : 'none';
@@ -13127,9 +13127,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             }
             const sumandos = c.partes.map(p => `${p.n} pág${p.n === 1 ? '.' : 's.'} × ${_eur(p.precio)}`).join(' &nbsp;+&nbsp; ');
             const tramosTxt = c.tramos.map((t, i) => (i === c.tramos.length - 1 && t.hasta >= 1000) ? t.desde + '+' : (t.desde === t.hasta ? String(t.desde) : t.desde + '-' + t.hasta)).join(' · ');
-            return `<div style="line-height:1.6;">Cálculo (tramos de la web, ${escapeHtml(src || '')} → ${escapeHtml(tgt || '')}, ${c.pages} pág${c.pages === 1 ? '.' : 's.'} contabilizada${c.pages === 1 ? '' : 's'}):<br>` +
-                `<span style="display:inline-block;margin-left:10px;">${sumandos} = <span class="tariff-calc-result">${_eur(c.total)}</span></span><br>` +
-                `<span style="color:#94a3b8;font-size:0.75rem;">Tramos: ${tramosTxt} (pestaña TarifasPaginas)</span></div>`;
+            // v3.10.86: la suma a la vista; de dónde sale, en el ⓘ
+            return `<div style="line-height:1.6;">${sumandos} = <span class="tariff-calc-result">${_eur(c.total)}</span>` +
+                ib(`Tarifa por páginas de la web (pestaña TarifasPaginas), ${src || ''} → ${tgt || ''}, sobre ${c.pages} pág${c.pages === 1 ? '.' : 's.'} contabilizada${c.pages === 1 ? '' : 's'}. Tramos: ${tramosTxt.replace(/&nbsp;/g, ' ')}.`) + `</div>`;
         }
 
         // ---------- plazo mínimo de la web ----------
@@ -13196,9 +13196,14 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 } else if (vacio) {
                     nota = ' Propuesto en "Plazo"; puedes cambiarlo (0 = entrega en el día).';
                 }
-                hint.innerHTML = `📅 <b>Plazo estándar de la web:</b> ${regla.dias} día${regla.dias === 1 ? '' : 's'} laborable${regla.dias === 1 ? '' : 's'} → <b>${_fechaLarga(fecha)}</b>` +
-                    `<br><span style="opacity:.85;">${escapeHtml(budgetData.sourceLang || '')} → ${escapeHtml(budgetData.targetLang || '')}, ${pages} págs. (regla ${regla.desde}-${regla.hasta}: ${regla.dias}) · pedido antes de las ${escapeHtml(calendarioWeb.horaCorte)} · ` +
-                    `${calendarioWeb.festivos.length ? calendarioWeb.festivos.length + ' festivo(s) en Calendario' : 'sin festivos'}.${nota}</span>`;
+                // v3.10.86: una línea; la regla y el calendario, en el ⓘ. Un plazo más corto que el estándar sigue a la vista.
+                const _detalle = `${budgetData.sourceLang || ''} → ${budgetData.targetLang || ''}, ${pages} págs. (regla ${regla.desde}-${regla.hasta}: ${regla.dias} día${regla.dias === 1 ? '' : 's'}) · pedido antes de las ${calendarioWeb.horaCorte} · ` +
+                    `${calendarioWeb.festivos.length ? calendarioWeb.festivos.length + ' festivo(s) en Calendario' : 'sin festivos'}.` +
+                    (vacio ? ' Propuesto en «Plazo»; puedes cambiarlo (0 = entrega en el día).' : '');
+                const _notaCorta = corto
+                    ? ` · ⚡ <b>indicado: ${esPlazoEnElDia(actual) ? 'en el día' : actual + ' día' + (actual === 1 ? '' : 's')}</b> (${esPlazoEnElDia(actual) ? 'hoy, ' : ''}${_fechaLarga(fechaEntrega(actual))}), más corto que el estándar`
+                    : '';
+                hint.innerHTML = `📅 <b>Plazo web:</b> ${regla.dias} día${regla.dias === 1 ? '' : 's'} laborable${regla.dias === 1 ? '' : 's'} → <b>${_fechaLarga(fecha)}</b>${_notaCorta}` + ib(_detalle, 'right');
             }
             return regla;
         }
@@ -13254,8 +13259,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (directTariff) {
                 const clientRate = budgetData.tariffPerWordClient || 0;
                 directTariff.value = clientRate > 0 ? clientRate.toFixed(3) : '';
-                document.getElementById('directTariffHint').textContent =
-                    clientRate > 0 ? `(hoja Tarifas, ${budgetData.sourceLang} → ${budgetData.targetLang}; editable)` : '(añádela en la hoja Tarifas, columna E)';
+                document.getElementById('directTariffHint').setAttribute('data-tip',   // v3.10.86: en el ⓘ
+                    clientRate > 0 ? `Tarifa cliente por palabra (IVA incluido) de la hoja Tarifas, ${budgetData.sourceLang} → ${budgetData.targetLang}. Puedes cambiarla aquí para este presupuesto.` : `No hay tarifa cliente por palabra para ${budgetData.sourceLang} → ${budgetData.targetLang} en la hoja Tarifas (columna E): escríbela aquí o añádela en la hoja.`);
             }
             
             // Calcular precio por páginas (tarifa web)
