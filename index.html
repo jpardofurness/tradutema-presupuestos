@@ -1368,18 +1368,12 @@
                 </div>
             </div>
             
-            <div class="checkbox-row">
-                <div class="custom-checkbox" id="includeWordCount" onclick="onCasillaRecuentoClick()"></div>
-                <span class="checkbox-label">Incluir recuento de palabras/páginas <span style="color:#94a3b8;font-weight:normal;">(se marca sola si hay recuento)</span></span>
-            </div>
-            <!-- v3.10.71: qué se adjunta además de los documentos (nunca el Excel con las tarifas) -->
-            <div class="checkbox-row" style="padding-top:4px;" id="fila_enviarExtracciones">
-                <div class="custom-checkbox checked" id="enviarExtracciones" onclick="onCasillaAdjuntoClick('enviarExtracciones')"></div>
-                <span class="checkbox-label">Enviar extracciones <span style="color:#94a3b8;font-weight:normal;" id="hint_enviarExtracciones">(los .txt del texto extraído de cada archivo)</span></span>
-            </div>
-            <div class="checkbox-row" style="padding-top:4px;" id="fila_enviarRecuento">
-                <div class="custom-checkbox checked" id="enviarRecuento" onclick="onCasillaAdjuntoClick('enviarRecuento')"></div>
-                <span class="checkbox-label">Enviar recuento <span style="color:#94a3b8;font-weight:normal;" id="hint_enviarRecuento">(_RECUENTO.xlsx: archivos, páginas y palabras; sin precios)</span></span>
+            <!-- v3.10.82: sin casillas. Siempre se adjuntan los documentos y el
+                 _RECUENTO.xlsx (archivos y páginas; con las palabras si las hay) y
+                 las extracciones .txt si existen; el email lleva archivos, páginas
+                 y, si las hay, palabras. -->
+            <div id="infoAdjuntosProveedor" style="margin:6px 0 12px;padding:9px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:0.84rem;color:#475569;line-height:1.5;">
+                📎 <b>Al traductor se le envía:</b> los documentos · <b>_RECUENTO.xlsx</b> (archivos y páginas; con las palabras si hay recuento) · las extracciones .txt si existen. En el email: nº de archivos, páginas y, si las hay, palabras.
             </div>
             
             <div class="checkbox-row">
@@ -1465,13 +1459,11 @@
                         <input type="radio" name="calcMethod" value="pages" checked onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
                         <span class="calc-method-label">📄 Por páginas (tarifa web)</span>
                     </label>
-                    <label class="calc-method-option">
-                        <input type="radio" name="calcMethod" value="direct" onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
-                        <span class="calc-method-label">🔤 Por tarifa por palabra (IVA inc.)</span>
-                    </label>
+                    <!-- v3.10.82: "tarifa por palabra" y "palabras + margen" fundidos: un
+                         solo método con la casilla "Añadir margen" dentro de su caja -->
                     <label class="calc-method-option">
                         <input type="radio" name="calcMethod" value="words" onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
-                        <span class="calc-method-label">💰 Por palabras + margen</span>
+                        <span class="calc-method-label">🔤 Por palabras</span>
                     </label>
                     <label class="calc-method-option">
                         <input type="radio" name="calcMethod" value="provider" onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
@@ -1516,34 +1508,40 @@
                 </div>
             </div>
             
-            <!-- OPCIÓN 2: Cálculo directo por tarifa por palabra (IVA inc.) -->
-            <div class="margin-calc-box hidden" id="step5TariffCalcDirect">
-                <div class="margin-calc-header">
-                    <span>🔤 Cálculo por tarifa por palabra (IVA inc.)</span>
-                </div>
-                <div class="margin-calc-row">
-                    <span class="margin-label">Tarifa por palabra (IVA inc.):</span>
-                    <input type="number" id="directTariffPerWord" step="0.001" min="0" style="width:90px;" onchange="recalculateFromDirect()">
-                    <span class="margin-hint" id="directTariffHint">(de hoja Tarifas, editable)</span>
-                </div>
-                <div class="margin-calc-row">
-                    <span class="margin-label">Nº palabras:</span>
-                    <input type="number" id="directWordCount" min="0" value="0" style="width:100px;" onchange="recalculateFromDirect()">
-                    <span class="margin-hint" id="directWordCountHint">(del análisis o manual)</span>
-                </div>
-                <div class="margin-divider"></div>
-                <div class="margin-calc-row suggested-row">
-                    <span class="margin-label">→ Total cliente (IVA inc.):</span>
-                    <input type="number" id="quoteAmountDirect" step="0.01" min="0" placeholder="0.00" onchange="updateClientMessage()" style="width:120px;font-weight:600;">
-                </div>
-            </div>
-            
-            <!-- OPCIÓN 3: Cálculo por palabras + margen -->
+            <!-- OPCIÓN 2 (v3.10.82): Cálculo por palabras, con o sin margen -->
             <div class="margin-calc-box hidden" id="step5TariffCalcWords">
                 <div class="margin-calc-header">
-                    <span>💰 Cálculo por palabras + margen</span>
+                    <span>🔤 Cálculo por palabras</span>
                 </div>
-                
+                <!-- Nº de palabras: UN solo sitio. Del recuento, o escrito a mano
+                     (y entonces vale para el presupuesto, la hoja y el _RECUENTO.xlsx) -->
+                <div class="margin-calc-row">
+                    <span class="margin-label">Nº palabras:</span>
+                    <input type="number" id="quoteWordCount" min="0" value="0" onchange="onWordCountEdit()" style="width: 100px;">
+                    <span class="margin-hint" id="wordCountHint">(del recuento · o escríbelo a mano)</span>
+                </div>
+                <div class="margin-calc-row">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:#1e3a8a;">
+                        <input type="checkbox" id="wordsMargen" onchange="onWordsMargenChange()" style="width:18px;height:18px;cursor:pointer;"> Añadir margen <span style="font-weight:normal;color:#64748b;">(tarifa del proveedor + margen sugerido)</span>
+                    </label>
+                </div>
+                <div class="margin-divider"></div>
+
+                <!-- Sin margen: tarifa cliente por palabra (IVA inc., hoja Tarifas col. E) × palabras -->
+                <div id="wordsSinMargen">
+                    <div class="margin-calc-row">
+                        <span class="margin-label">Tarifa cliente por palabra (IVA inc.):</span>
+                        <input type="number" id="directTariffPerWord" step="0.001" min="0" style="width:90px;" onchange="recalculateFromDirect()">
+                        <span class="margin-hint" id="directTariffHint">(de hoja Tarifas, editable)</span>
+                    </div>
+                    <div class="margin-calc-row suggested-row">
+                        <span class="margin-label">→ Total cliente (IVA inc.):</span>
+                        <input type="number" id="quoteAmountDirect" step="0.01" min="0" placeholder="0.00" onchange="updateClientMessage()" style="width:120px;font-weight:600;">
+                    </div>
+                </div>
+
+                <!-- Con margen: tarifa del proveedor × palabras + margen sugerido -->
+                <div id="wordsConMargen">
                 <!-- Tarifa por palabra según idiomas (de hoja Tarifas) -->
                 <div class="margin-calc-row">
                     <span class="margin-label">Tarifa referencia:</span>
@@ -1554,12 +1552,6 @@
                             onclick="restoreReferenceRate()" style="display:none; padding: 2px 8px;"
                             title="Volver a la tarifa de la hoja Tarifas">↺ hoja</button>
                     <span class="margin-hint" id="referenceRateHint">(€/palabra, de hoja Tarifas)</span>
-                </div>
-                
-                <div class="margin-calc-row">
-                    <span class="margin-label">Nº palabras:</span>
-                    <input type="number" id="quoteWordCount" min="0" value="0" onchange="recalculateFromWords()" style="width: 100px;">
-                    <span class="margin-hint" id="wordCountHint">(del análisis o manual)</span>
                 </div>
                 
                 <div class="margin-calc-row">
@@ -1609,8 +1601,9 @@
                 <div class="margin-status" id="marginStatus">
                     <!-- Se rellena con JS -->
                 </div>
+                </div><!-- /wordsConMargen -->
             </div>
-            
+
             <!-- OPCIÓN 3: Cálculo por cotización proveedor + margen -->
             <div class="margin-calc-box hidden" id="step5TariffCalcProvider">
                 <div class="margin-calc-header">
@@ -1709,25 +1702,7 @@
             
             <div class="form-group">
                 <label style="font-weight: 600;">Mensaje al cliente (editable):</label>
-                <!-- v3.7.35: toggles de información a incluir en el presupuesto -->
-                <div id="msgInfoToggles" style="display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 10px;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.82rem;">
-                    <span style="color:#64748b;font-weight:600;">Incluir en el presupuesto:</span>
-                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-                        <input type="checkbox" id="msgIncludeFileCount" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de archivos
-                    </label>
-                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-                        <input type="checkbox" id="msgIncludeFileNames" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nombres de archivos
-                    </label>
-                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-                        <input type="checkbox" id="msgIncludePages" checked onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de páginas
-                    </label>
-                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-                        <input type="checkbox" id="msgIncludeWords" onchange="regenerateMessageSilent()" style="cursor:pointer;"> Nº de palabras
-                    </label>
-                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-                        <input type="checkbox" id="msgIncludeInstructions" onchange="regenerateMessageSilent()" style="cursor:pointer;"> Notas/exclusiones
-                    </label>
-                </div>
+                <!-- v3.10.82: sin casillas: nº de archivos, nombres y páginas siempre; palabras cuando las hay -->
                 <textarea class="editable-message" id="clientMessageEdit" rows="10" oninput="onClientMessageEdit()"></textarea>
             </div>
             
@@ -1867,13 +1842,13 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.81';
-        const HTML_DATE = '26/11/2026';
+        const HTML_VERSION = '3.10.82';
+        const HTML_DATE = '27/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
         // fallar con "Acción no reconocida" al usar una función nueva.
         // v3.10.57: 3.7.90 = el servidor guarda el recuento antes de responder.
-        const API_MIN_VERSION = '3.7.104';   // v3.10.81: páginas por archivo guardadas en los ajustes + getFileBase64 (botón 🔢 Actualizar archivos y páginas)
+        const API_MIN_VERSION = '3.7.105';   // v3.10.82: palabras escritas a mano en el _RECUENTO.xlsx (total en H, por archivo en ⚙)
         const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
         // State
@@ -2693,8 +2668,8 @@
             if (clientMessagePreview) clientMessagePreview.innerHTML = '';
             
             // Reset método de cálculo a "páginas"
-            const calcMethodPages = document.querySelector('input[name="calcMethod"][value="pages"]');
-            if (calcMethodPages) calcMethodPages.checked = true;
+            seleccionarMetodo('pages');   // v3.10.82
+            const _cm = document.getElementById('wordsMargen'); if (_cm) _cm.checked = false;
             currentCalcMethod = 'pages';
             calcMethodPickedByUser = false;   // v3.10.49
             // v3.8.7: limpiar la ficha de tarificación del presupuesto anterior
@@ -2705,10 +2680,6 @@
             if (typeof pintarAvisoFicha === 'function') pintarAvisoFicha(null);
             if (typeof renderQuoteConfigStamp === 'function') renderQuoteConfigStamp(null);
             document.querySelectorAll('.calc-method-option').forEach(l => l.classList.remove('cm-active'));
-            const _mw = document.getElementById('msgIncludeWords');
-            if (_mw) _mw.checked = false;
-            const _mi = document.getElementById('msgIncludeInstructions');
-            if (_mi) _mi.checked = false;
             
             // Reset comentarios de proveedor (paso 4)
             const providerComments = document.getElementById('providerComments');
@@ -5587,6 +5558,8 @@
                     budgetData.savedQuoteTotal = parseFloat(b.importe) || 0;
                     budgetData.wordCount = parseInt(b.palabras) || 0;
                     budgetData.pageCount = parseInt(b.paginas) || 0;
+                    // v3.10.82: palabras en la hoja sin desglose por archivo = total escrito a mano
+                    budgetData.wordCountManualTotal = budgetData.wordCount > 0 && !((b.analisisDetalle || []).some(a => (parseInt(a.words) || 0) > 0));
                     if (budgetData.wordCount > 0 && budgetData.savedQuoteTotal > 0) {
                         budgetData.savedQuotePricePerWord = budgetData.savedQuoteTotal / budgetData.wordCount;
                     } else {
@@ -6314,7 +6287,7 @@
                 // v3.10.44: nota — budgetId se lee al ARRANCAR esta llamada, así
                 // que un cambio de presupuesto durante la espera no la desvía
                 // v3.10.34: con recuento manual, la hoja recibe el total corregido
-                wordCount: (budgetData.fileAnalysis || []).some(a => a.manual) ? budgetData.wordCount : undefined,
+                wordCount: ((budgetData.fileAnalysis || []).some(a => a.manual) || budgetData.wordCountManualTotal) ? budgetData.wordCount : undefined,   // v3.10.82: también el total escrito a mano
                 // v3.10.28: los ajustes ⚙ por archivo (rango de páginas
                 // e instrucciones) viajaban SOLO al relanzar el
                 // análisis. Si escribías "solo 1-2" y guardabas sin
@@ -10497,6 +10470,14 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                         return { ok: false, error: err, perdida: false };
                     }
                 }
+                if (!res && !enMarcha(job)) {
+                    // v3.10.82: "Detener todo" aborta la petición y eso llegaba aquí como
+                    // respuesta perdida, con el aviso "recuperando el recuento desde la
+                    // hoja…" (sin cruz) pintado DESPUÉS de que el botón lo quitara
+                    terminado = true; if (esperaHoja) esperaHoja.cancelar();
+                    prodLogError(kA, 'detenido por el usuario');
+                    return { ok: false, error: 'Detenido por el usuario', perdida: false };
+                }
                 if (!res) {
                     // respuesta perdida o vacía: el servidor guarda en la hoja; esperar a que aparezca
                     prodLogError(kA, motivoPerdida + ' · esperando el recuento en la hoja (el servidor sigue trabajando)');
@@ -10511,6 +10492,11 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                         prodLogDone(kA, `${res.totalWords} palabras · ${res.totalPages} pág. · recuperado de la hoja tras ${motivoPerdida.slice(0, 160)}`);
                     } else {
                         terminado = true;
+                        if (!enMarcha(job)) {   // v3.10.82: parado mientras se consultaba la hoja
+                            if (esAbierto(job)) { try { dismissGlobalAnalysisBanner(); hideBgBanner(); } catch (e) {} }
+                            prodLogError(kA, 'detenido por el usuario');
+                            return { ok: false, error: 'Detenido por el usuario', perdida: false };
+                        }
                         prodLogError(kA, 'sin recuento en la hoja tras ' + Math.round((Date.now() - t0) / 1000) + ' s: ' + motivoPerdida);
                         return { ok: false, error: motivoPerdida, perdida: true };
                     }
@@ -10686,6 +10672,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 return true;
             } catch (e) {
                 if (job.fase === 'detenido' || esErrorDeParada(e)) {   // v3.10.64: "Detener todo"
+                    if (esAbierto(job)) { try { dismissGlobalAnalysisBanner(); hideBgBanner(); } catch (e2) {} }   // v3.10.82: ningún aviso "en curso" sobrevive a la parada
                     job.reintentar = () => { const j2 = nuevoTrabajo('contar', Object.assign({}, ctx)); ejecutarTrabajoContar(j2); };
                     renderTrabajos();
                     return false;
@@ -11254,7 +11241,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (!providers.length) {
                 showStatus('No hay ningún traductor seleccionado', 'warning'); setTimeout(hideStatus, 3000); return;
             }
-            const includeWords = document.getElementById('includeWordCount').classList.contains('checked');
+            const includeWords = (parseInt(budgetData.wordCount, 10) || 0) > 0;   // v3.10.82: sin casilla: si hay palabras, van
             const includeProposedRate = document.getElementById('includeProposedRate').classList.contains('checked');
 
             // v3.7.95: el modal se abre AL INSTANTE con los datos ya conocidos;
@@ -11324,17 +11311,12 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     ? ` <span style="color:#475569; font-weight:normal;">· se enviarán en un único ZIP (${budgetData.id}_documentos.zip)</span>`
                     : '';
                 const notaHtml = nota ? `<div style="font-size:0.78rem; color:#94a3b8; margin-top:2px;">${nota}</div>` : '';
-                // v3.10.71: extras opcionales (nunca el Excel con las tarifas)
-                // v3.10.75: solo si el presupuesto tiene recuento (sin él no hay .txt)
+                // v3.10.82: sin casillas: el _RECUENTO.xlsx va siempre (archivos y
+                // páginas; con palabras si hay recuento) y las extracciones si existen
                 const hayRecuento = hayRecuentoParaAdjuntar();
-                const extras = [];
-                if (hayRecuento && casillaMarcada('enviarExtracciones')) { const n = (budgetData.fileAnalysis || []).filter(a => a && a.fileName).length; extras.push('📝 extracciones en .txt' + (n ? ' (' + n + ')' : '')); }
-                if (hayRecuento && casillaMarcada('enviarRecuento')) extras.push('📊 _RECUENTO.xlsx');
-                const extrasHtml = extras.length
-                    ? `<div style="margin-top:4px; font-size:0.85rem; color:#475569; font-weight:normal;">+ ${extras.join(' · ')}</div>`
-                    : (hayRecuento
-                        ? `<div style="margin-top:4px; font-size:0.82rem; color:#94a3b8; font-weight:normal;">sin extracciones ni recuento (casillas del paso 3)</div>`
-                        : `<div style="margin-top:4px; font-size:0.82rem; color:#94a3b8; font-weight:normal;">sin extracciones ni recuento: este presupuesto no tiene recuento</div>`);
+                const extras = ['📊 _RECUENTO.xlsx' + (hayRecuento ? '' : ' (archivos y páginas)')];
+                if (hayRecuento && (budgetData.fileAnalysis || []).some(a => a && a.fileName && !a.manual)) { const n = (budgetData.fileAnalysis || []).filter(a => a && a.fileName && !a.manual).length; extras.push('📝 extracciones .txt' + (n ? ' (' + n + ')' : '') + ' si existen'); }
+                const extrasHtml = `<div style="margin-top:4px; font-size:0.85rem; color:#475569; font-weight:normal;">+ ${extras.join(' · ')}</div>`;
                 recipientsHtml += `
                     <div style="margin-top: 8px; color: #1e8449;">
                         <strong>📎 Adjuntos: ${allFiles.length} documento(s)</strong>${pendingNote}${zipNote}
@@ -11879,16 +11861,16 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             const q = (budgetData.providerQuotes || {})[elegido];
             const tarifa = q ? parseFloat(String(q.tarifa).replace(',', '.')) : 0;
             if (!(tarifa > 0)) return false;
-            const radio = document.querySelector('input[name="calcMethod"][value="provider"]');
-            if (!radio) return false;
-            radio.checked = true;
+            if (!seleccionarMetodo('provider')) return false;   // v3.10.82
             onCalcMethodChange();
             return true;
         }
         
         // Cambiar método de cálculo
         function onCalcMethodChange() {
-            const method = document.querySelector('input[name="calcMethod"]:checked').value;
+            const radioVal = document.querySelector('input[name="calcMethod"]:checked').value;
+            // v3.10.82: el radio "Por palabras" se desdobla en direct/words según la casilla
+            const method = radioVal === 'words' ? (margenActivado() ? 'words' : 'direct') : radioVal;
             currentCalcMethod = method;
             // v3.8.7: resaltar visualmente el método elegido — es el dato que
             // explica el precio y tiene que verse de un vistazo.
@@ -11898,26 +11880,24 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             });
             
             const pagesBox = document.getElementById('step5TariffCalcPages');
-            const directBox = document.getElementById('step5TariffCalcDirect');
             const wordsBox = document.getElementById('step5TariffCalcWords');
             const providerBox = document.getElementById('step5TariffCalcProvider');
 
             pagesBox.classList.add('hidden');
-            directBox.classList.add('hidden');
             wordsBox.classList.add('hidden');
             providerBox.classList.add('hidden');
 
             if (method === 'pages') {
                 pagesBox.classList.remove('hidden');
-            } else if (method === 'direct') {
-                directBox.classList.remove('hidden');
-                recalculateFromDirect();
-            } else if (method === 'words') {
+            } else if (method === 'direct' || method === 'words') {
                 wordsBox.classList.remove('hidden');
-                if (budgetData.wordCount > 0) {
-                    document.getElementById('quoteWordCount').value = budgetData.wordCount;
-                }
-                recalculateFromWords();
+                const sin = document.getElementById('wordsSinMargen'), con = document.getElementById('wordsConMargen');
+                if (sin) sin.style.display = (method === 'direct') ? '' : 'none';
+                if (con) con.style.display = (method === 'words') ? '' : 'none';
+                const qw = document.getElementById('quoteWordCount');
+                if (qw && budgetData.wordCount > 0 && !(parseInt(qw.value, 10) > 0)) qw.value = budgetData.wordCount;
+                pintarPistaPalabras();
+                if (method === 'direct') recalculateFromDirect(); else recalculateFromWords();
             } else if (method === 'provider') {
                 providerBox.classList.remove('hidden');
                 recalculateFromProvider();
@@ -12044,22 +12024,58 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         // todo eso se guarda en la hoja (columna AG) y se restaura al abrir.
         const QUOTE_CONFIG_FIELDS = [
             'quoteTotalPages', 'quotePagesToTranslate', 'quotePagesCount', 'quoteAmountPages',
-            'directTariffPerWord', 'directWordCount', 'quoteAmountDirect',
+            'directTariffPerWord', 'quoteAmountDirect',
             'quoteWordCount', 'quoteAmountWords',
             'quoteAmountProvider',
             'quoteDays', 'quoteUrgency'
         ];
-        const QUOTE_CONFIG_CHECKS = [
-            'msgIncludeFileCount', 'msgIncludeFileNames', 'msgIncludePages',
-            'msgIncludeWords', 'msgIncludeInstructions'
-        ];
+        // v3.10.82: ya no hay casillas en el mensaje al cliente (las fichas
+        // antiguas pueden traer "checks"; se ignoran)
+        const QUOTE_CONFIG_CHECKS = [];
 
+        // v3.10.82: "direct" y "words" son el mismo método (Por palabras); la
+        // diferencia es la casilla "Añadir margen". Se conservan los dos valores
+        // internos para que las fichas guardadas sigan entendiéndose.
         const CALC_METHOD_LABELS = {
             pages: '📄 Por páginas (tarifa web)',
-            direct: '🔤 Por tarifa por palabra (IVA inc.)',
-            words: '💰 Por palabras + margen',
+            direct: '🔤 Por palabras (sin margen)',
+            words: '🔤 Por palabras + margen',
             provider: '🤝 Por cotización proveedor + margen'
         };
+        function margenActivado() { const c = document.getElementById('wordsMargen'); return !!(c && c.checked); }
+        // Marca el método en la interfaz (radio + casilla de margen). Devuelve true si existe.
+        function seleccionarMetodo(m) {
+            const esPalabras = (m === 'words' || m === 'direct');
+            const radio = document.querySelector('input[name="calcMethod"][value="' + (esPalabras ? 'words' : m) + '"]');
+            if (!radio) return false;
+            radio.checked = true;
+            if (esPalabras) { const c = document.getElementById('wordsMargen'); if (c) c.checked = (m === 'words'); }
+            return true;
+        }
+        function onWordsMargenChange() { calcMethodPickedByUser = true; onCalcMethodChange(); }
+        // Nº de palabras escrito a mano en el paso 4: pasa a ser EL recuento del
+        // presupuesto (barra, mensaje al cliente, hoja y _RECUENTO.xlsx al guardar)
+        function onWordCountEdit() {
+            const el = document.getElementById('quoteWordCount');
+            const n = parseInt(el && el.value, 10) || 0;
+            const delRecuento = (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.words) || 0), 0);
+            budgetData.wordCount = n;
+            budgetData.wordCountManualTotal = n > 0 && n !== delRecuento;
+            pintarPistaPalabras();
+            if (typeof updateBudgetSummaryBar === 'function') { try { updateBudgetSummaryBar(); } catch (e) {} }
+            if (currentCalcMethod === 'direct') recalculateFromDirect();
+            else if (currentCalcMethod === 'words') recalculateFromWords();
+            updateClientMessage();   // el mensaje al cliente lleva las palabras si las hay
+        }
+        function pintarPistaPalabras() {
+            const hint = document.getElementById('wordCountHint');
+            if (!hint) return;
+            const n = parseInt((document.getElementById('quoteWordCount') || {}).value, 10) || 0;
+            const delRecuento = (budgetData.fileAnalysis || []).reduce((s, a) => s + (parseInt(a.words) || 0), 0);
+            if (n <= 0) hint.textContent = '(sin recuento: escríbelo a mano y valdrá para el presupuesto y la hoja)';
+            else if (budgetData.wordCountManualTotal || (delRecuento > 0 && n !== delRecuento) || delRecuento === 0) hint.textContent = '(escrito a mano: vale para el presupuesto, la hoja y el _RECUENTO.xlsx)';
+            else hint.textContent = '(del recuento)';
+        }
         // v3.10.61: solo para mostrar fichas antiguas guardadas con el método retirado
         const CALC_METHOD_LABELS_LEGACY = { historical: '📊 Según tipo de documento (histórico, retirado)' };
 
@@ -12123,9 +12139,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 if (cfg.method === 'historical' && cfg.fields && cfg.fields.quoteAmountHistorical && !cfg.fields.quoteAmountPages) {
                     cfg.fields.quoteAmountPages = cfg.fields.quoteAmountHistorical;
                 }
-                const radio = document.querySelector(`input[name="calcMethod"][value="${m}"]`);
-                if (radio) {
-                    radio.checked = true;
+                if (seleccionarMetodo(m)) {   // v3.10.82: radio + casilla de margen
                     calcMethodPickedByUser = true;   // v3.10.49: ficha guardada = método ya decidido
                     // onCalcMethodChange recalcula y sobrescribe campos, así que
                     // se llama ANTES de restaurar los valores guardados.
@@ -12136,6 +12150,12 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     const el = document.getElementById(id);
                     if (el) el.value = cfg.fields[id];
                 });
+                // v3.10.82: fichas antiguas del método "tarifa por palabra" traían el nº
+                // de palabras en su propio campo; ahora hay uno solo
+                if (cfg.fields && cfg.fields.directWordCount && !(parseInt((cfg.fields.quoteWordCount || 0), 10) > 0)) {
+                    const qw = document.getElementById('quoteWordCount'); if (qw) qw.value = cfg.fields.directWordCount;
+                }
+                if (m === 'direct' || m === 'words') { pintarPistaPalabras(); if (m === 'direct') recalculateFromDirect(); }
                 // 3) toggles del mensaje al cliente
                 Object.keys(cfg.checks || {}).forEach(id => {
                     const el = document.getElementById(id);
@@ -12227,7 +12247,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     return Math.abs(Math.round(calc) - g) < 0.01 || Math.abs(calc - g) < 0.01;
                 }
                 case 'direct': {
-                    const calc = _numF(f.directTariffPerWord) * (antes.palabras || _numF(f.directWordCount));
+                    const calc = _numF(f.directTariffPerWord) * (antes.palabras || _numF(f.quoteWordCount) || _numF(f.directWordCount));
                     return calc > 0 && Math.abs(Math.round(calc) - _numF(f.quoteAmountDirect)) < 0.51;
                 }
                 default: return false;   // words (margen decidido a mano) y provider: nunca se tocan solos
@@ -12361,7 +12381,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     cant = num(f.quotePagesCount) || num(f.quotePagesToTranslate) || num(f.quoteTotalPages);
                     tot = num(f.quoteAmountPages); u = 'pág'; break;
                 case 'direct':
-                    cant = num(f.directWordCount); uni = num(f.directTariffPerWord);
+                    cant = num(f.quoteWordCount) || num(f.directWordCount); uni = num(f.directTariffPerWord);
                     tot = num(f.quoteAmountDirect); u = 'pal'; break;
                 case 'words':
                     cant = num(f.quoteWordCount); tot = num(f.quoteAmountWords); u = 'pal'; break;
@@ -13008,30 +13028,17 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     : (_porFiltro != null ? _porFiltro : pages));
             }
             
-            // Pre-rellenar número de palabras (del análisis si existe)
+            // Pre-rellenar número de palabras (del recuento, o el escrito a mano y guardado)
             const words = budgetData.wordCount || 0;
-            if (quoteWordCount) {
-                quoteWordCount.value = words;
-                if (words > 0) {
-                    document.getElementById('wordCountHint').textContent = '(del análisis)';
-                } else {
-                    document.getElementById('wordCountHint').textContent = '(introducir manualmente)';
-                }
-            }
-            
-            // Pre-rellenar método directo (col E)
+            if (quoteWordCount) { quoteWordCount.value = words; pintarPistaPalabras(); }
+
+            // Tarifa cliente por palabra (hoja Tarifas, col E) para el modo sin margen
             const directTariff = document.getElementById('directTariffPerWord');
-            const directWords = document.getElementById('directWordCount');
-            const directHint = document.getElementById('directWordCountHint');
             if (directTariff) {
                 const clientRate = budgetData.tariffPerWordClient || 0;
                 directTariff.value = clientRate > 0 ? clientRate.toFixed(3) : '';
                 document.getElementById('directTariffHint').textContent =
-                    clientRate > 0 ? `(${budgetData.sourceLang} → ${budgetData.targetLang}, editable)` : '(Añadir en hoja Tarifas col E)';
-            }
-            if (directWords) {
-                directWords.value = words;
-                if (directHint) directHint.textContent = words > 0 ? '(del análisis)' : '(introducir manualmente)';
+                    clientRate > 0 ? `(hoja Tarifas, ${budgetData.sourceLang} → ${budgetData.targetLang}; editable)` : '(añádela en la hoja Tarifas, columna E)';
             }
             
             // Calcular precio por páginas (tarifa web)
@@ -13066,7 +13073,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 if (_tarifa > 0) _def = 'provider';
                 else if (_metodoHoja) _def = _metodoHoja;
                 else if (budgetData.chosenProvider || (budgetData.contactedProviders && budgetData.contactedProviders.length > 0)) _def = 'words';
-                document.querySelector('input[name="calcMethod"][value="' + _def + '"]').checked = true;
+                seleccionarMetodo(_def);   // v3.10.82
                 currentCalcMethod = _def;
             }
             
@@ -13099,7 +13106,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         // Recalcular desde tarifa directa por palabra (col E, IVA inc.)
         function recalculateFromDirect() {
             const rate = parseFloat(document.getElementById('directTariffPerWord').value) || 0;
-            const wordCount = parseInt(document.getElementById('directWordCount').value) || 0;
+            const wordCount = parseInt(document.getElementById('quoteWordCount').value) || 0;   // v3.10.82: campo único
             const total = rate * wordCount;
             const amountInput = document.getElementById('quoteAmountDirect');
             if (rate > 0 && wordCount > 0) {
@@ -13228,18 +13235,16 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 plazoFraseEn = `In the Deadline field, enter the date and time: ${daysTextEn} after today's date (for example, if you place the order today, ${hoyEn}, the date would be ${deliveryDateEn}).`;
             }
             
-            // v3.7.35: bloque de información configurable con toggles.
-            // Por defecto todos activados. Lee el estado de los checkboxes.
-            const incFileCount = document.getElementById('msgIncludeFileCount')?.checked !== false;
-            const incFileNames = document.getElementById('msgIncludeFileNames')?.checked !== false;
-            const incPages = document.getElementById('msgIncludePages')?.checked !== false;
-            // v3.8.7: palabras y notas/exclusiones son opt-IN (desmarcados por
-            // defecto). El resto sigue siendo opt-OUT.
-            const incWords = document.getElementById('msgIncludeWords')?.checked === true;
-            const incInstructions = document.getElementById('msgIncludeInstructions')?.checked === true;
+            // v3.10.82: sin casillas. Nº de archivos, nombres y páginas siempre;
+            // palabras cuando hay recuento o se han escrito a mano. Los
+            // comentarios internos ya no se vuelcan al cliente (antes, "Notas/
+            // exclusiones"): si hace falta una nota, se escribe en el mensaje.
+            const incFileCount = true, incFileNames = true, incPages = true;
+            const totalWords = budgetData.wordCount || 0;
+            const incWords = totalWords > 0;
+            const incInstructions = false;
 
             const hasFiles = fileNames.length > 0;
-            const totalWords = budgetData.wordCount || 0;
             const internalNotes = (budgetData.internalComments || '').trim();
 
             // Construir el bloque ES
@@ -13861,8 +13866,8 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                 sourceLang: budgetData.sourceLang, targetLang: budgetData.targetLang,
                 customMessage: document.getElementById('providerMessageEdit').value,
                 additionalComments: document.getElementById('providerComments').value.trim(),
-                enviarExtracciones: casillaMarcada('enviarExtracciones'),   // v3.10.71
-                enviarRecuento: casillaMarcada('enviarRecuento'),
+                enviarExtracciones: true,   // v3.10.82: sin casillas; el servidor adjunta lo que exista
+                enviarRecuento: true,
                 providers: providers.map(p => ({ nombre: p.nombre, email: p.email }))
             });
             if (!budgetData.contactedProviders) budgetData.contactedProviders = [];
