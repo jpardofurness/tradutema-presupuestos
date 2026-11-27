@@ -47,7 +47,7 @@
         .delete-btn:hover { background: rgba(220,53,69,1); transform: scale(1.1); }
         
         /* PROGRESS STEPS */
-        .progress-container { background: white; border-bottom: 1px solid var(--border-color); padding: 12px 20px; position: sticky; top: 64px; z-index: 99; }
+        .progress-container { background: white; border-bottom: 1px solid var(--border-color); padding: 12px 20px; position: sticky; top: var(--hdr-h, 64px); z-index: 99; }   /* v3.10.84: la altura real de la cabecera la pone ajustarAlturaCabecera() */
         .progress-steps { max-width: 700px; margin: 0 auto; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
         .progress-step { flex: 1; min-width: 80px; text-align: center; padding: 8px 4px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); background: var(--bg-primary); transition: all 0.3s; cursor: pointer; border: 2px solid transparent; }
         .progress-step:hover { background: rgba(52,152,219,0.1); }
@@ -600,6 +600,138 @@
             .results-grid { grid-template-columns: 1fr; }
             .quote-row { flex-direction: column; gap: 0; }
         }
+
+        /* ============ v3.10.84: INTERFAZ COMPACTA ============
+           Petición de Javier (27/11/2026): menos espacio en blanco, explicaciones
+           largas en ⓘ (info bullet), proveedores y traductores contactados en
+           filas, cálculo por cotización en tres líneas. Este bloque va al final
+           para ganar a las reglas anteriores sin tocarlas una a una. */
+        /* ⓘ info bullet: al pasar el ratón (ordenador) o al tocar (móvil) */
+        .ib { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:#dbe3ec; color:#475569; font-size:10px; font-weight:700; cursor:help; position:relative; vertical-align:middle; margin-left:5px; font-style:normal; line-height:1; flex-shrink:0; font-family:Georgia,serif; user-select:none; }
+        .ib:hover, .ib.open { background:#3498db; color:#fff; }
+        .ib:hover::after, .ib.open::after { content:attr(data-tip); position:absolute; left:0; top:21px; background:#1e293b; color:#fff; padding:8px 10px; border-radius:6px; font-size:0.74rem; font-weight:400; line-height:1.45; width:max-content; max-width:min(340px, 80vw); white-space:pre-line; z-index:200; text-align:left; box-shadow:0 4px 14px rgba(0,0,0,.25); font-family:'DM Sans',sans-serif; pointer-events:none; }
+        .ib.right::after { left:auto; right:-4px; }
+        .pc-dim { color:#94a3b8; font-weight:400; }
+        /* espacios */
+        .header { padding:8px 20px; }
+        .progress-container { padding:6px 20px; }
+        .progress-step { padding:4px 4px; font-size:0.68rem; }
+        .progress-step.active { transform:none; }
+        .step-num { font-size:0.9rem; display:inline; margin-right:4px; }
+        .main { padding:12px 20px; }
+        .card { padding:12px 16px; margin-bottom:10px; }
+        .card-title { margin-bottom:8px; }
+        .form-group { margin-bottom:8px; }
+        .form-group label { font-size:0.82rem; margin-bottom:3px; }
+        .form-group input, .form-group select, .form-group textarea { padding:8px 10px; font-size:0.9rem; }
+        .form-group textarea { min-height:52px; }
+        .checkbox-row { padding:5px 0; }
+        .custom-checkbox { width:38px; height:22px; }
+        .custom-checkbox::after { width:16px; height:16px; }
+        .custom-checkbox.checked::after { transform:translateX(16px); }
+        .btn { padding:9px 16px; font-size:0.92rem; }
+        .btn-row { margin-top:8px; }
+        .file-upload-area { padding:10px 14px; display:flex; align-items:center; justify-content:center; gap:10px; }
+        .file-upload-icon { font-size:1.4rem; margin:0; }
+        .file-upload-text { font-size:0.85rem; }
+        .file-upload-text br { display:none; }
+        .file-upload-text small { margin-left:6px; }
+        .deadline-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .deadline-row > label { margin:0; }
+        .deadline-toggle { margin:0; gap:6px; display:inline-flex; }
+        .toggle-btn { padding:6px 10px; font-size:0.82rem; flex:0 0 auto; border-width:1px; }
+        .deadline-fields { margin-top:6px; }
+        #infoAdjuntosProveedor { margin:4px 0 8px !important; padding:5px 10px !important; font-size:0.8rem !important; line-height:1.4 !important; }
+        .select-all-row { margin-bottom:6px; padding-bottom:6px; }
+        .tariff-calc-box, .margin-calc-box { padding:8px 12px; margin-bottom:10px; }
+        .tariff-calc-header, .margin-calc-header { margin-bottom:4px; font-size:0.92rem; }
+        .tariff-calc-detail { padding:4px 0; margin-top:4px; }
+        .tariff-calc-result-row { margin-top:6px; padding-top:6px; }
+        .tariff-calc-result-row input { font-size:1rem; padding:5px 8px; }
+        .margin-calc-row { margin-bottom:3px; gap:6px; }
+        .margin-divider { margin:4px 0; }
+        .margin-calc-row input { padding:5px 8px; font-size:0.92rem; width:100px; }
+        .calc-method-selector { padding:6px 12px; margin-bottom:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .calc-method-title { margin:0; font-size:0.85rem; }
+        .calc-method-options { gap:4px; }
+        .calc-method-option { padding:3px 6px; margin:0; gap:5px; }
+        .calc-method-option input[type="radio"] { width:15px; height:15px; margin:0; }
+        .calc-method-label { font-size:0.8rem; white-space:nowrap; }
+        #metodoDefectoNota, #quoteConfigStamp, #fichaDesfasadaAviso { flex-basis:100%; margin-top:4px !important; }
+        #quoteConfigStamp { padding:4px 10px !important; line-height:1.4 !important; }
+        .lang-toggle { margin-bottom:8px; }
+        .lang-toggle button { padding:5px 12px; }
+        .section-subtitle { margin-bottom:6px; }
+        .quote-row { gap:10px; }
+        .two-cols { display:flex; gap:10px; }
+        .two-cols > * { flex:1; min-width:0; }
+        #wordCountSummaryBox { padding:8px 12px !important; margin-bottom:10px !important; }
+        #wordCountSummaryBox table td, #wordCountSummaryBox table th { padding:2px 6px !important; }
+        #wordCountSummaryAviso { margin-top:4px !important; }
+        #budgetSummaryBar { padding:5px 12px !important; margin-top:6px !important; gap:6px !important; font-size:0.78rem !important; }
+        #budgetSummaryBar > div { gap:4px 10px !important; }
+        #bsBarTarifWrap { margin-top:2px !important; padding-top:2px !important; }
+        #entregaMinimaHint { margin:-2px 0 8px !important; padding:4px 10px !important; }
+        .traductor-propio-aviso { padding:5px 10px; font-size:0.8rem; margin-bottom:6px; }
+        .client-send-history { margin-top:8px; padding:6px 10px; }
+        .copy-buttons { margin-top:8px; }
+        .copy-btn { padding:9px; }
+        #sendClientBtn { width:auto; margin-top:0 !important; }
+        /* líneas compactas de los cálculos (cotización proveedor, palabras, páginas) */
+        .pc-line { display:flex; align-items:center; gap:6px 14px; flex-wrap:wrap; font-size:0.84rem; color:#475569; margin:3px 0; }
+        .pc-line b { color:#1e293b; }
+        .pc-line .sug { background:rgba(39,174,96,0.14); padding:2px 8px; border-radius:6px; color:#166534; font-weight:700; }
+        .pc-line input[type="number"] { padding:5px 8px; border:1px solid var(--border-color); border-radius:6px; font-size:0.9rem; text-align:right; width:90px; }
+        .pc-line input.pc-tarifa { width:100px; border:2px solid #27ae60; font-weight:600; }
+        .pc-line .pc-bar { flex:1; min-width:140px; max-width:280px; height:8px; margin:0; }
+        .pc-line .pc-bar .margin-bar-fill { height:14px; top:-3px; width:6px; }
+        .pc-line .pc-bar .margin-bar-center { height:12px; top:-2px; }
+        .pc-line .margin-status { display:inline-block; margin:0; padding:2px 8px; font-size:0.78rem; text-align:left; }
+        .pc-line .margin-deviation { margin-left:0; }
+        .pc-line .btn-sm { padding:2px 8px !important; font-size:0.78rem; }
+        /* proveedores (paso 3): una fila por traductor */
+        .providers-list { gap:4px; max-height:300px; }
+        .prov-row { display:flex; align-items:center; gap:8px; padding:5px 10px; border:1px solid var(--border-color); border-radius:8px; background:#fff; cursor:pointer; font-size:0.84rem; transition:border-color .15s; }
+        .prov-row:hover { border-color:var(--tradutema-blue-dark); }
+        .prov-row.selected { border-color:var(--tradutema-blue); background:rgba(52,152,219,0.06); }
+        .prov-row .provider-checkbox { width:18px; height:18px; margin:0; }
+        .prov-row.selected .provider-checkbox { background:var(--tradutema-blue); border-color:var(--tradutema-blue); }
+        .prov-row.selected .provider-checkbox::after { opacity:1; }
+        .prov-row .pn { font-weight:600; min-width:90px; }
+        .prov-row .pe { color:#64748b; font-size:0.78rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+        .prov-row .pt { font-size:0.76rem; font-weight:600; color:#16a34a; white-space:nowrap; }
+        .prov-row .pt .vacio, .prov-row .pt.vacio { color:#b45309; font-weight:500; }
+        .prov-row .provider-edit-btn { padding:0 4px; font-size:0.9rem; }
+        /* traductores contactados (paso 4): una fila por traductor */
+        .contacted-list { gap:4px; }
+        .ct-row { display:flex; align-items:center; gap:8px; padding:5px 10px; border:1px solid var(--border-color); border-radius:8px; background:#fff; font-size:0.84rem; transition:border-color .15s; }
+        .ct-row:hover { border-color:var(--tradutema-blue-dark); }
+        .ct-row.chosen { border-color:var(--accent-green); background:rgba(46,204,113,0.08); }
+        .ct-row .contacted-radio { width:16px; height:16px; margin:0; cursor:pointer; }
+        .ct-row.chosen .contacted-radio { border-color:var(--accent-green); }
+        .ct-row.chosen .contacted-radio::after { content:''; width:8px; height:8px; background:var(--accent-green); border-radius:50%; }
+        .ct-row .pn { font-weight:600; min-width:90px; cursor:pointer; }
+        .ct-row .st { font-size:0.74rem; color:#16a34a; font-family:'Space Mono',monospace; white-space:nowrap; }
+        .ct-row .st.manual { color:#b45309; font-family:inherit; font-weight:600; }
+        .ct-row .qf { display:flex; align-items:center; gap:4px; margin-left:auto; }
+        .ct-row .qf label { font-size:0.74rem; color:#64748b; white-space:nowrap; }
+        .ct-row .qf input { width:76px; padding:4px 6px; border:1px solid var(--border-color); border-radius:6px; font-size:0.82rem; font-family:inherit; }
+        .ct-row .qf input.pl { width:70px; }
+        .ct-row .qf input:focus { border-color:var(--tradutema-blue); outline:none; }
+        .ct-row .contacted-badge { margin-left:4px; padding:1px 6px; font-size:0.66rem; }
+        /* en pantallas anchas la app usa algo más de ancho (820 px); en el móvil, igual que siempre */
+        @media (min-width: 1000px) {
+            .main, .header-content, .progress-steps { max-width: 820px; }
+        }
+        @media (max-width: 600px) {
+            /* la cabecera ya no desborda a lo ancho (los botones pasan a una segunda línea) */
+            .header-content { flex-wrap:wrap; gap:6px; }
+            .header-content > div:last-child { flex-wrap:wrap; }
+            .prov-row .pe { display:none; }
+            .ct-row { flex-wrap:wrap; }
+            .ct-row .qf { margin-left:0; width:100%; }
+            .ct-row .qf input, .ct-row .qf input.pl { flex:1; width:auto; min-width:0; }
+        }
     </style>
     <!-- PDF.js para contar páginas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -679,8 +811,8 @@
                 <span><span style="color:#64748b;">Importe:</span> <strong id="bsBarImporte" style="color:#15803d;">—</strong></span>
                 <span><span style="color:#64748b;">Plazo:</span> <strong id="bsBarPlazo" style="color:#0c4a6e;">—</strong></span>
                 <span id="bsBarPedido" style="display:none;"></span>
+                <span id="bsBarEstado" style="font-size:0.78rem;font-weight:600;padding:2px 10px;border-radius:999px;background:#e2e8f0;color:#475569;"></span>
             </div>
-            <span id="bsBarEstado" style="font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;background:#e2e8f0;color:#475569;"></span>
         </div>
         <!-- v3.7.24: banner GLOBAL de progreso/resultado de análisis, persiste entre pestañas -->
         <div id="globalAnalysisBanner" class="hidden" style="margin:6px auto 0;max-width:1100px;padding:10px 14px;border-radius:8px;font-size:0.88rem;display:flex;align-items:center;gap:10px;border:1px solid;">
@@ -1266,19 +1398,17 @@
             <!-- Contacto del cliente (v3.7.47: el canal se deduce del campo
                  rellenado; WhatsApp si hay teléfono, si no Mail si hay email) -->
             <div class="form-group" style="margin-top: 16px;">
-                <label>Contacto del cliente</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+                <label>Contacto del cliente <span class="ib" data-tip="El canal se asigna solo: 📱 si hay WhatsApp, 📧 si solo hay email." onclick="ibToggle(event)">i</span></label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px;">
                     <input type="email" id="clientEmailStep1" placeholder="📧 Email del cliente" oninput="onStep1Change()">
                     <input type="tel" id="clientWhatsAppStep1" placeholder="📱 WhatsApp (+34...)" oninput="onStep1Change()">
                 </div>
-                <small style="color:#666;font-size:11px;">El canal se asigna solo: 📱 si hay WhatsApp, 📧 si solo hay email.</small>
             </div>
             
             <!-- Notas internas / instrucciones para el análisis -->
             <div class="form-group" style="margin-top: 16px;">
-                <label>📝 Notas e instrucciones (opcional)</label>
-                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2 · Solo el cuerpo del documento, sin sellos · El documento está en X idioma · Revisar formato..." style="min-height: 60px;" oninput="onNotasChange()"></textarea>
-                <small style="color: #666; font-size: 11px;">📌 Se aplican al análisis con IA: si pides "solo página 1", la extracción y el recuento se restringirán a esa página. También aparecen en el listado de presupuestos para referencia.</small>
+                <label>📝 Notas e instrucciones (opcional) <span class="ib" data-tip="Se aplican al análisis: si pides &quot;solo página 1&quot;, la extracción y el recuento se restringen a esa página. También aparecen en el listado de presupuestos." onclick="ibToggle(event)">i</span></label>
+                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2 · Solo el cuerpo del documento, sin sellos · El documento está en X idioma · Revisar formato..." style="min-height: 52px;" oninput="onNotasChange()"></textarea>
             </div>
             
             <button class="btn btn-primary action-btn" id="step1Btn" onclick="completeStep1()" disabled>
@@ -1346,15 +1476,17 @@
             <div id="wordCountSummaryBox" class="hidden" style="background:#f0f9ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
                 <div style="font-weight:600;color:#2b6cb0;margin-bottom:8px;">📊 Recuento de palabras</div>
                 <table style="width:100%;font-size:0.85rem;border-collapse:collapse;" id="wordCountSummaryTable"></table>
-                <div style="margin-top:8px;font-weight:700;color:#2b6cb0;">Total: <span id="wordCountSummaryTotal">0</span> palabras</div>
+                <div style="margin-top:4px;font-weight:700;color:#2b6cb0;font-size:0.9rem;">Total: <span id="wordCountSummaryTotal">0</span> palabras</div>
             </div>
             
             <!-- Opciones de la tasación -->
             <div class="form-group">
+                <div class="deadline-row">
                 <label>Plazo de entrega</label>
                 <div class="deadline-toggle">
                     <button class="toggle-btn active" id="deadlineOpen" onclick="setDeadlineType('open')">Plazo abierto</button>
                     <button class="toggle-btn" id="deadlineFixed" onclick="setDeadlineType('fixed')">Fecha específica</button>
+                </div>
                 </div>
                 <div class="deadline-fields" id="deadlineFields">
                     <div class="form-group">
@@ -1373,7 +1505,7 @@
                  las extracciones .txt si existen; el email lleva archivos, páginas
                  y, si las hay, palabras. -->
             <div id="infoAdjuntosProveedor" style="margin:6px 0 12px;padding:9px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:0.84rem;color:#475569;line-height:1.5;">
-                📎 <b>Al traductor se le envía:</b> los documentos · <b>_RECUENTO.xlsx</b> (archivos y páginas; con las palabras si hay recuento) · las extracciones .txt si existen. En el email: nº de archivos, páginas y, si las hay, palabras.
+                📎 Se envía: documentos · <b>_RECUENTO.xlsx</b> · extracciones .txt (si existen) <span class="ib right" data-tip="El _RECUENTO.xlsx lleva archivos y páginas, y las palabras si hay recuento. El email indica nº de archivos, páginas y, si las hay, palabras." onclick="ibToggle(event)">i</span>
             </div>
             
             <div class="checkbox-row">
@@ -1395,9 +1527,8 @@
             </div>
             
             <div class="form-group">
-                <label>💬 Comentarios para proveedores</label>
-                <textarea id="providerComments" placeholder="Detalles sobre el documento, formato de entrega, etc." oninput="onComentariosProveedorChange()"></textarea>
-                <small style="color: #666; font-size: 11px;">Se incluirán en el mensaje a los traductores.</small>
+                <label>💬 Comentarios para proveedores <span class="ib" data-tip="Se incluyen en el mensaje a los traductores." onclick="ibToggle(event)">i</span></label>
+                <textarea id="providerComments" placeholder="Detalles sobre el documento, formato de entrega, etc." oninput="onComentariosProveedorChange()" style="min-height:48px;"></textarea>
             </div>
             
             <!-- Proveedores -->
@@ -1438,7 +1569,7 @@
             <div class="contacted-providers-section hidden" id="contactedProvidersSection">
                 <div class="section-subtitle">
                     📋 Traductores contactados
-                    <span class="section-hint">(introduce la cotización recibida y selecciona el elegido)</span>
+                    <span class="section-hint">(cotización recibida · elige el traductor)</span>
                 </div>
                 <div class="contacted-list" id="contactedProvidersList"></div>
                 <!-- v3.10.49: retirado el bloque "Añadir como contactado / Recuperar desde Gmail"
@@ -1453,11 +1584,11 @@
             
             <!-- Selector de método de cálculo -->
             <div class="calc-method-selector">
-                <div class="calc-method-title">Método de cálculo de tarifa:</div>
+                <div class="calc-method-title" title="Método de cálculo de tarifa">Método:</div>
                 <div class="calc-method-options">
                     <label class="calc-method-option">
                         <input type="radio" name="calcMethod" value="pages" checked onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
-                        <span class="calc-method-label">📄 Por páginas (tarifa web)</span>
+                        <span class="calc-method-label">📄 Por páginas (web)</span>
                     </label>
                     <!-- v3.10.82: "tarifa por palabra" y "palabras + margen" fundidos: un
                          solo método con la casilla "Añadir margen" dentro de su caja -->
@@ -1467,7 +1598,7 @@
                     </label>
                     <label class="calc-method-option">
                         <input type="radio" name="calcMethod" value="provider" onchange="calcMethodPickedByUser = true; onCalcMethodChange()">
-                        <span class="calc-method-label">🤝 Por cotización proveedor + margen</span>
+                        <span class="calc-method-label">🤝 Cotización proveedor + margen</span>
                     </label>
                 </div>
                 <!-- v3.10.61: método por defecto del par (columna "Método por defecto" de Tarifas) -->
@@ -1483,21 +1614,17 @@
                 <div class="tariff-calc-header">
                     <span>📄 Cálculo por páginas (<span id="step5LangPair">-</span>)</span>
                 </div>
-                <!-- v3.7.53: tres conceptos de páginas diferenciados -->
-                <div class="tariff-calc-row">
-                    <label>Páginas totales:</label>
-                    <input type="number" id="quoteTotalPages" min="1" value="1" onchange="onTotalPagesChange()" style="width: 80px;">
-                    <span class="tariff-calc-hint">(las de los archivos; aparece al cliente)</span>
-                </div>
-                <div class="tariff-calc-row">
-                    <label>Páginas a traducir:</label>
-                    <input type="number" id="quotePagesToTranslate" min="0" value="1" onchange="onPagesToTranslateChange()" style="width: 80px;">
-                    <span class="tariff-calc-hint">(las que traduces; aparece al cliente)</span>
-                </div>
-                <div class="tariff-calc-row">
-                    <label>Páginas contabilizadas:</label>
-                    <input type="number" id="quotePagesCount" min="0" value="1" onchange="recalculateQuoteFromPages()" style="width: 80px;">
-                    <span class="tariff-calc-hint">(base del precio; NO aparece al cliente)</span>
+                <!-- v3.7.53: tres conceptos de páginas diferenciados · v3.10.84: en una línea, pistas en ⓘ -->
+                <div class="pc-line">
+                    <span>Páginas totales:</span>
+                    <input type="number" id="quoteTotalPages" min="1" value="1" onchange="onTotalPagesChange()" style="width: 70px;">
+                    <span class="ib" id="totalPagesHint" data-tip="Las de los archivos; aparece al cliente." onclick="ibToggle(event)">i</span>
+                    <span>a traducir:</span>
+                    <input type="number" id="quotePagesToTranslate" min="0" value="1" onchange="onPagesToTranslateChange()" style="width: 70px;">
+                    <span class="ib" data-tip="Las que traduces; aparece al cliente." onclick="ibToggle(event)">i</span>
+                    <span>contabilizadas:</span>
+                    <input type="number" id="quotePagesCount" min="0" value="1" onchange="recalculateQuoteFromPages()" style="width: 70px;">
+                    <span class="ib" data-tip="Base del precio; NO aparece al cliente." onclick="ibToggle(event)">i</span>
                 </div>
                 <div class="tariff-calc-detail" id="step5TariffDetail">
                     <!-- Se rellena con JS -->
@@ -1515,91 +1642,59 @@
                 </div>
                 <!-- Nº de palabras: UN solo sitio. Del recuento, o escrito a mano
                      (y entonces vale para el presupuesto, la hoja y el _RECUENTO.xlsx) -->
-                <div class="margin-calc-row">
-                    <span class="margin-label">Nº palabras:</span>
-                    <input type="number" id="quoteWordCount" min="0" value="0" onchange="onWordCountEdit()" style="width: 100px;">
-                    <span class="margin-hint" id="wordCountHint">(del recuento · o escríbelo a mano)</span>
-                </div>
-                <div class="margin-calc-row">
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:#1e3a8a;">
-                        <input type="checkbox" id="wordsMargen" onchange="onWordsMargenChange()" style="width:18px;height:18px;cursor:pointer;"> Añadir margen <span style="font-weight:normal;color:#64748b;">(tarifa del proveedor + margen sugerido)</span>
+                <!-- v3.10.84: líneas compactas (mismos ids; el JS no cambia) -->
+                <div class="pc-line">
+                    <span>Nº palabras:</span>
+                    <input type="number" id="quoteWordCount" min="0" value="0" onchange="onWordCountEdit()" style="width: 90px;">
+                    <span class="pc-dim" id="wordCountHint">(del recuento · o escríbelo a mano)</span>
+                    <span class="ib" data-tip="Un número escrito a mano vale para el presupuesto, la hoja y el _RECUENTO.xlsx. Un recuento posterior lo sustituye." onclick="ibToggle(event)">i</span>
+                    <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:#1e3a8a;margin-left:auto;">
+                        <input type="checkbox" id="wordsMargen" onchange="onWordsMargenChange()" style="width:16px;height:16px;cursor:pointer;margin:0;"> Añadir margen
+                        <span class="ib" data-tip="Tarifa del proveedor por palabra × palabras + margen sugerido. Sin marcar: tarifa cliente por palabra (hoja Tarifas, columna E) × palabras." onclick="ibToggle(event)">i</span>
                     </label>
                 </div>
-                <div class="margin-divider"></div>
 
                 <!-- Sin margen: tarifa cliente por palabra (IVA inc., hoja Tarifas col. E) × palabras -->
                 <div id="wordsSinMargen">
-                    <div class="margin-calc-row">
-                        <span class="margin-label">Tarifa cliente por palabra (IVA inc.):</span>
-                        <input type="number" id="directTariffPerWord" step="0.001" min="0" style="width:90px;" onchange="recalculateFromDirect()">
-                        <span class="margin-hint" id="directTariffHint">(de hoja Tarifas, editable)</span>
-                    </div>
-                    <div class="margin-calc-row suggested-row">
-                        <span class="margin-label">→ Total cliente (IVA inc.):</span>
-                        <input type="number" id="quoteAmountDirect" step="0.01" min="0" placeholder="0.00" onchange="updateClientMessage()" style="width:120px;font-weight:600;">
+                    <div class="pc-line">
+                        <span>Tarifa cliente por palabra (IVA inc.):</span>
+                        <input type="number" id="directTariffPerWord" step="0.001" min="0" style="width:80px;" onchange="recalculateFromDirect()">
+                        <span class="pc-dim" id="directTariffHint">(de hoja Tarifas, editable)</span>
+                        <span>→ Total cliente (IVA inc.):</span>
+                        <input type="number" id="quoteAmountDirect" class="pc-tarifa" step="0.01" min="0" placeholder="0.00" onchange="updateClientMessage()">
                     </div>
                 </div>
 
                 <!-- Con margen: tarifa del proveedor × palabras + margen sugerido -->
                 <div id="wordsConMargen">
-                <!-- Tarifa por palabra según idiomas (de hoja Tarifas) -->
-                <div class="margin-calc-row">
-                    <span class="margin-label">Tarifa referencia:</span>
+                <div class="pc-line">
+                    <span>Tarifa referencia:</span>
                     <input type="number" id="referenceRateInput" min="0" step="0.001" placeholder="€/pal"
-                           onchange="onReferenceRateEdit()" style="width: 90px;" title="Tarifa proveedor por palabra (editable)">
-                    <span class="margin-value">€/pal</span>
+                           onchange="onReferenceRateEdit()" style="width: 80px;" title="Tarifa proveedor por palabra (editable)">
+                    <span>€/pal</span>
                     <button type="button" class="btn btn-secondary btn-sm" id="referenceRateRestoreBtn"
                             onclick="restoreReferenceRate()" style="display:none; padding: 2px 8px;"
                             title="Volver a la tarifa de la hoja Tarifas">↺ hoja</button>
-                    <span class="margin-hint" id="referenceRateHint">(€/palabra, de hoja Tarifas)</span>
+                    <span class="pc-dim" id="referenceRateHint">(€/palabra, de hoja Tarifas)</span>
+                    <span>Coste proveedor (sin IVA): <b id="providerCostDisplay">-</b></span>
                 </div>
-                
-                <div class="margin-calc-row">
-                    <span class="margin-label">Coste proveedor (sin IVA):</span>
-                    <span class="margin-value" id="providerCostDisplay">-</span>
+                <div class="pc-line">
+                    <span>Margen sugerido: <b id="suggestedMarginDisplay">-</b> <span class="pc-dim" id="suggestedMarginPercent">(-)</span></span>
+                    <span>→ Tarifa sugerida (IVA inc.): <span class="sug" id="suggestedPriceDisplay">-</span></span>
                 </div>
-                
-                <div class="margin-divider"></div>
-                
-                <div class="margin-calc-row">
-                    <span class="margin-label">Margen sugerido:</span>
-                    <span class="margin-value" id="suggestedMarginDisplay">-</span>
-                    <span class="margin-percent" id="suggestedMarginPercent">(-)</span>
-                </div>
-                
-                <div class="margin-calc-row suggested-row">
-                    <span class="margin-label">→ Tarifa sugerida (IVA inc.):</span>
-                    <span class="margin-value suggested" id="suggestedPriceDisplay">-</span>
-                </div>
-                
-                <div class="margin-divider"></div>
-                
-                <div class="margin-calc-row input-row">
-                    <span class="margin-label">Tu tarifa (IVA inc.):</span>
-                    <input type="number" id="quoteAmountWords" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onWordsAmountChange()">
-                </div>
-                
-                <div class="margin-calc-row">
-                    <span class="margin-label">Tu margen:</span>
-                    <span class="margin-value" id="actualMarginDisplay">-</span>
+                <div class="pc-line">
+                    <span>Tu tarifa (IVA inc.):</span>
+                    <input type="number" id="quoteAmountWords" class="pc-tarifa" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onWordsAmountChange()">
+                    <span>Tu margen: <b id="actualMarginDisplay">-</b></span>
                     <span class="margin-deviation" id="marginDeviationPercent">-</span>
                 </div>
-                
-                <!-- Barra visual de desviación -->
-                <div class="margin-bar-container">
-                    <div class="margin-bar-labels">
-                        <span>-30%</span>
-                        <span>Sugerido</span>
-                        <span>+30%</span>
-                    </div>
-                    <div class="margin-bar">
+                <div class="pc-line">
+                    <div class="margin-bar pc-bar">
                         <div class="margin-bar-fill" id="marginBarFill"></div>
                         <div class="margin-bar-center"></div>
                     </div>
-                </div>
-                
-                <div class="margin-status" id="marginStatus">
-                    <!-- Se rellena con JS -->
+                    <span class="ib" data-tip="Tu margen respecto al sugerido (centro). Verde: cerca del sugerido; amarillo: por debajo; rojo: muy por encima (−30 % … +30 %)." onclick="ibToggle(event)">i</span>
+                    <span class="margin-status" id="marginStatus"></span>
                 </div>
                 </div><!-- /wordsConMargen -->
             </div>
@@ -1610,60 +1705,26 @@
                     <span>🤝 Cálculo por cotización proveedor + margen</span>
                 </div>
                 
-                <!-- Proveedor elegido y su cotización -->
-                <div class="margin-calc-row">
-                    <span class="margin-label">Proveedor elegido:</span>
-                    <span class="margin-value" id="chosenProviderName">-</span>
-                    <span class="margin-hint">(selecciona arriba)</span>
+                <!-- v3.10.84: tres líneas (mismos ids; el JS no cambia) -->
+                <div class="pc-line">
+                    <span>Proveedor: <b id="chosenProviderName">-</b></span>
+                    <span>Cotización: <b id="chosenProviderQuote">-</b> <span class="pc-dim">(sin IVA)</span></span>
+                    <span>Margen sugerido: <b id="suggestedMarginProviderDisplay">-</b> <span class="pc-dim" id="suggestedMarginProviderPercent">(-)</span></span>
+                    <span>→ Tarifa sugerida (IVA inc.): <span class="sug" id="suggestedPriceProviderDisplay">-</span></span>
                 </div>
-                
-                <div class="margin-calc-row">
-                    <span class="margin-label">Cotización proveedor (€):</span>
-                    <span class="margin-value" id="chosenProviderQuote">-</span>
-                    <span class="margin-hint">(sin IVA)</span>
-                </div>
-                
-                <div class="margin-divider"></div>
-                
-                <div class="margin-calc-row">
-                    <span class="margin-label">Margen sugerido:</span>
-                    <span class="margin-value" id="suggestedMarginProviderDisplay">-</span>
-                    <span class="margin-percent" id="suggestedMarginProviderPercent">(-)</span>
-                </div>
-                
-                <div class="margin-calc-row suggested-row">
-                    <span class="margin-label">→ Tarifa sugerida (IVA inc.):</span>
-                    <span class="margin-value suggested" id="suggestedPriceProviderDisplay">-</span>
-                </div>
-                
-                <div class="margin-divider"></div>
-                
-                <div class="margin-calc-row input-row">
-                    <span class="margin-label">Tu tarifa (IVA inc.):</span>
-                    <input type="number" id="quoteAmountProvider" step="0.01" min="0" placeholder="Ej: 120.00" onchange="onProviderAmountChange()">
-                </div>
-                
-                <div class="margin-calc-row">
-                    <span class="margin-label">Tu margen:</span>
-                    <span class="margin-value" id="actualMarginProviderDisplay">-</span>
+                <div class="pc-line">
+                    <span>Tu tarifa (IVA inc.):</span>
+                    <input type="number" id="quoteAmountProvider" class="pc-tarifa" step="0.01" min="0" placeholder="Ej: 120.00" onchange="onProviderAmountChange()">
+                    <span>Tu margen: <b id="actualMarginProviderDisplay">-</b></span>
                     <span class="margin-deviation" id="marginDeviationProviderPercent">-</span>
                 </div>
-                
-                <!-- Barra visual de desviación -->
-                <div class="margin-bar-container">
-                    <div class="margin-bar-labels">
-                        <span>-30%</span>
-                        <span>Sugerido</span>
-                        <span>+30%</span>
-                    </div>
-                    <div class="margin-bar">
+                <div class="pc-line">
+                    <div class="margin-bar pc-bar">
                         <div class="margin-bar-fill" id="marginBarFillProvider"></div>
                         <div class="margin-bar-center"></div>
                     </div>
-                </div>
-                
-                <div class="margin-status" id="marginStatusProvider">
-                    <!-- Se rellena con JS -->
+                    <span class="ib" data-tip="Tu margen respecto al sugerido (centro). Verde: cerca del sugerido; amarillo: por debajo; rojo: muy por encima (−30 % … +30 %)." onclick="ibToggle(event)">i</span>
+                    <span class="margin-status" id="marginStatusProvider"></span>
                 </div>
             </div>
 
@@ -1683,14 +1744,15 @@
             <!-- v3.10.61: plazo mínimo según la web (pestañas Plazos y Calendario) -->
             <div id="entregaMinimaHint" style="display:none;margin:-6px 0 14px;font-size:0.8rem;color:#065f46;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:7px 10px;line-height:1.45;"></div>
             
+            <div class="two-cols">
             <div class="form-group">
-                <label>Email del cliente (opcional, para envío directo)</label>
+                <label>Email del cliente <span class="ib" data-tip="Opcional: para enviarle el presupuesto por email desde aquí." onclick="ibToggle(event)">i</span></label>
                 <input type="email" id="clientEmail" placeholder="" oninput="onContactoPaso4Change()">
             </div>
-            
             <div class="form-group">
-                <label>WhatsApp del cliente (opcional)</label>
+                <label>WhatsApp del cliente</label>
                 <input type="tel" id="clientWhatsApp" placeholder="" oninput="onContactoPaso4Change()">
+            </div>
             </div>
             
             <!-- v3.7.52: asunto del email editable (se rellena solo; puedes añadir
@@ -1703,22 +1765,20 @@
             <div class="form-group">
                 <label style="font-weight: 600;">Mensaje al cliente (editable):</label>
                 <!-- v3.10.82: sin casillas: nº de archivos, nombres y páginas siempre; palabras cuando las hay -->
-                <textarea class="editable-message" id="clientMessageEdit" rows="10" oninput="onClientMessageEdit()"></textarea>
+                <textarea class="editable-message" id="clientMessageEdit" rows="8" oninput="onClientMessageEdit()"></textarea>
             </div>
             
             <div class="copy-buttons">
                 <button class="btn copy-btn whatsapp" id="waCopyBtn" onclick="copyForWhatsApp()">
                     💾 Guardar y Copiar WhatsApp
                 </button>
-
+                <button class="btn btn-primary btn-success action-btn copy-btn" id="sendClientBtn" onclick="sendClientEmail()">
+                    💾 Guardar y Enviar Email
+                </button>
             </div>
-            
+
             <!-- Historial de envíos al cliente -->
             <div id="clientSendHistoryContainer" class="client-send-history hidden"></div>
-            
-            <button class="btn btn-primary btn-success action-btn" id="sendClientBtn" onclick="sendClientEmail()" style="margin-top: 12px;">
-                💾 Guardar y Enviar Email
-            </button>
         </div>
     </main>
 
@@ -1842,7 +1902,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.82';
+        const HTML_VERSION = '3.10.84';
         const HTML_DATE = '27/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
@@ -1915,7 +1975,39 @@
         let clientSubjectEdited = false;  // v3.7.52: rastrear si editó el asunto
 
         // ====== INIT ======
+        // ====== v3.10.84: ⓘ INFO BULLET ======
+        // Las explicaciones largas de la interfaz van en un ⓘ: en el ordenador se
+        // abren al pasar el ratón (CSS) y en el móvil al tocarlo (clase .open).
+        // El texto va en data-tip (lo pinta el CSS con attr()), así que no admite
+        // HTML; los saltos de línea sí (white-space: pre-line).
+        function ib(tip, cls) {
+            return '<span class="ib' + (cls ? ' ' + cls : '') + '" data-tip="' + escapeHtml(String(tip == null ? '' : tip)) + '" onclick="ibToggle(event)">i</span>';
+        }
+        function ibColocar(el) {
+            try { const r = el.getBoundingClientRect(); el.classList.toggle('right', r.left > window.innerWidth * 0.55); } catch (e) {}
+        }
+        function ibToggle(ev) {
+            if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+            const el = ev && (ev.currentTarget || ev.target);
+            if (!el) return;
+            const abierto = el.classList.contains('open');
+            document.querySelectorAll('.ib.open').forEach(x => { if (x !== el) x.classList.remove('open'); });
+            el.classList.toggle('open', !abierto);
+            ibColocar(el);
+        }
+        document.addEventListener('click', () => { document.querySelectorAll('.ib.open').forEach(x => x.classList.remove('open')); });
+        document.addEventListener('mouseover', e => { const el = e.target && e.target.closest ? e.target.closest('.ib') : null; if (el) ibColocar(el); });
+        // La barra de pasos es sticky justo debajo de la cabecera: su "top" sigue a la altura real
+        function ajustarAlturaCabecera() {
+            try { const h = document.querySelector('.header'); if (h && h.offsetHeight > 0) document.documentElement.style.setProperty('--hdr-h', h.offsetHeight + 'px'); } catch (e) {}
+        }
+        window.addEventListener('resize', ajustarAlturaCabecera);
+        // la cabecera cambia de alto cuando aparecen sus botones (al abrir un presupuesto): se sigue con ResizeObserver
+        try { if (window.ResizeObserver) { const _roH = new ResizeObserver(ajustarAlturaCabecera); document.addEventListener('DOMContentLoaded', () => { const h = document.querySelector('.header'); if (h) _roH.observe(h); }); } } catch (e) {}
+
         document.addEventListener('DOMContentLoaded', () => {
+            ajustarAlturaCabecera();   // v3.10.84
+            setTimeout(ajustarAlturaCabecera, 500);
             if (apiUrl) {
                 document.getElementById('configSection').style.display = 'none';
                 loadData();
@@ -5577,6 +5669,9 @@
                     if (budgetData.quoteConfig && budgetData.quoteConfig.countMethod) {
                         budgetData.countMethodUsed = budgetData.quoteConfig.countMethod;
                     }
+                    // v3.10.83: total de páginas escrito a mano, guardado en la ficha
+                    budgetData.paginasTotalesManual = (budgetData.quoteConfig && parseInt(budgetData.quoteConfig.paginasManual, 10) > 0) ? parseInt(budgetData.quoteConfig.paginasManual, 10) : null;
+                    budgetData.paginasTotalesManualBase = budgetData.paginasTotalesManual ? (parseInt(budgetData.quoteConfig.paginasManualBase, 10) || 0) : null;
                     budgetData.numeroPedido = b.numeroPedido || '';   // v3.7.100: para enlaces Pedido/Dashboard en la barra
                     budgetData.numArchivos = b.numArchivos ? parseInt(b.numArchivos) : 1;  // Cargar número de archivos
                     _ultimoInventarioPersistido = (parseInt(b.paginas) || 0) + '/' + (parseInt(b.numArchivos) || 0);   // v3.10.65
@@ -6448,19 +6543,19 @@
                     const _fallos = (typeof resumenFallos === 'function') ? resumenFallos(budgetData.failedPages) : '';
                 const _trabajoAbierto = (typeof trabajoDelAbierto === 'function') ? trabajoDelAbierto() : null;   // v3.10.54
                 if (_trabajoAbierto && _sinAnalizar.length > 0) {
-                    avisoEl.innerHTML = '⏳ Recuento en curso (' + textoFase(_trabajoAbierto) + ' · ' + fmtMmSs(Date.now() - _trabajoAbierto.inicio) +
-                        '). La tabla se rellenará sola al terminar; puedes ir a Inicio y seguir con otro presupuesto.';
+                    avisoEl.innerHTML = '⏳ Recuento en curso (' + textoFase(_trabajoAbierto) + ' · ' + fmtMmSs(Date.now() - _trabajoAbierto.inicio) + ')' +
+                        ib('La tabla se rellena sola al terminar; puedes ir a Inicio y seguir con otro presupuesto.');   // v3.10.84
                     avisoEl.style.display = '';
                 } else if (_sinAnalizar.length > 0 || _fallos) {
                     let txt = '';
                     if (_sinAnalizar.length > 0) {
                         txt += '⚠️ ' + _sinAnalizar.length + ' archivo(s) sin analizar: ' +
-                            '<strong>el total no los incluye</strong>. El botón de recontar solo cuenta páginas; ' +
-                            'para las palabras hay que reanalizar desde el paso 2.';
+                            '<strong>el total no los incluye</strong>' +
+                            ib('El botón «Actualizar archivos y páginas» solo cuenta páginas; para las palabras hay que reanalizar desde el paso 2.');   // v3.10.84
                     }
                     if (_fallos) {
                         txt += (txt ? '<br>' : '') + '⚠️ Páginas que fallaron en el último análisis: ' + escapeHtml(_fallos) +
-                            '. Si vuelve a fallar, escribe el recuento a mano en ⚙ del archivo (paso 2).';
+                            ib('Si vuelve a fallar, escribe el recuento a mano en ⚙ del archivo (paso 2).');
                     }
                     avisoEl.innerHTML = txt;
                     avisoEl.style.display = '';
@@ -6984,9 +7079,86 @@
             return { total: total, aTraducir: aTraducir, hayFiltros: inv.some(f => f.filtro), inventario: inv };
         }
 
+        // ====== v3.10.83: UNA SOLA FUENTE PARA "PÁGINAS TOTALES" ======
+        // Caso real 1126-03-W (27/11/2026): tres PDF de 6+7+7 páginas y el
+        // mensaje al cliente decía "Páginas totales: 18 · Páginas a traducir: 20".
+        // "Totales" salía de budgetData.pageCount (la columna I de la hoja, o lo
+        // que la ficha guardada congeló en su día) y "a traducir" del inventario
+        // real de archivos (pdf.js): dos fuentes distintas y nada que las
+        // obligara a coincidir. aplicarFiltrosAPaginas ponía al día "a traducir"
+        // y "contabilizadas" pero no "totales"; applyQuoteConfig restauraba el
+        // total guardado tal cual; y la reconciliación de 3.10.65 compara
+        // inventarios, no ese campo, así que un total viejo sobrevivía. Encima,
+        // con el método "cotización proveedor" o "por palabras" esos campos
+        // están ocultos (viven en la caja "por páginas"), así que no se veía.
+        // Ahora el total del presupuesto es, por este orden:
+        //   1. el escrito a mano en "Páginas totales", si sigue vigente: se
+        //      guarda en la ficha junto con lo que sumaban los archivos en ese
+        //      momento, y deja de valer en cuanto los archivos suman otra cosa
+        //      (añadir/quitar documentos, un recuento distinto);
+        //   2. la suma del inventario cuando se conocen las páginas de TODOS los
+        //      archivos (pdf.js > ⚙ > servidor);
+        //   3. budgetData.pageCount (la hoja), como respaldo.
+        // y "Páginas totales" se pone a ese valor en cada sitio por el que pasa.
+        function inventarioPaginasCompleto() {
+            const r = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null;
+            if (!r || !r.inventario || !r.inventario.length) return null;
+            if (r.inventario.some(f => !(parseInt(f.paginas, 10) > 0))) return null;   // alguno sin contar: no hay total fiable
+            return r;
+        }
+        // Total escrito a mano, si sigue valiendo (0 si no hay o los archivos ya suman otra cosa)
+        function totalManualVigente() {
+            const m = parseInt(budgetData.paginasTotalesManual, 10) || 0;
+            if (!(m > 0)) return 0;
+            const base = parseInt(budgetData.paginasTotalesManualBase, 10) || 0;
+            const r = inventarioPaginasCompleto();
+            if (r && base > 0 && r.total !== base) return 0;
+            return m;
+        }
+        function paginasTotalesDelPresupuesto() {
+            const manual = totalManualVigente();
+            if (manual > 0) return manual;
+            const r = inventarioPaginasCompleto();
+            if (r && r.total > 0) return r.total;
+            return parseInt(budgetData.pageCount, 10) || 0;
+        }
+        function pintarPistaPaginasTotales() {
+            const h = document.getElementById('totalPagesHint');
+            if (!h) return;
+            const manual = totalManualVigente();
+            const r = inventarioPaginasCompleto();
+            // v3.10.84: la pista vive en el ⓘ (data-tip); el campo se resalta si el total es manual
+            const esManual = (manual > 0 && r && r.total !== manual);
+            h.setAttribute('data-tip', esManual
+                ? 'Escrito a mano; los archivos suman ' + r.total + '. Aparece al cliente.'
+                : 'Las de los archivos; aparece al cliente.');
+            const inp = document.getElementById('quoteTotalPages');
+            if (inp) inp.style.borderColor = esManual ? '#f59e0b' : '';
+        }
+        // Pone "Páginas totales" (y, sin filtros ⚙, "Páginas a traducir") al día.
+        // No toca "contabilizadas" ni el importe: eso es cosa de la reconciliación
+        // (los documentos cambiaron) o del usuario. Devuelve true si cambió algo.
+        function sincronizarPaginasTotales() {
+            const total = paginasTotalesDelPresupuesto();
+            if (!(total > 0)) return false;
+            let cambio = false;
+            const elT = document.getElementById('quoteTotalPages');
+            if (elT && parseInt(elT.value, 10) !== total) { elT.value = total; cambio = true; }
+            if ((parseInt(budgetData.pageCount, 10) || 0) !== total) { budgetData.pageCount = total; cambio = true; }
+            const r = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null;
+            if (!(r && r.hayFiltros)) {
+                budgetData.pagesToTranslate = null;
+                const elA = document.getElementById('quotePagesToTranslate');
+                if (elA && parseInt(elA.value, 10) !== total) { elA.value = total; cambio = true; }
+            }
+            pintarPistaPaginasTotales();
+            return cambio;
+        }
+
         // Refresca los tres campos del paso 4 y la barra de resumen.
         function aplicarFiltrosAPaginas() {
             const r = calcularPaginasATraducir();
+            try { sincronizarPaginasTotales(); } catch (e) {}   // v3.10.83: "totales" también
             if (!r) {
                 budgetData.pagesToTranslate = null;
                 budgetData.quotePagesCount = null;
@@ -6994,12 +7166,14 @@
                 // v3.10.0: sin filtros, "a traducir" ES el total. Antes se
                 // dejaban los campos como estuvieran, así que podían seguir
                 // mostrando el número anterior al recuento.
+                // v3.10.83: el MISMO total que "Páginas totales" (manual vigente > inventario)
                 budgetData.pagesToTranslate = null;
                 budgetData.quotePagesCount = null;
+                const tot = paginasTotalesDelPresupuesto() || r.total;
                 const elT0 = document.getElementById('quotePagesToTranslate');
                 const elC0 = document.getElementById('quotePagesCount');
-                if (elT0 && r.total > 0) elT0.value = r.total;
-                if (elC0 && r.total > 0) elC0.value = r.total;
+                if (elT0 && tot > 0) elT0.value = tot;
+                if (elC0 && tot > 0) elC0.value = tot;
             } else {
                 budgetData.pagesToTranslate = r.aTraducir;
                 budgetData.quotePagesCount = r.aTraducir;
@@ -7547,7 +7721,7 @@
 
             // Con carpeta y páginas reales conocidas, actualizar el dato que
             // usan la barra de resumen y el cálculo por páginas.
-            if (budgetData.folderId && drivePagesKnown && budgetData.pageCount !== displayPages) {
+            if (budgetData.folderId && drivePagesKnown && !(totalManualVigente() > 0) && budgetData.pageCount !== displayPages) {   // v3.10.83: el total escrito a mano (vigente) se respeta
                 budgetData.pageCount = displayPages;
                 if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
             }
@@ -10766,28 +10940,22 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 // pantalla no enseniara tarifas: no se distinguia "no tiene" de
                 // "no se muestra". Lo que falta se dice con todas las letras.
                 // El minimo es del traductor; la tarifa por palabra, de este par.
+                // v3.10.84: una fila por traductor (casilla · nombre · email · tarifas · ⓘ comentarios · ✏️)
                 const minTxt = p.tarifaMinima
-                    ? `Mín: ${p.tarifaMinima}€`
-                    : '<span class="provider-tariff-empty">sin mínimo</span>';
+                    ? `Mín ${escapeHtml(String(p.tarifaMinima))} €`
+                    : '<span class="vacio">sin mínimo</span>';
                 const palTxt = p.tarifaPalabra
-                    ? `${p.tarifaPalabra}€/pal`
-                    : '<span class="provider-tariff-empty">sin tarifa por palabra</span>';
-                const tarifaInfo = `<div class="provider-tariff" title="El mínimo es del traductor; la tarifa por palabra es de esta combinación de idiomas">${minTxt} · ${palTxt}</div>`;
-
-                // Comentarios del traductor
-                const comentarioInfo = p.comentarios
-                    ? `<div class="provider-comment">${p.comentarios}</div>`
-                    : '<div class="provider-comment provider-comment-empty">sin comentarios</div>';
-                
+                    ? `${escapeHtml(String(p.tarifaPalabra))} €/pal`
+                    : '<span class="vacio">sin €/pal</span>';
+                const sinTarifas = !p.tarifaMinima && !p.tarifaPalabra;
+                const comentarioInfo = p.comentarios ? ib(p.comentarios, 'right') : '';
                 html += `
-                    <div class="provider-item ${selected}">
-                        <div class="provider-checkbox" onclick="toggleProvider(${i})"></div>
-                        <div class="provider-info" onclick="toggleProvider(${i})">
-                            <div class="provider-name">${p.nombre}</div>
-                            <div class="provider-email">${p.email}</div>
-                            ${tarifaInfo}
-                            ${comentarioInfo}
-                        </div>
+                    <div class="prov-row ${selected}" onclick="toggleProvider(${i})">
+                        <div class="provider-checkbox"></div>
+                        <span class="pn">${escapeHtml(p.nombre)}</span>
+                        <span class="pe" title="${escapeHtml(p.email)}">${escapeHtml(p.email)}</span>
+                        <span class="pt ${sinTarifas ? 'vacio' : ''}" title="El mínimo es del traductor; la tarifa por palabra es de esta combinación de idiomas">${minTxt} · ${palTxt}</span>
+                        ${comentarioInfo}
                         <button class="provider-edit-btn" onclick="event.stopPropagation(); openEditProvider(${i})" title="Editar tarifas">✏️</button>
                     </div>
                 `;
@@ -11618,7 +11786,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         }
         function avisoTraductorPropioHtml() {
             if (!esEmailPropio(budgetData.chosenProviderEmail) || !hayTraductorDesignado()) return '';
-            return `<div class="traductor-propio-aviso">👤 <b>Traductor designado por defecto: ${escapeHtml(nombreTraductorPropio())}</b> · ninguno de los consultados está elegido todavía (en la hoja, columna Q, va tu email). Elige uno de la lista para sustituirlo.</div>`;
+            return `<div class="traductor-propio-aviso">👤 Designado por defecto: <b>${escapeHtml(nombreTraductorPropio())}</b>${ib('Ninguno de los consultados está elegido todavía: en la hoja (columna Q) va tu email. Elige uno de la lista para sustituirlo.')}</div>`;   // v3.10.84: una línea + ⓘ
         }
 
         function renderContactedProviders() {
@@ -11642,63 +11810,37 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 });
             }
             
+            // v3.10.84: una fila por traductor: ○ nombre · ⓘ email · estado del envío · Cotización · Plazo
+            const fechaCorta = f => String(f || '').replace(/ \((sin envío|sin envio)\)$/, '').replace(/^(\d\d)-(\d\d)-\d{4}\s+(\d\d:\d\d).*$/, '$1/$2 $3');
             let html = '';
             budgetData.contactedProviders.forEach((p, idx) => {
                 const nombreNorm = p.nombre.trim();
                 const isChosen = budgetData.chosenProvider && budgetData.chosenProvider.trim() === nombreNorm;
                 const quote = budgetData.providerQuotes[nombreNorm] || budgetData.providerQuotes[p.nombre] || {};
-                
-                // Obtener historial COMPLETO de envíos para este proveedor
-                let sendHistoryHtml = '';
-                const envios = historialNormalizado[nombreNorm];
-                // v3.10.50: contactado sin solicitud enviada (marcado en el paso 3
-                // y "Continuar"): historial solo con entradas manuales o vacío.
-                const sinEnvio = !envios || envios.length === 0 || envios.every(e => e && e.manual);
-                if (envios && envios.length > 0) {
-                    sendHistoryHtml = '<div class="send-history-list">';
-                    envios.forEach((envio, i) => {
-                        const isLast = i === envios.length - 1;
-                        const manual = !!(envio && envio.manual);
-                        sendHistoryHtml += `
-                            <div class="send-history-item ${isLast ? 'latest' : ''}" ${manual ? 'style="border-left-color:#f59e0b;background:#fffbeb;"' : ''}>
-                                <span class="send-history-icon">${manual ? '✋' : '📤'}</span>
-                                <span class="send-history-label">${manual ? 'Seleccionado (sin envío)' : 'Solicitado'}</span>
-                                <span class="send-history-date">${String(envio.fecha || '').replace(/ \((sin envío|sin envio)\)$/, '')}</span>
-                            </div>
-                        `;
-                    });
-                    sendHistoryHtml += '</div>';
+                const envios = historialNormalizado[nombreNorm] || [];
+                // v3.10.50: contactado sin solicitud enviada (marcado en el paso 3 y "Continuar")
+                const sinEnvio = envios.length === 0 || envios.every(e => e && e.manual);
+                let estadoHtml;
+                if (sinEnvio) {
+                    estadoHtml = '<span class="st manual" title="Marcado en el paso 3 sin enviar solicitud">✋ sin solicitud enviada</span>';
+                } else {
+                    const reales = envios.filter(e => e && !e.manual);
+                    const ultimo = reales[reales.length - 1];
+                    estadoHtml = `<span class="st" title="Solicitud enviada">📤 ${escapeHtml(fechaCorta(ultimo.fecha))}</span>` +
+                        (envios.length > 1 ? ib('Envíos: ' + envios.map(e => (e.manual ? '✋ ' : '📤 ') + String(e.fecha || '')).join('\n')) : '');
                 }
-                const sinEnvioBadge = sinEnvio ? ' <span style="font-size:0.72rem;color:#b45309;background:#fef3c7;padding:2px 8px;border-radius:999px;font-weight:600;">sin solicitud enviada</span>' : '';
-                
+                const nombreJs = String(p.nombre).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 html += `
-                    <div class="contacted-item ${isChosen ? 'chosen' : ''}">
-                        <div class="contacted-header" onclick="chooseProvider(${idx})">
-                            <div class="contacted-radio"></div>
-                            <div class="contacted-info">
-                                <div class="contacted-name">${p.nombre}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}${sinEnvioBadge}</div>
-                                <div class="contacted-email">${p.email}</div>
-                                ${sendHistoryHtml}
-                            </div>
-                        </div>
-                        <div class="contacted-quote-fields">
-                            <div class="quote-field">
-                                <label>Cotización (€ total):</label>
-                                <input type="number" 
-                                       step="0.01"
-                                       placeholder="ej: 85" 
-                                       value="${quote.tarifa || ''}"
-                                       onchange="updateProviderQuote('${p.nombre}', 'tarifa', this.value)"
-                                       onclick="event.stopPropagation()">
-                            </div>
-                            <div class="quote-field">
-                                <label>Plazo:</label>
-                                <input type="text" 
-                                       placeholder="ej: 3 días" 
-                                       value="${quote.plazo || ''}"
-                                       onchange="updateProviderQuote('${p.nombre}', 'plazo', this.value)"
-                                       onclick="event.stopPropagation()">
-                            </div>
+                    <div class="ct-row ${isChosen ? 'chosen' : ''}">
+                        <div class="contacted-radio" onclick="chooseProvider(${idx})" title="Elegir este traductor"></div>
+                        <span class="pn" onclick="chooseProvider(${idx})">${escapeHtml(p.nombre)}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}</span>
+                        ${p.email ? ib(p.email) : ''}
+                        ${estadoHtml}
+                        <div class="qf">
+                            <label>Cotización</label>
+                            <input type="number" step="0.01" placeholder="€ total" title="Cotización del traductor (€ total, sin IVA)" value="${escapeHtml(quote.tarifa || '')}" onchange="updateProviderQuote('${nombreJs}', 'tarifa', this.value)">
+                            <label>Plazo</label>
+                            <input type="text" class="pl" placeholder="3 días" title="Plazo indicado por el traductor" value="${escapeHtml(quote.plazo || '')}" onchange="updateProviderQuote('${nombreJs}', 'plazo', this.value)">
                         </div>
                     </div>
                 `;
@@ -12113,6 +12255,10 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 pages: budgetData.pageCount || 0,
                 // v3.10.65: inventario exacto (páginas, a traducir, palabras, documentos)
                 inventario: (function () { try { const i = inventarioActual(); return { paginas: i.paginas, aTraducir: i.aTraducir, palabras: i.palabras, archivos: i.archivos }; } catch (e) { return null; } })(),
+                // v3.10.83: total de páginas escrito a mano en "Páginas totales" (null = el del
+                // inventario) y lo que sumaban los archivos entonces (si suman otra cosa, caduca)
+                paginasManual: (totalManualVigente() > 0) ? totalManualVigente() : null,
+                paginasManualBase: (totalManualVigente() > 0) ? (parseInt(budgetData.paginasTotalesManualBase, 10) || 0) : null,
                 countMethod: budgetData.countMethodUsed || countMethod(),
                 otrosIdiomas: budgetData.otrosIdiomas || null,   // v3.8.8
                 sourceLang: budgetData.sourceLang || '',
@@ -12132,6 +12278,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 // 0) v3.10.47: tarifa €/pal manual, ANTES de recalcular
                 const tm = parseFloat(cfg.tariffManual);
                 budgetData.tariffPerWordManual = (!isNaN(tm) && tm > 0) ? tm : null;
+                // v3.10.83: total de páginas escrito a mano (si lo hubo)
+                budgetData.paginasTotalesManual = (parseInt(cfg.paginasManual, 10) > 0) ? parseInt(cfg.paginasManual, 10) : null;
+                budgetData.paginasTotalesManualBase = budgetData.paginasTotalesManual ? (parseInt(cfg.paginasManualBase, 10) || 0) : null;
                 // 1) método: marcar el radio y desplegar su caja
                 const m = CALC_METHOD_LABELS[cfg.method] ? cfg.method : 'pages';
                 // v3.10.61: ficha guardada con el método "histórico" (retirado): se
@@ -12194,7 +12343,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         const _numF = x => { const n = parseFloat(String(x == null ? '' : x).replace(',', '.')); return isNaN(n) ? 0 : n; };
         function inventarioActual() {
             const r = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null;
-            const total = r ? r.total : (parseInt(budgetData.pageCount) || 0);
+            // v3.10.83: sin inventario, el respaldo es lo que suman los archivos según la hoja,
+            // nunca un total escrito a mano (si no, parecía que los documentos habían cambiado)
+            const total = r ? r.total : ((totalManualVigente() > 0 && parseInt(budgetData.paginasTotalesManualBase, 10) > 0) ? parseInt(budgetData.paginasTotalesManualBase, 10) : (parseInt(budgetData.pageCount) || 0));
             const aTraducir = r ? (r.hayFiltros ? r.aTraducir : r.total) : total;
             return {
                 paginas: total,
@@ -12351,6 +12502,7 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             if (!budgetData || !budgetData.id) return;
             try { aplicarFiltrosAPaginas(); } catch (e) {}
             try { reconciliarFichaConDocumentos(); } catch (e) { console.warn('reconciliarFicha:', e); }
+            try { sincronizarPaginasTotales(); } catch (e) {}   // v3.10.83
             try { updateBudgetSummaryBar(); } catch (e) {}
             if (!clientMessageEdited) { try { updateClientMessage(); } catch (e) {} }
             // la hoja: páginas y nº de documentos, solo si han cambiado y no hay un trabajo escribiéndolos ya
@@ -12442,9 +12594,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 partes.push(`proveedor: ${escapeHtml(cfg.providerName)}${cfg.providerQuote ? ' · ' + escapeHtml(cfg.providerQuote) : ''}`);
             }
             const _rc = cfg.recalculadaPorDocumentos;   // v3.10.65
-            box.innerHTML = `<b>🔒 Tarificación guardada</b> — método: <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || CALC_METHOD_LABELS_LEGACY[cfg.method] || cfg.method)}</b>`
-                + (partes.length ? `<br>Datos usados: ${partes.join(' · ')}` : '')
-                + (fecha ? `<br><span style="color:#047857;font-size:0.75rem;">Guardado el ${escapeHtml(fecha)}</span>` : '')
+            // v3.10.84: una línea; los datos usados, en ⓘ
+            box.innerHTML = `<b>🔒 Guardada</b>${fecha ? ' el ' + escapeHtml(fecha) : ''} · <b>${escapeHtml(CALC_METHOD_LABELS[cfg.method] || CALC_METHOD_LABELS_LEGACY[cfg.method] || cfg.method)}</b>`
+                + (partes.length ? ib('Datos usados: ' + partes.join(' · ').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')) : '')
                 + (_rc ? `<br><span style="color:#92400e;font-size:0.75rem;">⚠️ Recalculada por cambio de documentos (${escapeHtml((_rc.cambios || []).map(c => c.que + ' ' + c.de + ' → ' + c.a).join(', '))}) · pendiente de guardar</span>` : '');
             box.style.background = _rc ? '#fffbeb' : '#ecfdf5';
             box.style.borderColor = _rc ? '#fcd34d' : '#a7f3d0';
@@ -13012,7 +13164,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             // Pre-rellenar número de páginas (v3.7.53: tres campos diferenciados,
             // por defecto los tres = total de páginas de los archivos; se
             // restauran ediciones previas si las hubo en esta sesión)
-            const pages = budgetData.pageCount || 1;
+            // v3.10.83: el total sale de la misma fuente que el mensaje al cliente
+            const pages = ((typeof paginasTotalesDelPresupuesto === 'function') ? paginasTotalesDelPresupuesto() : 0) || budgetData.pageCount || 1;
             // v3.9.3: si hay filtros por archivo, mandan sobre el total.
             const _filtros = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null;
             const _porFiltro = (_filtros && _filtros.hayFiltros) ? _filtros.aTraducir : null;
@@ -13098,6 +13251,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             } else {
                 pintarAvisoFicha(null);
             }
+            // v3.10.83: "Páginas totales" nunca se queda con un número que no sea el
+            // del presupuesto (la ficha guardada podía traer uno viejo)
+            try { sincronizarPaginasTotales(); } catch (e) { console.warn('sincronizarPaginasTotales:', e); }
             // v3.10.61: plazo mínimo de la web (rellena "Plazo" si está vacío y pinta la fecha)
             try { proponerPlazoWeb(); } catch (e) { console.warn('proponerPlazoWeb:', e); }
             if (!clientMessageEdited && typeof updateClientMessage === 'function') { try { updateClientMessage(); } catch (e) {} }
@@ -13145,7 +13301,21 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
         function onTotalPagesChange() {
             const el = document.getElementById('quoteTotalPages');
             const v = parseInt(el && el.value) || 0;
-            if (v > 0) budgetData.pageCount = v;
+            if (v > 0) {
+                const prev = parseInt(budgetData.pageCount, 10) || 0;
+                budgetData.pageCount = v;
+                // v3.10.83: un total escrito a mano se recuerda (va en la ficha, con lo
+                // que sumaban los archivos) y manda mientras los archivos sumen lo mismo;
+                // si coincide con ellos, no hay nada que recordar
+                const r = (typeof inventarioPaginasCompleto === 'function') ? inventarioPaginasCompleto() : null;
+                if (r && r.total === v) { budgetData.paginasTotalesManual = null; budgetData.paginasTotalesManualBase = null; }
+                else { budgetData.paginasTotalesManual = v; budgetData.paginasTotalesManualBase = r ? r.total : 0; }
+                // sin filtros ⚙, "a traducir" sigue al total si lo estaba reflejando
+                const rf = (typeof calcularPaginasATraducir === 'function') ? calcularPaginasATraducir() : null;
+                const elA = document.getElementById('quotePagesToTranslate');
+                if (elA && !(rf && rf.hayFiltros) && (parseInt(elA.value, 10) || 0) === prev) { elA.value = v; budgetData.pagesToTranslate = null; }
+                try { pintarPistaPaginasTotales(); } catch (e) {}
+            }
             if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
             updateClientMessage();
         }
