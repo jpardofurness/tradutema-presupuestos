@@ -612,6 +612,16 @@
         .ib:hover::after, .ib.open::after { content:attr(data-tip); position:absolute; left:0; top:21px; background:#1e293b; color:#fff; padding:8px 10px; border-radius:6px; font-size:0.74rem; font-weight:400; line-height:1.45; width:max-content; max-width:min(340px, 80vw); white-space:pre-line; z-index:200; text-align:left; box-shadow:0 4px 14px rgba(0,0,0,.25); font-family:'DM Sans',sans-serif; pointer-events:none; }
         .ib.right::after { left:auto; right:-4px; }
         .pc-dim { color:#94a3b8; font-weight:400; }
+        /* v3.10.87: campos obligatorios (*), campos no válidos, tabla de traductores contactados */
+        .req { color:#dc2626; margin-left:2px; font-weight:700; }
+        .campo-invalido, input.campo-invalido { border-color:#dc2626 !important; background:#fff5f5 !important; }
+        .campo-aviso { color:#b91c1c; font-size:0.74rem; margin-top:3px; line-height:1.3; }
+        #contactedProvidersList .ct-head, #contactedProvidersList .ct-row { display:grid; grid-template-columns:18px minmax(0,1fr) 116px 88px 80px; gap:6px 8px; align-items:center; }
+        #contactedProvidersList .ct-head { padding:2px 10px 4px; font-size:0.7rem; text-transform:uppercase; letter-spacing:.3px; color:#64748b; font-weight:600; }
+        #contactedProvidersList .ct-row .pn { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        #contactedProvidersList .ct-row .st { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        #contactedProvidersList .ct-row .qf { display:contents; }
+        #contactedProvidersList .ct-row .qf input, #contactedProvidersList .ct-row .qf input.pl { width:100%; min-width:0; box-sizing:border-box; }
         /* v3.10.85: panel "Proceso" */
         #prodLogPanel.pl-compacto { width:270px; max-height:190px; font-size:11px; }
         #prodLogPanel.pl-compacto #prodLogBody { max-height:calc(190px - 32px); }
@@ -740,9 +750,11 @@
             .header-content { flex-wrap:wrap; gap:6px; }
             .header-content > div:last-child { flex-wrap:wrap; }
             .prov-row .pe { display:none; }
-            .ct-row { flex-wrap:wrap; }
-            .ct-row .qf { margin-left:0; width:100%; }
-            .ct-row .qf input, .ct-row .qf input.pl { flex:1; width:auto; min-width:0; }
+            #contactedProvidersList .ct-head { display:none; }
+            #contactedProvidersList .ct-row { grid-template-columns:18px minmax(0,1fr) 100px; }
+            #contactedProvidersList .ct-row .qf { display:flex; grid-column:1 / -1; gap:6px; align-items:center; }
+            #contactedProvidersList .ct-row .qf::before { content:'Cotización € · plazo'; font-size:0.7rem; color:#64748b; white-space:nowrap; }
+            #contactedProvidersList .ct-row .qf input, #contactedProvidersList .ct-row .qf input.pl { flex:1; width:auto; }
         }
     </style>
     <!-- PDF.js para contar páginas -->
@@ -1037,7 +1049,7 @@
                     </div>
                     <div class="form-group">
                         <label>Nombre o email</label>
-                        <input type="text" id="consultText" class="form-control" placeholder="opcional" oninput="filterConsultProviders()">
+                        <input type="text" id="consultText" class="form-control" oninput="filterConsultProviders()">
                     </div>
                 </div>
 
@@ -1064,13 +1076,13 @@
                 <div id="addProviderForm" class="hidden" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin-bottom:16px;background:#f8fafc;">
                     <div style="font-weight:600;margin-bottom:12px;color:#0c4a6e;">➕ Nuevo traductor <span class="ib" data-tip="Si el email ya existe, el mínimo y los comentarios se heredan del traductor. Para añadirle más combinaciones de idiomas, mejor usa ✏️ Editar en su ficha." onclick="ibToggle(event)">i</span></div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                        <div><label style="font-size:0.8rem;color:#475569;">Nombre</label><input type="text" id="addProvNombre" class="form-control" placeholder="APELLIDOS, Nombre"></div>
-                        <div><label style="font-size:0.8rem;color:#475569;">Email (id único)</label><input type="email" id="addProvEmail" class="form-control" placeholder="email@dominio.com"></div>
-                        <div><label style="font-size:0.8rem;color:#475569;">Idioma origen</label><select id="addProvOrigen" class="form-control"></select></div>
-                        <div><label style="font-size:0.8rem;color:#475569;">Idioma destino</label><select id="addProvDestino" class="form-control"></select></div>
-                        <div><label style="font-size:0.8rem;color:#475569;">Tarifa mínima (€)</label><input type="text" id="addProvMin" class="form-control" placeholder="Ej: 20"></div>
-                        <div><label style="font-size:0.8rem;color:#475569;">Tarifa por palabra (€)</label><input type="text" id="addProvPalabra" class="form-control" placeholder="Ej: 0.08"></div>
-                        <div style="grid-column:1 / -1;"><label style="font-size:0.8rem;color:#475569;">Comentarios</label><textarea id="addProvComentarios" class="form-control" rows="2" placeholder="Notas sobre el traductor..."></textarea></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Nombre (APELLIDOS, Nombre)<span class="req">*</span></label><input type="text" id="addProvNombre" class="form-control"></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Email (id único)<span class="req">*</span></label><input type="email" id="addProvEmail" class="form-control" oninput="marcarCampoEmail(this)"></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Idioma origen<span class="req">*</span></label><select id="addProvOrigen" class="form-control"></select></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Idioma destino<span class="req">*</span></label><select id="addProvDestino" class="form-control"></select></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Tarifa mínima (€)</label><input type="text" id="addProvMin" class="form-control"></div>
+                        <div><label style="font-size:0.8rem;color:#475569;">Tarifa por palabra (€)</label><input type="text" id="addProvPalabra" class="form-control"></div>
+                        <div style="grid-column:1 / -1;"><label style="font-size:0.8rem;color:#475569;">Comentarios</label><textarea id="addProvComentarios" class="form-control" rows="2"></textarea></div>
                     </div>
                     <div style="display:flex;gap:8px;margin-top:12px;">
                         <button onclick="submitAddProvider()" class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;padding:8px 16px;">Guardar</button>
@@ -1091,8 +1103,8 @@
                 </p>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end;">
                     <div class="form-group"><label>Idioma jurado</label><select id="dirIdioma" class="form-control"></select></div>
-                    <div class="form-group"><label>Provincia / País</label><input type="text" id="dirProvincia" class="form-control" placeholder="Ej: SEVILLA, MADRID, ALEMANIA..."></div>
-                    <div class="form-group"><label>Texto (nombre/email)</label><input type="text" id="dirQuery" class="form-control" placeholder="opcional"></div>
+                    <div class="form-group"><label>Provincia / País</label><input type="text" id="dirProvincia" class="form-control"></div>
+                    <div class="form-group"><label>Texto (nombre/email)</label><input type="text" id="dirQuery" class="form-control"></div>
                 </div>
                 <div style="display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap;">
                     <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;color:#475569;cursor:pointer;"><input type="checkbox" id="dirSoloEmail" checked> Sólo con email</label>
@@ -1235,7 +1247,7 @@
                     </p>
                     <div style="display: flex; gap: 8px; margin-bottom: 16px;">
                         <input type="date" id="newStrategyDate" style="flex: 0 0 150px;">
-                        <input type="text" id="newStrategyNote" placeholder="Ej: Bajé margen FR→ES de 55% a 45%" style="flex: 1;">
+                        <input type="text" id="newStrategyNote" title="Nota del cambio (p. ej. «Bajé margen FR→ES de 55 % a 45 %»)" style="flex: 1;">
                         <button class="btn-secondary" onclick="addStrategyChange()" style="white-space: nowrap;">+ Añadir</button>
                     </div>
                     <div id="strategyChangesList" class="strategy-changes-list">
@@ -1337,7 +1349,7 @@
             <div class="budget-filters">
                 <div class="form-group" style="grid-column: span 2;">
                     <label>🔍 Código presupuesto</label>
-                    <input type="text" id="filterCode" placeholder="Ej: 2412-00001" oninput="filterBudgets()" style="font-family: 'Space Mono', monospace;">
+                    <input type="text" id="filterCode" oninput="filterBudgets()" style="font-family: 'Space Mono', monospace;">
                 </div>
                 <div class="form-group">
                     <label>Estado</label>
@@ -1397,14 +1409,14 @@
             </div>
             <div class="language-row">
                 <div class="form-group">
-                    <label>Idioma origen</label>
+                    <label>Idioma origen<span class="req">*</span></label>
                     <select id="sourceLang" onchange="onLanguageChange()">
                         <option value="">Seleccionar...</option>
                     </select>
                 </div>
                 <div class="arrow-icon">→</div>
                 <div class="form-group">
-                    <label>Idioma destino</label>
+                    <label>Idioma destino<span class="req">*</span></label>
                     <select id="targetLang" onchange="onLanguageChange()">
                         <option value="">Seleccionar...</option>
                     </select>
@@ -1416,15 +1428,24 @@
             <div class="form-group" style="margin-top: 16px;">
                 <label>Contacto del cliente <span class="ib" data-tip="El canal se asigna solo: 📱 si hay WhatsApp, 📧 si solo hay email." onclick="ibToggle(event)">i</span></label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px;">
-                    <input type="email" id="clientEmailStep1" placeholder="📧 Email del cliente" oninput="onStep1Change()">
-                    <input type="tel" id="clientWhatsAppStep1" placeholder="📱 WhatsApp (+34...)" oninput="onStep1Change()">
+                    <div>
+                        <label style="font-size:0.76rem;color:#64748b;margin-bottom:2px;">📧 Email</label>
+                        <input type="email" id="clientEmailStep1" oninput="onStep1Change()">
+                        <div class="campo-aviso" id="avisoEmailStep1" style="display:none;"></div>
+                    </div>
+                    <div>
+                        <label style="font-size:0.76rem;color:#64748b;margin-bottom:2px;">📱 WhatsApp</label>
+                        <input type="tel" id="clientWhatsAppStep1" oninput="onStep1Change()">
+                        <div class="campo-aviso" id="avisoWhatsAppStep1" style="display:none;"></div>
+                    </div>
                 </div>
             </div>
             
             <!-- Notas internas / instrucciones para el análisis -->
             <div class="form-group" style="margin-top: 16px;">
-                <label>📝 Notas e instrucciones (opcional) <span class="ib" data-tip="Se aplican al análisis: si pides &quot;solo página 1&quot;, la extracción y el recuento se restringen a esa página. También aparecen en el listado de presupuestos." onclick="ibToggle(event)">i</span></label>
-                <textarea id="internalComments" placeholder="Ej: Traducir solo página 2 · Solo el cuerpo del documento, sin sellos · El documento está en X idioma · Revisar formato..." style="min-height: 52px;" oninput="onNotasChange()"></textarea>
+                <label>📝 Notas e instrucciones <span class="ib" data-tip="Se aplican al análisis: si pides &quot;solo página 1&quot;, la extracción y el recuento se restringen a esa página. También aparecen en el listado de presupuestos.
+Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sellos» · «El documento está en X idioma» · «Revisar formato»." onclick="ibToggle(event)">i</span></label>
+                <textarea id="internalComments" style="min-height: 52px;" oninput="onNotasChange()"></textarea>
             </div>
             
             <button class="btn btn-primary action-btn" id="step1Btn" onclick="completeStep1()" disabled>
@@ -1543,8 +1564,8 @@
             </div>
             
             <div class="form-group">
-                <label>💬 Comentarios para proveedores <span class="ib" data-tip="Se incluyen en el mensaje a los traductores." onclick="ibToggle(event)">i</span></label>
-                <textarea id="providerComments" placeholder="Detalles sobre el documento, formato de entrega, etc." oninput="onComentariosProveedorChange()" style="min-height:48px;"></textarea>
+                <label>💬 Comentarios para proveedores <span class="ib" data-tip="Se incluyen en el mensaje a los traductores: detalles sobre el documento, formato de entrega, etc." onclick="ibToggle(event)">i</span></label>
+                <textarea id="providerComments" oninput="onComentariosProveedorChange()" style="min-height:48px;"></textarea>
             </div>
             
             <!-- Proveedores -->
@@ -1643,7 +1664,7 @@
                     <!-- Se rellena con JS -->
                 </div>
                 <div class="tariff-calc-result-row">
-                    <span>Tarifa cliente (IVA inc.):</span>
+                    <span>Tarifa cliente (IVA inc.)<span class="req">*</span>:</span>
                     <input type="number" id="quoteAmountPages" step="0.01" min="0" onchange="onPagesAmountChange()" style="width: 120px; font-weight: 600;">
                 </div>
             </div>
@@ -1672,8 +1693,8 @@
                         <span>Tarifa cliente por palabra (IVA inc.):</span>
                         <input type="number" id="directTariffPerWord" step="0.001" min="0" style="width:80px;" onchange="recalculateFromDirect()">
                         <span class="ib" id="directTariffHint" data-tip="Tarifa cliente por palabra (IVA incluido) de la hoja Tarifas, columna E. Puedes cambiarla aquí para este presupuesto." onclick="ibToggle(event)">i</span>
-                        <span>→ Total cliente (IVA inc.):</span>
-                        <input type="number" id="quoteAmountDirect" class="pc-tarifa" step="0.01" min="0" placeholder="0.00" onchange="updateClientMessage()">
+                        <span>→ Total cliente (IVA inc.)<span class="req">*</span>:</span>
+                        <input type="number" id="quoteAmountDirect" class="pc-tarifa" step="0.01" min="0" onchange="updateClientMessage()">
                     </div>
                 </div>
 
@@ -1681,7 +1702,7 @@
                 <div id="wordsConMargen">
                 <div class="pc-line">
                     <span>Tarifa referencia:</span>
-                    <input type="number" id="referenceRateInput" min="0" step="0.001" placeholder="€/pal"
+                    <input type="number" id="referenceRateInput" min="0" step="0.001"
                            onchange="onReferenceRateEdit()" style="width: 80px;" title="Tarifa proveedor por palabra (editable)">
                     <span>€/pal</span>
                     <button type="button" class="btn btn-secondary btn-sm" id="referenceRateRestoreBtn"
@@ -1695,8 +1716,8 @@
                     <span>→ Tarifa sugerida (IVA inc.): <span class="sug" id="suggestedPriceDisplay">-</span></span>
                 </div>
                 <div class="pc-line">
-                    <span>Tu tarifa (IVA inc.):</span>
-                    <input type="number" id="quoteAmountWords" class="pc-tarifa" step="0.01" min="0" placeholder="Ej: 85.00" onchange="onWordsAmountChange()">
+                    <span>Tu tarifa (IVA inc.)<span class="req">*</span>:</span>
+                    <input type="number" id="quoteAmountWords" class="pc-tarifa" step="0.01" min="0" onchange="onWordsAmountChange()">
                     <span>Tu margen: <b id="actualMarginDisplay">-</b></span>
                     <span class="margin-deviation" id="marginDeviationPercent">-</span>
                 </div>
@@ -1725,8 +1746,8 @@
                     <span>→ Tarifa sugerida (IVA inc.): <span class="sug" id="suggestedPriceProviderDisplay">-</span></span>
                 </div>
                 <div class="pc-line">
-                    <span>Tu tarifa (IVA inc.):</span>
-                    <input type="number" id="quoteAmountProvider" class="pc-tarifa" step="0.01" min="0" placeholder="Ej: 120.00" onchange="onProviderAmountChange()">
+                    <span>Tu tarifa (IVA inc.)<span class="req">*</span>:</span>
+                    <input type="number" id="quoteAmountProvider" class="pc-tarifa" step="0.01" min="0" onchange="onProviderAmountChange()">
                     <span>Tu margen: <b id="actualMarginProviderDisplay">-</b></span>
                     <span class="margin-deviation" id="marginDeviationProviderPercent">-</span>
                 </div>
@@ -1745,12 +1766,12 @@
             <!-- Plazo común para todos los métodos -->
             <div class="quote-row">
                 <div class="form-group">
-                    <label>Plazo (días laborables)</label>
-                    <input type="number" id="quoteDays" min="0" placeholder="Ej: 3 · 0 = en el día" onchange="try { proponerPlazoWeb(); } catch (e) {} updateClientMessage()">
+                    <label>Plazo (días laborables)<span class="req">*</span> <span class="ib" data-tip="0 = entrega en el día. Si lo dejas vacío se propone el plazo estándar de la web para este par y este número de páginas." onclick="ibToggle(event)">i</span></label>
+                    <input type="number" id="quoteDays" min="0" onchange="try { proponerPlazoWeb(); } catch (e) {} updateClientMessage()">
                 </div>
                 <div class="form-group">
-                    <label>Recargo urgencia (€, opcional)</label>
-                    <input type="number" id="quoteUrgency" step="0.01" min="0" placeholder="" onchange="updateClientMessage()">
+                    <label>Recargo urgencia (€)</label>
+                    <input type="number" id="quoteUrgency" step="0.01" min="0" onchange="updateClientMessage()">
                 </div>
             </div>
             <!-- v3.10.61: plazo mínimo según la web (pestañas Plazos y Calendario) -->
@@ -1758,12 +1779,14 @@
             
             <div class="two-cols">
             <div class="form-group">
-                <label>Email del cliente <span class="ib" data-tip="Opcional: para enviarle el presupuesto por email desde aquí." onclick="ibToggle(event)">i</span></label>
-                <input type="email" id="clientEmail" placeholder="" oninput="onContactoPaso4Change()">
+                <label>Email del cliente <span class="ib" data-tip="Necesario para «Guardar y Enviar Email». Se comprueba que tenga la forma nombre@dominio." onclick="ibToggle(event)">i</span></label>
+                <input type="email" id="clientEmail" oninput="onContactoPaso4Change()">
+                <div class="campo-aviso" id="avisoEmailPaso4" style="display:none;"></div>
             </div>
             <div class="form-group">
-                <label>WhatsApp del cliente</label>
-                <input type="tel" id="clientWhatsApp" placeholder="" oninput="onContactoPaso4Change()">
+                <label>WhatsApp del cliente <span class="ib" data-tip="Solo números, espacios y el + del prefijo internacional (p. ej. +34 600 11 22 33)." onclick="ibToggle(event)">i</span></label>
+                <input type="tel" id="clientWhatsApp" oninput="onContactoPaso4Change()">
+                <div class="campo-aviso" id="avisoWhatsAppPaso4" style="display:none;"></div>
             </div>
             </div>
             
@@ -1771,7 +1794,7 @@
                  p. ej. la referencia del cliente) -->
             <div class="form-group">
                 <label>Asunto del email</label>
-                <input type="text" id="clientSubject" placeholder="Asunto del email al cliente" oninput="onClientSubjectEdit()">
+                <input type="text" id="clientSubject" oninput="onClientSubjectEdit()">
             </div>
             
             <div class="form-group">
@@ -1854,28 +1877,28 @@
                 <!-- v3.10.41: datos de contacto editables -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                     <div style="grid-column:1 / -1;">
-                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Nombre</label>
-                        <input type="text" id="editProviderName" class="form-control" placeholder="APELLIDOS, Nombre">
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Nombre (APELLIDOS, Nombre)<span class="req">*</span></label>
+                        <input type="text" id="editProviderName" class="form-control">
                     </div>
                     <div>
                         <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Email <span title="Es la clave del traductor en la hoja: cambiarlo lo cambia en todas sus combinaciones">ⓘ</span></label>
-                        <input type="email" id="editProviderEmail" class="form-control" placeholder="email@dominio.com">
+                        <input type="email" id="editProviderEmail" class="form-control" oninput="marcarCampoEmail(this)">
                     </div>
                     <div>
                         <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Teléfono</label>
-                        <input type="text" id="editProviderTelefono" class="form-control" placeholder="+34 …">
+                        <input type="text" id="editProviderTelefono" class="form-control" oninput="marcarCampoTelefono(this)">
                     </div>
                     <div>
                         <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Nº TIJ</label>
-                        <input type="text" id="editProviderTIJ" class="form-control" placeholder="opcional">
+                        <input type="text" id="editProviderTIJ" class="form-control">
                     </div>
                     <div>
                         <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Provincia</label>
-                        <input type="text" id="editProviderProvincia" class="form-control" placeholder="opcional">
+                        <input type="text" id="editProviderProvincia" class="form-control">
                     </div>
                     <div style="grid-column:1 / -1;">
-                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Fecha de nombramiento</label>
-                        <input type="text" id="editProviderAnio" class="form-control" placeholder="dd/mm/aaaa (opcional)">
+                        <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:3px;">Fecha de nombramiento (dd/mm/aaaa)</label>
+                        <input type="text" id="editProviderAnio" class="form-control">
                     </div>
                 </div>
                 <div id="editProviderMaec" style="display:none;"></div>
@@ -1883,9 +1906,9 @@
                 <div style="background: var(--bg-secondary); border-radius: var(--radius-md); padding: 12px; margin: 14px 0;">
                     <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px;">Datos del traductor — se aplican a todas sus combinaciones</div>
                     <label style="font-weight: 500; display: block; margin-bottom: 6px; font-size:0.85rem;">Tarifa mínima (€)</label>
-                    <input type="text" id="editTarifaMinima" class="form-control" placeholder="Ej: 20">
+                    <input type="text" id="editTarifaMinima" class="form-control">
                     <label style="font-weight: 500; display: block; margin: 12px 0 6px; font-size:0.85rem;">Comentarios</label>
-                    <textarea id="editComentarios" class="form-control" rows="2" placeholder="Notas sobre este traductor..."></textarea>
+                    <textarea id="editComentarios" class="form-control" rows="2"></textarea>
                 </div>
 
                 <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:6px;">Combinaciones de idiomas <span class="ib" data-tip="La tarifa por palabra y el orden son de cada par. Los idiomas salen del catálogo de la hoja Tarifas. Cada dirección es una combinación aparte: Inglés → Español y Español → Inglés pueden tener tarifas distintas. Lo que quites aquí se borra de la hoja al guardar." onclick="ibToggle(event)">i</span></div>
@@ -1909,7 +1932,7 @@
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.86';
+        const HTML_VERSION = '3.10.87';
         const HTML_DATE = '27/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
@@ -2737,6 +2760,7 @@
             if (clientEmail) clientEmail.value = '';
             if (clientWhatsApp) clientWhatsApp.value = '';
             if (clientEmailStep1) clientEmailStep1.value = '';
+            try { marcarContactoCliente(); } catch (e) {}   // v3.10.87
             if (clientWhatsAppStep1) clientWhatsAppStep1.value = '';
 
             document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
@@ -3347,6 +3371,11 @@
             if (!nombre || !email || !origen || !destino) {
                 showStatus('Faltan nombre, email o idiomas', 'warning');
                 setTimeout(hideStatus, 3000);
+                return;
+            }
+            if (!emailValido(email)) {   // v3.10.87
+                showStatus(AVISO_EMAIL, 'warning'); setTimeout(hideStatus, 3000);
+                marcarCampoEmail(document.getElementById('addProvEmail'));
                 return;
             }
             if (origen === destino) {
@@ -5832,6 +5861,7 @@
                     if (clientWhatsApp && budgetData.clientWhatsApp) {
                         clientWhatsApp.value = budgetData.clientWhatsApp;
                     }
+                    try { marcarContactoCliente(); } catch (e) {}   // v3.10.87
                     // Restaurar importe en todos los campos
                     if (budgetData.savedAmount) {
                         if (quoteAmountPages) quoteAmountPages.value = budgetData.savedAmount;
@@ -6245,6 +6275,35 @@
             return 'W';
         }
 
+        // ====== v3.10.87: COMPROBACIÓN BÁSICA DE EMAIL Y TELÉFONO ======
+        // Email: algo@algo.algo (admite "Nombre <email>"). Teléfono: solo dígitos, espacios y el + del prefijo.
+        function emailValido(v) {
+            const e = (typeof extractEmail === 'function') ? extractEmail(String(v || '')) : String(v || '').trim();
+            return !!e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+        }
+        function telefonoValido(v) {
+            const t = String(v || '').trim();
+            return /^\+?[\d ]+$/.test(t) && (t.replace(/\D/g, '').length >= 6);
+        }
+        const AVISO_EMAIL = 'Email no válido: tiene que ser nombre@dominio.ext';
+        const AVISO_TELEFONO = 'Teléfono no válido: solo números, espacios y el + del prefijo';
+        // Marca el campo (borde rojo) y escribe el aviso debajo; vacío = sin marca
+        function marcarCampo(input, valido, avisoEl, texto) {
+            if (!input) return;
+            const vacio = String(input.value || '').trim() === '';
+            input.classList.toggle('campo-invalido', !vacio && !valido);
+            if (avisoEl) { avisoEl.style.display = (!vacio && !valido) ? '' : 'none'; avisoEl.textContent = (!vacio && !valido) ? texto : ''; }
+        }
+        function marcarCampoEmail(input, avisoEl) { marcarCampo(input, emailValido(input && input.value), avisoEl, AVISO_EMAIL); }
+        function marcarCampoTelefono(input, avisoEl) { marcarCampo(input, telefonoValido(input && input.value), avisoEl, AVISO_TELEFONO); }
+        // Los cuatro campos del cliente (paso 1 y paso 4) a la vez
+        function marcarContactoCliente() {
+            marcarCampoEmail(document.getElementById('clientEmailStep1'), document.getElementById('avisoEmailStep1'));
+            marcarCampoTelefono(document.getElementById('clientWhatsAppStep1'), document.getElementById('avisoWhatsAppStep1'));
+            marcarCampoEmail(document.getElementById('clientEmail'), document.getElementById('avisoEmailPaso4'));
+            marcarCampoTelefono(document.getElementById('clientWhatsApp'), document.getElementById('avisoWhatsAppPaso4'));
+        }
+
         function onStep1Change() {
             // Capturar datos del cliente del paso 1
             const emailEl = document.getElementById('clientEmailStep1');
@@ -6257,6 +6316,7 @@
             // v3.7.47: canal deducido siempre del contacto (ya no hay selector).
             budgetData.channel = deriveChannelFromContact();
             if (typeof espejarContactoAPaso4 === 'function') espejarContactoAPaso4();   // v3.10.66
+            try { marcarContactoCliente(); } catch (e) {}   // v3.10.87
             checkStep1Complete();
             if (typeof updateBudgetSummaryBar === 'function') updateBudgetSummaryBar();
         }
@@ -11181,8 +11241,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             editingProvider.pares.forEach((par, i) => {
                 html += `<div class="prov-edit-row">
                     <span style="font-size:0.88rem;">${par.idiomaOrigen} &rarr; ${par.idiomaDestino}</span>
-                    <input type="text" class="form-control" value="${escapeHtmlAttr(par.tarifaPalabra)}" placeholder="sin tarifa" oninput="setPairField(${i}, 'tarifaPalabra', this.value)">
-                    <input type="number" min="1" class="form-control" value="${escapeHtmlAttr(par.orden)}" placeholder="sin orden" oninput="setPairField(${i}, 'orden', this.value)">
+                    <input type="text" class="form-control" value="${escapeHtmlAttr(par.tarifaPalabra)}" oninput="setPairField(${i}, 'tarifaPalabra', this.value)">
+                    <input type="number" min="1" class="form-control" value="${escapeHtmlAttr(par.orden)}" oninput="setPairField(${i}, 'orden', this.value)">
                     <button class="prov-btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;" onclick="removePairFromEditor(${i})" title="Quitar esta combinación">&#128465;</button>
                 </div>`;
             });
@@ -11193,8 +11253,8 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                     <span style="color:var(--text-secondary);">&rarr;</span>
                     <select id="newPairDestino" class="form-control" style="min-width:0;">${opts('')}</select>
                 </span>
-                <input type="text" id="newPairTarifa" class="form-control" placeholder="sin tarifa">
-                <input type="number" min="1" id="newPairOrden" class="form-control" placeholder="sin orden">
+                <input type="text" id="newPairTarifa" class="form-control">
+                <input type="number" min="1" id="newPairOrden" class="form-control">
                 <button class="prov-btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="addPairToEditor()" title="Añadir esta combinación">&#10133;</button>
             </div>`;
 
@@ -11862,8 +11922,9 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
             }
             
             // v3.10.84: una fila por traductor: ○ nombre · ⓘ email · estado del envío · Cotización · Plazo
+            // v3.10.87: columnas con cabecera (Traductor · Enviado · Cotización € · Plazo) en vez de repetir las etiquetas
             const fechaCorta = f => String(f || '').replace(/ \((sin envío|sin envio)\)$/, '').replace(/^(\d\d)-(\d\d)-\d{4}\s+(\d\d:\d\d).*$/, '$1/$2 $3');
-            let html = '';
+            let html = '<div class="ct-head"><span></span><span>Traductor</span><span>Enviado</span><span>Cotización €</span><span>Plazo</span></div>';
             budgetData.contactedProviders.forEach((p, idx) => {
                 const nombreNorm = p.nombre.trim();
                 const isChosen = budgetData.chosenProvider && budgetData.chosenProvider.trim() === nombreNorm;
@@ -11873,25 +11934,22 @@ Devuelve SOLO un JSON válido sin markdown, sin explicaciones ni comentarios:
                 const sinEnvio = envios.length === 0 || envios.every(e => e && e.manual);
                 let estadoHtml;
                 if (sinEnvio) {
-                    estadoHtml = '<span class="st manual" title="Marcado en el paso 3 sin enviar solicitud">✋ sin solicitud enviada</span>';
+                    estadoHtml = '<span class="st manual" title="Marcado en el paso 3 sin enviar la solicitud">✋ sin enviar</span>';
                 } else {
                     const reales = envios.filter(e => e && !e.manual);
                     const ultimo = reales[reales.length - 1];
-                    estadoHtml = `<span class="st" title="Solicitud enviada">📤 ${escapeHtml(fechaCorta(ultimo.fecha))}</span>` +
-                        (envios.length > 1 ? ib('Envíos: ' + envios.map(e => (e.manual ? '✋ ' : '📤 ') + String(e.fecha || '')).join('\n')) : '');
+                    estadoHtml = `<span class="st" title="Solicitud enviada el ${escapeHtml(String(ultimo.fecha || ''))}">📤 ${escapeHtml(fechaCorta(ultimo.fecha))}` +
+                        (envios.length > 1 ? ib('Envíos: ' + envios.map(e => (e.manual ? '✋ ' : '📤 ') + String(e.fecha || '')).join('\n')) : '') + '</span>';
                 }
                 const nombreJs = String(p.nombre).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 html += `
                     <div class="ct-row ${isChosen ? 'chosen' : ''}">
                         <div class="contacted-radio" onclick="chooseProvider(${idx})" title="Elegir este traductor"></div>
-                        <span class="pn" onclick="chooseProvider(${idx})">${escapeHtml(p.nombre)}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}</span>
-                        ${p.email ? ib(p.email) : ''}
+                        <span class="pn" onclick="chooseProvider(${idx})" title="Elegir este traductor">${escapeHtml(p.nombre)}${isChosen ? '<span class="contacted-badge">ELEGIDO</span>' : ''}${p.email ? ib(p.email) : ''}</span>
                         ${estadoHtml}
                         <div class="qf">
-                            <label>Cotización</label>
-                            <input type="number" step="0.01" placeholder="€ total" title="Cotización del traductor (€ total, sin IVA)" value="${escapeHtml(quote.tarifa || '')}" onchange="updateProviderQuote('${nombreJs}', 'tarifa', this.value)">
-                            <label>Plazo</label>
-                            <input type="text" class="pl" placeholder="3 días" title="Plazo indicado por el traductor" value="${escapeHtml(quote.plazo || '')}" onchange="updateProviderQuote('${nombreJs}', 'plazo', this.value)">
+                            <input type="number" step="0.01" title="Cotización del traductor (€ total, sin IVA)" value="${escapeHtml(quote.tarifa || '')}" onchange="updateProviderQuote('${nombreJs}', 'tarifa', this.value)">
+                            <input type="text" class="pl" title="Plazo indicado por el traductor" value="${escapeHtml(quote.plazo || '')}" onchange="updateProviderQuote('${nombreJs}', 'plazo', this.value)">
                         </div>
                     </div>
                 `;
@@ -13746,6 +13804,12 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
                     faltan.push('un email de cliente válido para enviarlo por correo');
                 }
             }
+            // v3.10.87: un contacto escrito pero mal formado no se guarda en la hoja sin avisar
+            const _wa = (document.getElementById('clientWhatsApp') ? document.getElementById('clientWhatsApp').value : '').trim();
+            if (_wa && !telefonoValido(_wa)) faltan.push('un WhatsApp válido (solo números, espacios y el + del prefijo) o deja el campo vacío');
+            const _em = (document.getElementById('clientEmail') ? document.getElementById('clientEmail').value : '').trim();
+            if (channel !== 'email_enviar' && _em && !emailValido(_em)) faltan.push('un email válido (nombre@dominio) o deja el campo vacío');
+            try { marcarContactoCliente(); } catch (e) {}
 
             // 5. Control final: marcadores sin rellenar en el cuerpo del mensaje
             const msg = (document.getElementById('clientMessageEdit') ? document.getElementById('clientMessageEdit').value : '');
@@ -13864,6 +13928,7 @@ Member of Professional Translator Associations: APTIJ, ASETRAD and IAPTI`;
             if (e4) { budgetData.clientEmail = e4.value.trim(); if (e1 && e1.value !== e4.value) e1.value = e4.value; }
             if (w4) { budgetData.clientWhatsApp = w4.value.trim(); if (w1 && w1.value !== w4.value) w1.value = w4.value; }
             budgetData.channel = deriveChannelFromContact();
+            try { marcarContactoCliente(); } catch (e) {}   // v3.10.87
             try { updateClientChannelButtons(); } catch (e) {}
             try { checkStep1Complete(); } catch (e) {}
             try { updateBudgetSummaryBar(); } catch (e) {}
