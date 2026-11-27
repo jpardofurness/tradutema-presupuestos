@@ -1932,7 +1932,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
     <script>
         // TRADUTEMA QUOTES - Gestor de Presupuestos
 
-        const HTML_VERSION = '3.10.88';
+        const HTML_VERSION = '3.10.89';
         const HTML_DATE = '27/11/2026';
         // v3.10.56: versión mínima del Apps Script que esta pantalla necesita.
         // Si el servidor ejecuta una anterior, se avisa en Inicio en vez de
@@ -8955,6 +8955,11 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
         // almacén y del permiso tiene un plazo: si no contesta, se sigue por Drive y se dice.
         const LOCAL_TIMEOUT_MS = 4000;
         let _localFalloMotivo = '';   // último motivo por el que el modo local no estuvo disponible
+        // v3.10.89: si el almacén o el permiso no contestan, se anota y NO se vuelve a esperar 4 s en
+        // cada creación: el modo local queda como "roto" hasta que se vuelva a elegir la carpeta
+        // (Ajustes o el aviso del paso 2) o se pulse Reintentar.
+        let _localRoto = '';
+        function localRotoReset() { _localRoto = ''; _localFalloMotivo = ''; }
         function conPlazo(promesa, ms, mensaje) {
             let t;
             const plazo = new Promise((_, rej) => { t = setTimeout(() => rej(new Error(mensaje)), ms); });
@@ -8986,6 +8991,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
         }
 
         async function getLocalDirHandle() {
+            if (_localRoto) { _localFalloMotivo = _localRoto; return null; }   // v3.10.89
             try {
                 const db = await _localDb();
                 const h = await conPlazo(new Promise((res, rej) => {
@@ -8998,6 +9004,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
                 return h;
             } catch (e) {
                 _localFalloMotivo = (e && e.message) || String(e);
+                if (/no responde|bloqueado/.test(_localFalloMotivo)) _localRoto = _localFalloMotivo;   // v3.10.89
                 console.warn('Modo local no disponible:', _localFalloMotivo);
                 return null;
             }
@@ -9020,6 +9027,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
                 return perm === 'granted' ? handle : null;
             } catch (e) {
                 _localFalloMotivo = (e && e.message) || String(e);
+                if (/no responde/.test(_localFalloMotivo)) _localRoto = _localFalloMotivo;   // v3.10.89
                 console.warn('Modo local no disponible:', _localFalloMotivo);
                 try { hideStatus(); } catch (e2) {}
                 return null;
@@ -9029,6 +9037,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
         async function chooseLocalFolder() {
             try {
                 const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                localRotoReset();   // v3.10.89: recuerdo nuevo
                 await saveLocalDirHandle(handle);
                 try { localStorage.setItem('tradutema_local_dir_name', handle.name); } catch (e) {}
                 updateLocalModeUI();
@@ -9068,7 +9077,9 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
                 const perm = await conPlazo(handle.queryPermission({ mode: 'readwrite' }), LOCAL_TIMEOUT_MS, 'Chrome no responde al consultar el permiso de la carpeta local');
                 return { estado: perm === 'granted' ? 'activo' : 'sinpermiso', nombre: handle.name || '' };
             } catch (e) {
-                return { estado: 'error', nombre: handle.name || '', motivo: (e && e.message) || String(e) };
+                const motivo = (e && e.message) || String(e);
+                if (/no responde/.test(motivo)) _localRoto = motivo;   // v3.10.89
+                return { estado: 'error', nombre: handle.name || '', motivo: motivo };
             }
         }
 
@@ -9103,6 +9114,11 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
                 html = '<span>⚠️</span><span style="flex:1;"><b>Carpeta local configurada, pero Chrome no da permiso en esta sesión.</b> ' +
                        'Si creas ahora, se subirá a Drive por Apps Script (lento).</span>' +
                        '<button onclick="reactivarCarpetaLocal()" style="padding:6px 12px;border:none;border-radius:6px;background:#b45309;color:#fff;cursor:pointer;font-weight:600;">💻 Reactivar carpeta local</button>';
+            } else if (s.estado === 'error') {   // v3.10.89
+                css = 'background:#fff1f2;color:#9f1239;border:1px solid #fecdd3;';
+                html = '<span>⚠️</span><span style="flex:1;"><b>Carpeta local sin respuesta</b> (' + escapeHtml(s.motivo || '') + '). ' +
+                       'Si creas ahora, se subirá a Drive por Apps Script (lento, máx. 20 MB). Vuelve a elegir la carpeta y Chrome guardará un recuerdo nuevo.</span>' +
+                       '<button onclick="chooseLocalFolder().then(refreshLocalModeBanner)" style="padding:6px 12px;border:none;border-radius:6px;background:#be123c;color:#fff;cursor:pointer;font-weight:600;white-space:nowrap;">📁 Volver a elegir la carpeta</button>';
             } else if (s.estado === 'sinconfigurar') {
                 css = 'background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;';
                 html = '<span>☁️</span><span style="flex:1;">Se creará en <b>Drive por Apps Script</b>. En el PC es más rápido y más fiable el modo local: ' +
@@ -9129,10 +9145,10 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
             }
             el.innerHTML = '⏳ comprobando permiso de <b>' + escapeHtml(name) + '</b>…';
             estadoModoLocal().then(s => {
-                if (s.estado === 'error') {   // v3.10.88
+                if (s.estado === 'error') {   // v3.10.88 · v3.10.89
                     el.innerHTML = '⚠️ Configurada (<b>' + escapeHtml(name) + '</b>) pero <b>no se puede comprobar</b>: ' + escapeHtml(s.motivo || '') + '. ' +
-                        'Mientras tanto los presupuestos se crean en Drive. Suele arreglarse cerrando todas las pestañas de la app y reiniciando Chrome. ' +
-                        '<a href="#" onclick="updateLocalModeUI(); return false;"><b>Reintentar</b></a> · ' +
+                        'Mientras tanto los presupuestos se crean en Drive. Lo que lo arregla es <b>volver a elegir la carpeta</b> con el botón de abajo (Chrome guarda un recuerdo nuevo). ' +
+                        '<a href="#" onclick="localRotoReset(); updateLocalModeUI(); return false;">Reintentar</a> · ' +
                         '<a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>';
                 } else if (s.estado === 'activo') {
                     el.innerHTML = '✓ Activo · carpeta: <b>' + escapeHtml(s.nombre) + '</b> · <a href="#" onclick="clearLocalFolder(); return false;">desactivar</a>';
@@ -9903,7 +9919,7 @@ Ejemplos: «Traducir solo página 2» · «Solo el cuerpo del documento, sin sel
             }
             if (_nombreLocal && !localHandle && _localFalloMotivo && !/sin permiso/.test(_localFalloMotivo)) {
                 showStatus('⚠️ Modo local no disponible (' + escapeHtml(_localFalloMotivo) + '): este presupuesto se crea en Drive por Apps Script. ' +
-                           'Suele arreglarse cerrando todas las pestañas de la app y reiniciando Chrome.', 'warning');
+                           'Para arreglarlo, vuelve a elegir la carpeta local en Ajustes (o en el aviso del paso 2).', 'warning');
                 setTimeout(hideStatus, 10000);
             }
 
